@@ -15,6 +15,26 @@ module TablerUi
     #                scoping that fixes a global-state bug this component
     #                used to have.
     #
+    # An `overlay` slot lets a caller nest a status dot or an avatar-brand
+    # chip inside the root element (`.avatar` has `position: relative`, and
+    # both overlays are `position: absolute`). Only supported on the image:
+    # and initials: render modes -- an <svg> can't host an HTML overlay
+    # without <foreignObject>, so passing an overlay to a generated
+    # identicon raises ArgumentError.
+    #
+    #   <%= tabler_ui.avatar initials: "JD" do |slots| %>
+    #     <% slots.overlay { tag.span(class: "badge bg-success") } %>
+    #   <% end %>
+    #
+    # Status-dot trap: the per-size CSS that positions and sizes the dot
+    # (`.avatar-{size} .badge:empty { ... }`) only matches a badge with *no*
+    # child nodes -- including whitespace text nodes. Render it with
+    # `tag.span(class: "badge bg-success")` and no block; a `do...end` block
+    # (even an empty-looking one) leaves a newline inside the tag and the
+    # badge silently falls back to a flat, unsized 10px dot. `badge-dot`
+    # does not help either -- it's hardcoded to 10px and ignores
+    # `--tblr-avatar-status-size`.
+    #
     # @example Initials
     #   <%= tabler_ui.avatar initials: "JD", size: "md" %>
     #
@@ -44,6 +64,7 @@ module TablerUi
       # @option options [Boolean] :show_details Render a title/subtitle block next to the avatar
       # @option options [String] :title         Shown in the details block
       # @option options [String] :subtitle      Shown in the details block
+      # @option options [Boolean] :cover        Adds avatar-cover, the "overlaps the card header" modifier
       # @option options [Hash]   :html          Rule 5 HTML hook for the root <span>/<svg> (part :root)
       # @option options [Hash]   :details_html  Rule 5 HTML hook for the show_details wrapper <div> (part :details)
       def initialize(options = {})
@@ -55,6 +76,7 @@ module TablerUi
         @show_details = options[:show_details]
         @title = options[:title]
         @subtitle = options[:subtitle]
+        @cover = options[:cover]
 
         initialize_html_options(options)
       end
@@ -79,6 +101,12 @@ module TablerUi
       # @return [Boolean]
       def show_details?
         @show_details.present?
+      end
+
+      # @return [Boolean] whether to add the avatar-cover modifier, which
+      #   pulls the avatar up over a card header via negative margin.
+      def cover?
+        @cover.present?
       end
 
       # @return [String] hsl() background colour derived from the initials' byte sum.
@@ -139,7 +167,10 @@ module TablerUi
       #   attribute value built by `tag.span`, which HTML-escapes it like
       #   any other attribute -- it can't break out of the attribute.
       def root_attributes
-        defaults = { class: "avatar #{size_class} #{shape_class}" }
+        classes = ["avatar", size_class, shape_class]
+        classes << "avatar-cover" if cover?
+
+        defaults = { class: classes.join(" ") }
         style = background_style
         defaults[:style] = style if style
 

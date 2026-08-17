@@ -222,6 +222,71 @@ RSpec.describe "TablerUi::Navbar", type: :component do
     expect(fragment.css(".navbar-brand").first.text.strip).to eq("MyApp")
   end
 
+  it "defaults to navbar-expand-lg on the root" do
+    fragment = component_fragment(:navbar)
+
+    classes = fragment.css("header.navbar").first["class"].split(/\s+/)
+    expect(classes).to include("navbar", "navbar-expand-lg", "d-print-none")
+  end
+
+  TablerUi::Breakpoint::ALL.each do |breakpoint|
+    it "expand: #{breakpoint.inspect} puts navbar-expand-#{breakpoint} on the root, and only that breakpoint class" do
+      fragment = component_fragment(:navbar, expand: breakpoint)
+
+      classes = fragment.css("header.navbar").first["class"].split(/\s+/)
+      expand_classes = classes.grep(/\Anavbar-expand-/)
+
+      expect(expand_classes).to eq(["navbar-expand-#{breakpoint}"])
+    end
+  end
+
+  it "expand: with an invalid breakpoint raises ArgumentError" do
+    expect {
+      component_fragment(:navbar, expand: "huge")
+    }.to raise_error(ArgumentError, /unknown breakpoint/)
+  end
+
+  it "dark: true adds navbar-dark to the root" do
+    fragment = component_fragment(:navbar, dark: true)
+
+    expect(fragment.css("header.navbar").first["class"].split(/\s+/)).to include("navbar-dark")
+  end
+
+  it "transparent: true adds navbar-transparent to the root" do
+    fragment = component_fragment(:navbar, transparent: true)
+
+    expect(fragment.css("header.navbar").first["class"].split(/\s+/)).to include("navbar-transparent")
+  end
+
+  it "overlap: true adds navbar-overlap to the root" do
+    fragment = component_fragment(:navbar, overlap: true)
+
+    expect(fragment.css("header.navbar").first["class"].split(/\s+/)).to include("navbar-overlap")
+  end
+
+  it "dark:, transparent: and overlap: together produce all three classes alongside the base ones" do
+    fragment = component_fragment(:navbar, dark: true, transparent: true, overlap: true)
+
+    classes = fragment.css("header.navbar").first["class"].split(/\s+/)
+    expect(classes).to include("navbar", "navbar-expand-lg", "d-print-none",
+                                "navbar-dark", "navbar-transparent", "navbar-overlap")
+  end
+
+  it "nav_scroll: true puts navbar-nav-scroll on the menu element, not the root" do
+    fragment = component_fragment(:navbar, nav_scroll: true)
+
+    expect(fragment.css(".navbar-collapse").first["class"].split(/\s+/)).to include("navbar-nav-scroll")
+    expect(fragment.css("header.navbar").first["class"].split(/\s+/)).not_to include("navbar-nav-scroll")
+  end
+
+  it "menu_html: style: still lands on the menu element alongside nav_scroll:" do
+    fragment = component_fragment(:navbar, nav_scroll: true, menu_html: { style: "--tblr-scroll-height: 300px" })
+
+    menu = fragment.css(".navbar-collapse").first
+    expect(menu["style"]).to eq("--tblr-scroll-height: 300px")
+    expect(menu["class"].split(/\s+/)).to include("navbar-nav-scroll")
+  end
+
   it "marks the current page active automatically" do
     view = tabler_ui_view_context
     view.define_singleton_method(:request) { ActionDispatch::TestRequest.create("PATH_INFO" => "/dashboard") }

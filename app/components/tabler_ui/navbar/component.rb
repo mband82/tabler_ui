@@ -44,10 +44,24 @@ module TablerUi
       builder_style!
 
       attr_accessor :brand, :brand_autodark, :items_left, :items_right
+      attr_reader :expand, :dark, :transparent, :overlap, :nav_scroll
 
       # @param options [Hash]
       # @option options [String]  :brand          Brand/logo markup, rendered as-is inside `.navbar-brand`
       # @option options [Boolean] :brand_autodark Adds `navbar-brand-autodark` to the brand element (default: true)
+      # @option options [String, Symbol] :expand  Breakpoint at/above which the navbar shows its full menu and
+      #   below which it collapses behind the toggler -- one of sm/md/lg/xl/xxl (default: "lg"). Validated via
+      #   TablerUi::Breakpoint.validate!; anything else raises ArgumentError.
+      # @option options [Boolean] :dark        Adds `navbar-dark`, which switches the text/brand/toggler-icon
+      #   colours for a dark background. It sets no background itself -- pair it with a `bg-*` utility (e.g.
+      #   via `html: { class: "bg-dark" }`).
+      # @option options [Boolean] :transparent Adds `navbar-transparent` (transparent background and border).
+      # @option options [Boolean] :overlap     Adds `navbar-overlap`, extending the navbar's background 9rem
+      #   below it via a `:after` pseudo-element.
+      # @option options [Boolean] :nav_scroll  Adds `navbar-nav-scroll` to the collapsible menu, capping it at
+      #   `var(--tblr-scroll-height, 75vh)` with a scrollbar. Above the `expand:` breakpoint scrolling is
+      #   switched off, so this only takes effect in the collapsed state. Set a custom cap via the menu html
+      #   hook, e.g. `menu_html: { style: "--tblr-scroll-height: 300px" }`.
       # @option options [Hash] :html         Rule 5 HTML hook for the outer `header.navbar` (part :root)
       # @option options [Hash] :brand_html   Rule 5 HTML hook for `.navbar-brand` (part :brand)
       # @option options [Hash] :toggler_html Rule 5 HTML hook for the mobile toggler button (part :toggler)
@@ -55,6 +69,11 @@ module TablerUi
       def initialize(options = {})
         @brand = options[:brand]
         @brand_autodark = options.fetch(:brand_autodark, true)
+        @expand = TablerUi::Breakpoint.validate!(options.fetch(:expand, "lg"), context: "navbar expand")
+        @dark = options[:dark]
+        @transparent = options[:transparent]
+        @overlap = options[:overlap]
+        @nav_scroll = options[:nav_scroll]
         @items_left = NavigationGroup.new
         @items_right = NavigationGroup.new
 
@@ -75,7 +94,7 @@ module TablerUi
 
       # @return [Hash] attributes for the outer `header.navbar` (part :root)
       def root_attributes
-        html_for(:root, class: "navbar navbar-expand-lg d-print-none")
+        html_for(:root, class: root_classes)
       end
 
       # @return [Hash] attributes for `.navbar-brand` (part :brand)
@@ -97,7 +116,7 @@ module TablerUi
 
       # @return [Hash] attributes for the collapsible menu container (part :menu)
       def menu_attributes
-        html_for(:menu, class: "collapse navbar-collapse", id: "navbar-menu")
+        html_for(:menu, class: menu_classes, id: "navbar-menu")
       end
 
       # @param item [NavigationGroup::Item] the item being rendered
@@ -115,6 +134,20 @@ module TablerUi
       end
 
       private
+
+      def root_classes
+        classes = ["navbar", "navbar-expand-#{expand}", "d-print-none"]
+        classes << "navbar-dark" if dark
+        classes << "navbar-transparent" if transparent
+        classes << "navbar-overlap" if overlap
+        classes.join(" ")
+      end
+
+      def menu_classes
+        classes = ["collapse", "navbar-collapse"]
+        classes << "navbar-nav-scroll" if nav_scroll
+        classes.join(" ")
+      end
 
       def item_classes(item, active)
         classes = ["nav-item"]

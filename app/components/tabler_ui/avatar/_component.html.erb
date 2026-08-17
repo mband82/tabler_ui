@@ -1,10 +1,22 @@
 <% if avatar.image? %>
-  <%= tag.span(**avatar.root_attributes) %>
+  <%= tag.span(**avatar.root_attributes) do %>
+    <% if defined?(slots) && slots.present?(:overlay) %>
+      <%= slots.overlay %>
+    <% end %>
+  <% end %>
 <% elsif avatar.initials? %>
   <%= tag.span(**avatar.root_attributes) do %>
     <%= avatar.initials %>
+    <% if defined?(slots) && slots.present?(:overlay) %>
+      <%= slots.overlay %>
+    <% end %>
   <% end %>
 <% else %>
+  <% if defined?(slots) && slots.present?(:overlay) %>
+    <% raise ArgumentError, "tabler_ui.avatar's overlay slot is not supported on the generated identicon " \
+                             "(no image: or initials: given) -- an <svg> can't host an HTML overlay without " \
+                             "<foreignObject>. Pass image: or initials: instead." %>
+  <% end %>
   <%= tag.svg(**avatar.root_attributes, viewBox: "0 0 40 40", xmlns: "http://www.w3.org/2000/svg") do %>
     <% avatar.identicon_shapes.each do |shape| %>
       <% if shape[:type] == :circle %>

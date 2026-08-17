@@ -105,4 +105,51 @@ RSpec.describe "TablerUi::Badge", type: :component do
 
     expect(fragment.css(".badge strong")).not_to be_empty
   end
+
+  it "adds badge-dot for dot: true and renders no children" do
+    fragment = component_fragment(:badge, color: "red", dot: true)
+    element = fragment.css(".badge").first
+
+    expect(element["class"].split(/\s+/)).to include("badge-dot")
+    expect(element.text.strip).to eq("")
+  end
+
+  it "raises ArgumentError when dot: is combined with text:" do
+    expect { component_fragment(:badge, color: "red", dot: true, text: "New") }
+      .to raise_error(ArgumentError, /dot/)
+  end
+
+  it "raises ArgumentError when dot: is combined with icon:" do
+    expect { component_fragment(:badge, color: "red", dot: true, icon: "star") }
+      .to raise_error(ArgumentError, /dot/)
+  end
+
+  it "raises ArgumentError when dot: is combined with content:" do
+    expect { component_fragment(:badge, color: "red", dot: true, content: "New") }
+      .to raise_error(ArgumentError, /dot/)
+  end
+
+  it "adds badge-icononly for icon_only: true with an icon" do
+    fragment = component_fragment(:badge, color: "blue", icon: "star", icon_only: true)
+
+    expect(fragment.css(".badge").first["class"].split(/\s+/)).to include("badge-icononly")
+  end
+
+  it "raises ArgumentError when icon_only: is combined with text:" do
+    expect { component_fragment(:badge, color: "blue", icon: "star", icon_only: true, text: "New") }
+      .to raise_error(ArgumentError, /icon_only/)
+  end
+
+  it "raises ArgumentError when icon_only: is combined with content:" do
+    expect { component_fragment(:badge, color: "blue", icon: "star", icon_only: true, content: "New") }
+      .to raise_error(ArgumentError, /icon_only/)
+  end
+
+  it "still emits badge-notification for notification: true, unaffected by dot/icon_only" do
+    fragment = component_fragment(:badge, color: "red", notification: true)
+    classes = fragment.css(".badge").first["class"].split(/\s+/)
+
+    expect(classes).to include("badge-notification")
+    expect(classes).not_to include("badge-dot", "badge-icononly")
+  end
 end

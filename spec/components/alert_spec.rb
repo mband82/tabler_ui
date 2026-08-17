@@ -156,4 +156,64 @@ RSpec.describe "TablerUi::Alert", type: :component do
 
     expect(fragment.css(".alert-link")).to be_empty
   end
+
+  it "adds alert-minor for minor: true" do
+    fragment = component_fragment(:alert, minor: true)
+
+    expect(fragment.css(".alert").first["class"].split(/\s+/)).to include("alert-minor")
+  end
+
+  it "combines alert-minor with a color" do
+    fragment = component_fragment(:alert, minor: true, color: "danger")
+    classes = fragment.css(".alert").first["class"].split(/\s+/)
+
+    expect(classes).to include("alert-minor", "alert-danger")
+  end
+
+  it "combines alert-minor with dismissible:" do
+    fragment = component_fragment(:alert, minor: true, dismissible: true)
+    classes = fragment.css(".alert").first["class"].split(/\s+/)
+
+    expect(classes).to include("alert-minor", "alert-dismissible")
+  end
+
+  it "renders no alert-minor when minor: is omitted" do
+    fragment = component_fragment(:alert)
+
+    expect(fragment.css(".alert").first["class"].split(/\s+/)).not_to include("alert-minor")
+  end
+
+  it "produces alert-muted for color: 'muted'" do
+    fragment = component_fragment(:alert, color: "muted")
+
+    expect(fragment.css(".alert").first["class"].split(/\s+/)).to include("alert-muted")
+  end
+
+  it "does not let muted leak into the shared color palette (badge still rejects it)" do
+    expect { component_fragment(:badge, color: "muted") }
+      .to raise_error(ArgumentError, /muted/)
+  end
+
+  it "defaults to alert-link when link_style: is omitted" do
+    fragment = component_fragment(:alert, url: "/changelog")
+    link = fragment.css("a").first
+
+    expect(link["class"].split(/\s+/)).to include("alert-link")
+  end
+
+  it "renders alert-action for link_style: :action, not alert-link" do
+    fragment = component_fragment(:alert, url: "/changelog", link_style: :action)
+    link = fragment.css("a").first
+    classes = link["class"].split(/\s+/)
+
+    expect(classes).to include("alert-action")
+    expect(classes).not_to include("alert-link")
+  end
+
+  it "raises ArgumentError naming alert for an invalid link_style:" do
+    expect { component_fragment(:alert, url: "/changelog", link_style: :bogus) }
+      .to raise_error(ArgumentError, /bogus/)
+    expect { component_fragment(:alert, url: "/changelog", link_style: :bogus) }
+      .to raise_error(ArgumentError, /alert/)
+  end
 end

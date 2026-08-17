@@ -33,6 +33,12 @@ module TablerUi
     #   <%= tabler_ui.badge text: "Small", color: "green", size: :sm %>
     #   <%= tabler_ui.badge text: "Large", color: "green", size: :lg %>
     #
+    # @example Fixed-size dot (no content -- a dot and content are mutually exclusive)
+    #   <%= tabler_ui.badge color: "red", dot: true %>
+    #
+    # @example Icon-only badge (no padding-x -- only meaningful without text/content)
+    #   <%= tabler_ui.badge color: "blue", icon: "star", icon_only: true %>
+    #
     # @example Rule 5 hook on the root <a>/<span>
     #   <%= tabler_ui.badge text: "New", html: { class: "me-2", data: { testid: "new-badge" } } %>
     class Component
@@ -41,7 +47,7 @@ module TablerUi
       SIZES = %w[sm lg].freeze
 
       attr_reader :text, :color, :light, :pill, :notification, :blink,
-                  :outline, :icon, :url, :size, :content
+                  :outline, :icon, :url, :size, :content, :dot, :icon_only
 
       attr_writer :content
 
@@ -54,7 +60,13 @@ module TablerUi
       # @option options [Boolean] :notification Empty notification dot (default: false)
       # @option options [Boolean] :blink        Blinking animation for notification dots (default: false)
       # @option options [Boolean] :outline      Outline variant, i.e. "badge-outline" (default: false)
+      # @option options [Boolean] :dot          Fixed 10px dot ("badge-dot"). `.badge` clips overflow
+      #   and the dot ignores badge-sm/badge-lg, so it cannot carry text/icon/content -- combining
+      #   raises ArgumentError (default: false)
       # @option options [String]  :icon         Tabler icon name
+      # @option options [Boolean] :icon_only    Icon-only style, zeroes horizontal padding
+      #   ("badge-icononly"). Only meaningful with an icon and no text/content -- combining with
+      #   text/content raises ArgumentError, since the padding would be wrong for text (default: false)
       # @option options [String]  :url          URL to make the badge a link (renders <a> instead of <span>)
       # @option options [String, Symbol] :size  Badge size (:sm or :lg)
       # @option options [String, ActiveSupport::SafeBuffer] :content
@@ -74,6 +86,20 @@ module TablerUi
         @url = options[:url]
         @size = validate_size(options[:size])
         @content = options[:content]
+        @dot = options[:dot]
+        @icon_only = options[:icon_only]
+
+        if @dot && (@text.present? || @icon.present? || @content.present?)
+          raise ArgumentError, "dot: true cannot be combined with text:, icon: or content: -- " \
+                                "a badge-dot is a fixed 10px circle and .badge clips overflow, " \
+                                "so its contents would just be clipped"
+        end
+
+        if @icon_only && (@text.present? || @content.present?)
+          raise ArgumentError, "icon_only: true cannot be combined with text: or content: -- " \
+                                "badge-icononly zeroes horizontal padding, which is only correct " \
+                                "for an icon with no text/content"
+        end
 
         initialize_html_options(options)
       end
@@ -118,6 +144,8 @@ module TablerUi
         classes << "badge-blink" if @blink
         classes << "badge-outline" if @outline
         classes << "badge-#{@size}" if @size
+        classes << "badge-dot" if @dot
+        classes << "badge-icononly" if @icon_only
 
         classes.join(" ")
       end

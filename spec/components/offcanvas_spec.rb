@@ -83,6 +83,53 @@ RSpec.describe "TablerUi::Offcanvas", type: :component do
     expect(fragment.css(".offcanvas").first["class"].split(/\s+/)).not_to include("offcanvas-narrow")
   end
 
+  describe "expand:" do
+    it "renders the bare offcanvas class and no offcanvas-<bp> class by default" do
+      fragment = component_fragment(:offcanvas, "my-offcanvas")
+      classes = fragment.css(".offcanvas").first["class"].split(/\s+/)
+
+      expect(classes).to include("offcanvas")
+      expect(classes.grep(/\Aoffcanvas-(sm|md|lg|xl|xxl)\z/)).to be_empty
+    end
+
+    %w[sm md lg xl xxl].each do |breakpoint|
+      it "swaps the bare offcanvas class for offcanvas-#{breakpoint} and keeps the edge class" do
+        fragment = component_fragment(:offcanvas, "my-offcanvas", expand: breakpoint)
+        element = fragment.css(".offcanvas-#{breakpoint}").first
+        classes = element["class"].split(/\s+/)
+
+        expect(classes).to include("offcanvas-#{breakpoint}", "offcanvas-start")
+        expect(classes).not_to include("offcanvas")
+      end
+    end
+
+    it "combines with narrow:" do
+      fragment = component_fragment(:offcanvas, "my-offcanvas", expand: "lg", narrow: true)
+      classes = fragment.css(".offcanvas-lg").first["class"].split(/\s+/)
+
+      expect(classes).to include("offcanvas-lg", "offcanvas-start", "offcanvas-narrow")
+    end
+
+    it "raises ArgumentError naming offcanvas for an unknown breakpoint" do
+      expect { component_fragment(:offcanvas, "my-offcanvas", expand: "not-a-real-breakpoint") }
+        .to raise_error(ArgumentError, /not-a-real-breakpoint/)
+      expect { component_fragment(:offcanvas, "my-offcanvas", expand: "not-a-real-breakpoint") }
+        .to raise_error(ArgumentError, /offcanvas/)
+    end
+
+    it "leaves data-bs-* attributes unchanged" do
+      without_expand = component_fragment(:offcanvas, "my-offcanvas", backdrop: :static, scroll: true)
+      with_expand = component_fragment(:offcanvas, "my-offcanvas", backdrop: :static, scroll: true, expand: "lg")
+
+      root_without = without_expand.css(".offcanvas").first
+      root_with = with_expand.css(".offcanvas-lg").first
+
+      expect(root_with["data-bs-backdrop"]).to eq(root_without["data-bs-backdrop"])
+      expect(root_with["data-bs-scroll"]).to eq(root_without["data-bs-scroll"])
+      expect(root_with["data-controller"]).to eq(root_without["data-controller"])
+    end
+  end
+
   describe "backdrop:" do
     it "renders no data-bs-backdrop by default" do
       fragment = component_fragment(:offcanvas, "my-offcanvas")

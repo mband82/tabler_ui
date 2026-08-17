@@ -37,6 +37,9 @@ module TablerUi
     # @example Suppress the close button
     #   <%= tabler_ui.offcanvas "my-offcanvas", close_button: false %>
     #
+    # @example Always-visible sidebar from lg upward
+    #   <%= tabler_ui.offcanvas "my-offcanvas", expand: "lg" %>
+    #
     # @example Rule 5 hooks
     #   <%= tabler_ui.offcanvas "my-offcanvas", title: "Filters",
     #                           html: { class: "mb-4" },
@@ -67,7 +70,7 @@ module TablerUi
     class Component
       include TablerUi::Base
 
-      attr_reader :id, :position, :title, :narrow, :backdrop, :scroll, :close_button
+      attr_reader :id, :position, :title, :narrow, :backdrop, :scroll, :close_button, :expand
 
       # @param id [String] Mandatory DOM id for the `.offcanvas` root -- the
       #   anchor a caller's own toggler points at via
@@ -80,6 +83,16 @@ module TablerUi
       #   (:start, :end, :top, :bottom). Defaults to :start -- Bootstrap's own
       #   default when no offcanvas-<edge> class is present, made explicit here.
       # @option options [Boolean] :narrow   `offcanvas-narrow` (fixed 20rem width, default: false)
+      # @option options [String, Symbol] :expand Breakpoint (sm/md/lg/xl/xxl,
+      #   validated via TablerUi::Breakpoint) at and above which the panel
+      #   becomes a permanently visible, non-modal sidebar instead of a
+      #   slide-in overlay. Replaces the bare `offcanvas` class with
+      #   `offcanvas-#{expand}` -- the `offcanvas-#{position}` edge class is
+      #   unaffected. Bootstrap's own CSS then force-hides `.offcanvas-header`
+      #   at and above that breakpoint, so the close button (which lives
+      #   inside the header) disappears too -- intended "always-open sidebar"
+      #   behaviour, not a bug. Omitted by default (always a slide-in overlay).
+      #   Purely CSS-driven -- no `data-bs-*` attribute changes.
       # @option options [Boolean, Symbol, String] :backdrop Bootstrap's `data-bs-backdrop`
       #   option -- omitted (Bootstrap default: true), false, or :static.
       # @option options [Boolean] :scroll   Bootstrap's `data-bs-scroll` option -- allow
@@ -94,6 +107,7 @@ module TablerUi
         @position = TablerUi::Position.validate!(options[:position] || :start, context: "offcanvas")
         @title = options[:title]
         @narrow = options[:narrow]
+        @expand = TablerUi::Breakpoint.validate!(options[:expand], context: "offcanvas")
         @backdrop = options[:backdrop]
         @scroll = options[:scroll]
         @close_button = options.key?(:close_button) ? options[:close_button] : true
@@ -157,7 +171,7 @@ module TablerUi
       private
 
       def root_classes
-        classes = ["offcanvas", "offcanvas-#{position}"]
+        classes = [expand ? "offcanvas-#{expand}" : "offcanvas", "offcanvas-#{position}"]
         classes << "offcanvas-narrow" if narrow
         classes.join(" ")
       end

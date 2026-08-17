@@ -120,4 +120,84 @@ RSpec.describe "TablerUi::Avatar", type: :component do
     expect(tabler_ui_view_context).not_to respond_to(:rand_color)
     expect(TablerUi::Avatar::Component.private_method_defined?(:rand_color)).to be true
   end
+
+  describe "cover:" do
+    it "adds avatar-cover on top of the image: render" do
+      classes = component_fragment(:avatar, image: "https://example.com/pic.png", cover: true)
+                  .css(".avatar").first["class"].split(/\s+/)
+
+      expect(classes).to include("avatar-cover")
+    end
+
+    it "adds avatar-cover on top of the initials: render" do
+      classes = component_fragment(:avatar, initials: "JD", cover: true)
+                  .css(".avatar").first["class"].split(/\s+/)
+
+      expect(classes).to include("avatar-cover")
+    end
+
+    it "adds avatar-cover on top of the generated identicon render" do
+      classes = component_fragment(:avatar, name: "Ada Lovelace", cover: true)
+                  .css(".avatar").first["class"].split(/\s+/)
+
+      expect(classes).to include("avatar-cover")
+    end
+
+    it "omits avatar-cover when not given" do
+      classes = component_fragment(:avatar, initials: "JD").css(".avatar").first["class"].split(/\s+/)
+
+      expect(classes).not_to include("avatar-cover")
+    end
+  end
+
+  describe "overlay slot" do
+    it "renders inside the .avatar element for image:, as a descendant not a sibling" do
+      fragment = component_fragment(:avatar, image: "https://example.com/pic.png") do |slots|
+        slots.overlay { '<span class="badge bg-success"></span>'.html_safe }
+      end
+
+      avatar_element = fragment.css("span.avatar").first
+      badge = fragment.css(".badge").first
+
+      expect(badge).not_to be_nil
+      expect(badge.parent).to eq(avatar_element)
+    end
+
+    it "renders inside the .avatar element for initials:, alongside the initials text" do
+      fragment = component_fragment(:avatar, initials: "JD") do |slots|
+        slots.overlay { '<span class="badge bg-success"></span>'.html_safe }
+      end
+
+      avatar_element = fragment.css("span.avatar").first
+      expect(avatar_element.text).to include("JD")
+      expect(avatar_element.css(".badge")).not_to be_empty
+    end
+
+    it "raises ArgumentError when given to a generated identicon (no image:/initials:)" do
+      # The check can only happen once the block's slots are known, which is
+      # render time -- and TablerUi::Ui only calls #validate! for
+      # builder-style components (avatar is slot-style), so it has to raise
+      # from inside the ERB template itself. Rails wraps any error raised
+      # during partial rendering in ActionView::Template::Error; the
+      # original ArgumentError (with the clear message) is its #cause.
+      expect {
+        component_fragment(:avatar, name: "Ada Lovelace") { |slots| slots.overlay { "x" } }
+      }.to raise_error { |error|
+        expect(error.cause).to be_a(ArgumentError)
+        expect(error.cause.message).to match(/overlay/i)
+      }
+    end
+  end
+
+  # --- Regression: the image: branch used to be a self-closing tag.span
+  # with no block at all. Giving it a do...end block (so the overlay slot
+  # has somewhere to render) must not add any stray child nodes inside the
+  # <span> when no overlay is passed -- it must still parse as one empty
+  # element, not e.g. a stray text/whitespace node.
+  it "renders no stray child nodes for image: when no block is passed (regression)" do
+    fragment = component_fragment(:avatar, image: "https://example.com/pic.png")
+    element = fragment.css("span.avatar").first
+
+    expect(element.children).to be_empty
+  end
 end

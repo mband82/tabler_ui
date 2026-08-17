@@ -23,7 +23,7 @@
       <% end %>
 
       <% if alert.url.present? %>
-        <%= link_to alert.link_text, alert.url, class: "alert-link" %>
+        <%= link_to alert.link_text, alert.url, class: alert.link_class %>
       <% end %>
     </div>
   </div>

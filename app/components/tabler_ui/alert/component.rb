@@ -34,7 +34,10 @@ module TablerUi
     class Component
       include TablerUi::Base
 
-      attr_reader :text, :color, :title, :icon, :dismissible, :important, :url, :link_text
+      attr_reader :text, :color, :title, :icon, :dismissible, :important, :url, :link_text,
+                  :minor, :link_style
+
+      LINK_STYLES = %i[link action].freeze
 
       # @param options [Hash]
       # @option options [String]  :color       Alert color -- validated against
@@ -48,6 +51,9 @@ module TablerUi
       # @option options [Boolean] :important   Important style with colored background (default: false)
       # @option options [String, nil] :url     Optional action link URL
       # @option options [String, nil] :link_text Action link text (default: "Learn more")
+      # @option options [Boolean] :minor       Transparent background, bordered style (default: false)
+      # @option options [Symbol]  :link_style  :link (default, bold underline-free) or :action
+      #   (underlined, no bold) for the action link's style
       # @option options [Hash]    :html        Rule 5 HTML hook for the root .alert element (part :root)
       # @option options [Hash]    :title_html  Rule 5 HTML hook for the .alert-title (part :title),
       #   only applied when a title renders
@@ -55,13 +61,15 @@ module TablerUi
       #   only applied when an icon renders
       def initialize(options = {})
         @text = options[:text]
-        @color = TablerUi::Color.validate!(options[:color], context: "alert") || "info"
+        @color = TablerUi::Color.validate!(options[:color], extra: TablerUi::Color::MUTED, context: "alert") || "info"
         @title = options[:title]
         @icon = options[:icon]
         @dismissible = options[:dismissible]
         @important = options[:important]
         @url = options[:url]
         @link_text = options[:link_text] || "Learn more"
+        @minor = options[:minor]
+        @link_style = validate_link_style!(options[:link_style])
 
         initialize_html_options(options)
       end
@@ -103,13 +111,28 @@ module TablerUi
         html_for(:icon, class: "alert-icon-wrapper")
       end
 
+      # @return [String] CSS class for the action link, based on link_style
+      def link_class
+        link_style == :action ? "alert-action" : "alert-link"
+      end
+
       private
 
       def alert_classes
         classes = ["alert", "alert-#{color}"]
         classes << "alert-dismissible" if dismissible
         classes << "alert-important" if important
+        classes << "alert-minor" if minor
         classes.join(" ")
+      end
+
+      def validate_link_style!(value)
+        return :link if value.nil?
+
+        value = value.to_sym
+        return value if LINK_STYLES.include?(value)
+
+        raise ArgumentError, "unknown link_style #{value.inspect} for alert — valid: #{LINK_STYLES.join(', ')}"
       end
     end
   end
