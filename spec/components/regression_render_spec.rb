@@ -43,10 +43,11 @@ RSpec.describe "TablerUi component regression render", type: :component do
   end
 
   it "renders dropdown" do
-    fragment = component_fragment(:dropdown, label: "Actions") { |dd| dd.item("Edit", "#") }
+    fragment = component_fragment(:dropdown, label: "Actions") { |dd| dd.item("Edit", url: "/edit") }
 
     expect(fragment.css(".dropdown")).not_to be_empty
-    expect(fragment.to_html).not_to be_empty
+    expect(fragment.text).to include("Actions", "Edit")
+    expect(fragment.css("a[href='/edit']")).not_to be_empty
   end
 
   it "renders icon" do

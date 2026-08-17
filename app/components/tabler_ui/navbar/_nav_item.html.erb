@@ -1,64 +1,71 @@
-<%# Authorization check: if action and subject are provided and can? is available, check permission %>
-<% authorized = ->(entry) { entry[:action].present? && entry[:subject].present? && respond_to?(:can?) ? can?(entry[:action], entry[:subject]) : true } %>
+<%# Authorization check: if action and subject are provided and can? is
+    available, check permission. Applies to regular links and dropdown items
+    -- dropdowns themselves, dividers and the dark mode toggle always show. %>
+<% authorized = ->(entry) { entry.action.present? && entry.subject.present? && respond_to?(:can?) ? can?(entry.action, entry.subject) : true } %>
+<% item_active = ->(entry) { entry.active.nil? ? (entry.url.present? && current_page?(entry.url)) : entry.active } %>
 
-<% if item[:dark_mode_toggle] %>
-  <!-- Dark Mode Toggle -->
-  <li class="nav-item" data-controller="tabler-ui--dark-mode">
-    <a href="#" class="nav-link px-0" data-action="click->tabler-ui--dark-mode#toggle" title="Theme wechseln">
-      <svg data-tabler-ui--dark-mode-target="light" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-        <path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
-        <path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" />
-      </svg>
-      <svg data-tabler-ui--dark-mode-target="dark" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon d-none">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-        <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
-      </svg>
-      <svg data-tabler-ui--dark-mode-target="system" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon d-none">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-        <path d="M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10z" />
-        <path d="M7 20h10" />
-        <path d="M9 16v4" />
-        <path d="M15 16v4" />
-      </svg>
-    </a>
-  </li>
-<% elsif item[:divider] %>
-  <!-- Divider -->
-  <li class="nav-item">
+<% case item.type %>
+<% when :dark_mode_toggle %>
+  <%= tag.li(**navbar.item_attributes(item)) do %>
+    <%= tabler_ui.dark_mode_toggle(**item.toggle_options) %>
+  <% end %>
+<% when :divider %>
+  <%= tag.li(**navbar.item_attributes(item)) do %>
     <span class="nav-link px-0 text-secondary">|</span>
-  </li>
-<% elsif item[:submenu] %>
-  <!-- Dropdown (only show items the user is authorized to see) -->
-  <% visible_items = item[:submenu].select { |sub| sub[:divider] || authorized.call(sub) } %>
-  <% visible_items = visible_items.drop_while { |sub| sub[:divider] } %>
-  <% visible_items = visible_items.reverse.drop_while { |sub| sub[:divider] }.reverse %>
-  <% if visible_items.any? { |sub| !sub[:divider] } %>
-    <li class="nav-item dropdown <%= 'active' if visible_items.any? { |sub| sub[:url] && current_page?(sub[:url]) } %>">
+  <% end %>
+<% when :dropdown %>
+  <% visible_items = item.submenu.select { |sub| authorized.call(sub) } %>
+  <% visible_items = visible_items.drop_while { |sub| sub.type == :divider } %>
+  <% visible_items = visible_items.reverse.drop_while { |sub| sub.type == :divider }.reverse %>
+  <% if visible_items.any? { |sub| sub.type != :divider } %>
+    <% dropdown_active = visible_items.any? { |sub| sub.type == :item && item_active.call(sub) } %>
+    <%= tag.li(**navbar.item_attributes(item, active: dropdown_active)) do %>
+      <%# TODO(rule 6): data-bs-toggle="dropdown" drives Bootstrap's Dropdown
+          class directly. Left as-is per instructions -- wrap this in a
+          shared tabler-ui--dropdown Stimulus controller once that lands. %>
       <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" role="button" aria-expanded="false">
-        <%= item[:title] %>
+        <%= item.title %>
       </a>
-      <div class="dropdown-menu <%= 'dropdown-menu-end' if item[:align] == :end %>">
+      <div class="dropdown-menu<%= ' dropdown-menu-end' if item.align == :end %>">
         <% visible_items.each do |sub| %>
-          <% if sub[:divider] %>
+          <% case sub.type %>
+          <% when :divider %>
             <div class="dropdown-divider"></div>
-          <% elsif sub[:method].present? && sub[:method] != :get %>
-            <%= button_to sub[:title], sub[:url], class: "dropdown-item #{'active' if sub[:url] && current_page?(sub[:url])}", method: sub[:method], target: sub[:target] %>
-          <% else %>
-            <%= link_to sub[:title], sub[:url], class: "dropdown-item #{'active' if sub[:url] && current_page?(sub[:url])}", target: sub[:target] %>
+          <% when :header %>
+            <h6 class="dropdown-header"><%= sub.title %></h6>
+          <% when :item %>
+            <% sub_active = item_active.call(sub) %>
+            <% item_class = class_names("dropdown-item", "active" => sub_active, "disabled" => sub.disabled) %>
+            <%
+              item_content = capture do
+                concat tabler_ui.icon(icon: sub.icon, html: { class: "me-1" }) if sub.icon.present?
+                concat sub.title
+              end
+            %>
+            <% if sub.method.present? && sub.method != :get %>
+              <%= button_to sub.url, method: sub.method, class: item_class, disabled: sub.disabled, target: sub.target do %>
+                <%= item_content %>
+              <% end %>
+            <% else %>
+              <%= link_to sub.url, class: item_class, disabled: sub.disabled, target: sub.target do %>
+                <%= item_content %>
+              <% end %>
+            <% end %>
           <% end %>
         <% end %>
       </div>
-    </li>
-  <% end %>
-<% elsif authorized.call(item) %>
-  <!-- Regular Link -->
-  <% active = item[:url] && current_page?(item[:url]) %>
-  <li class="nav-item <%= 'active' if active %>">
-    <% if item[:method].present? && item[:method] != :get %>
-      <%= button_to item[:title], item[:url], method: item[:method], class: "nav-link #{'active' if active}", target: item[:target] %>
-    <% else %>
-      <%= link_to item[:title], item[:url], class: "nav-link #{'active' if active}", target: item[:target] %>
     <% end %>
-  </li>
+  <% end %>
+<% when :link %>
+  <% if authorized.call(item) %>
+    <% active = item_active.call(item) %>
+    <% link_class = class_names("nav-link", "active" => active) %>
+    <%= tag.li(**navbar.item_attributes(item, active: active)) do %>
+      <% if item.method.present? && item.method != :get %>
+        <%= button_to item.title, item.url, method: item.method, class: link_class, target: item.target %>
+      <% else %>
+        <%= link_to item.title, item.url, class: link_class, target: item.target %>
+      <% end %>
+    <% end %>
+  <% end %>
 <% end %>

@@ -180,39 +180,44 @@ RSpec.describe TablerUi::Ui do
     end
   end
 
-  describe "legacy path (class exists, does not include TablerUi::Base)" do
-    it "calls a keyword-arg constructor with **kwargs" do
+  # The dispatcher used to carry a third branch for component classes that
+  # predated TablerUi::Base, telling keyword-arg constructors from positional
+  # view_context ones by inspecting initialize.parameters. Every shipped
+  # component now includes TablerUi::Base, so that branch is gone and an
+  # unmarked class is an error rather than a guess.
+  describe "class that does not include TablerUi::Base" do
+    it "raises telling the author to include TablerUi::Base" do
+      stub_const("TablerUi::SpecUnmarked::Component", Class.new do
+        def initialize(options = {}); end
+      end)
+
+      expect { dispatch(:spec_unmarked, text: "x") }
+        .to raise_error(ArgumentError, /must `include TablerUi::Base`/)
+    end
+  end
+
+  describe "real components dispatch through the modern path" do
+    it "builds a component with no mandatory arguments from kwargs alone" do
       fragment = fragment_for(:badge, text: "Hello", color: "blue")
 
       expect(fragment.text).to include("Hello")
       expect(fragment.css(".badge").first["class"]).to include("bg-blue")
     end
 
-    it "gives the positional view_context constructor the real view context, then injects attributes" do
-      view = dispatcher_view_context
-      expect(TablerUi::Dropdown::Component).to receive(:new).with(view).and_call_original
-
-      fragment = Nokogiri::HTML5.fragment(
-        view.tabler_ui.dropdown(label: "Actions", button_variant: "danger") { |dd| dd.item("Edit", "#") }
-      )
-
-      expect(fragment.text).to include("Actions")
-      expect(fragment.css(".btn").first["class"]).to include("btn-danger")
-      expect(fragment.css(".dropdown-item").first.text).to include("Edit")
-    end
-
-    it "yields the component itself when it duck-types to a builder method (e.g. :left)" do
+    it "yields the component itself to a builder-style component" do
       yielded = nil
       dispatch(:navbar) { |navbar| yielded = navbar }
 
       expect(yielded).to be_a(TablerUi::Navbar::Component)
+      expect(TablerUi::Navbar::Component.builder_style?).to be(true)
     end
 
-    it "yields a SlotContext when the component doesn't duck-type to any builder method" do
+    it "yields a SlotContext to a slot-style component" do
       yielded = nil
-      dispatch(:alert, variant: "info") { |slots| yielded = slots }
+      dispatch(:alert, color: "info") { |slots| yielded = slots }
 
       expect(yielded).to be_a(TablerUi::SlotContext)
+      expect(TablerUi::Alert::Component.builder_style?).to be(false)
     end
   end
 

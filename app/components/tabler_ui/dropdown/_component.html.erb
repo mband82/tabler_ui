@@ -1,45 +1,39 @@
-<!-- Tabler UI Dropdown Component -->
-<%
-  # Dropdown alignment
-  align_class = dropdown.align == 'right' ? 'dropdown-menu-end' : ''
-
-  # Button variant
-  button_class = "btn-#{dropdown.button_variant}"
-%>
-
-<div class="dropdown">
-  <button class="btn <%= button_class %> dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+<%# Tabler UI Dropdown Component %>
+<%= tag.div(**dropdown.root_attributes) do %>
+  <%# TODO(rule 6): data-bs-toggle="dropdown" drives Bootstrap's Dropdown class
+      directly. Left as-is per instructions -- wrap this in a shared
+      tabler-ui--dropdown-menu Stimulus controller once that lands. %>
+  <%= tag.button(type: "button", "data-bs-toggle": "dropdown", "aria-expanded": "false",
+                 **dropdown.toggle_attributes) do %>
     <%= dropdown.label %>
-  </button>
-  <div class="dropdown-menu <%= align_class %>">
+  <% end %>
+  <%= tag.div(**dropdown.menu_attributes) do %>
     <% dropdown.items.each do |item| %>
-      <% case item[:type] %>
+      <% case item.type %>
       <% when :divider %>
         <div class="dropdown-divider"></div>
       <% when :header %>
-        <h6 class="dropdown-header"><%= item[:title] %></h6>
+        <h6 class="dropdown-header"><%= item.title %></h6>
       <% when :item %>
         <%
           item_content = capture do
-            if item[:icon]
-              concat render("tabler_ui/icon/component", icon: OpenStruct.new(icon: item[:icon]))
-              concat " "
+            if item.icon.present?
+              concat tabler_ui.icon(icon: item.icon, html: { class: "me-1" })
             end
-            concat item[:title]
+            concat item.title
           end
-          item_class = "dropdown-item #{item[:class]} #{'active' if item[:active]} #{'disabled' if item[:disabled]}".strip
-          item_data = item[:data] || {}
         %>
-        <% if item[:method] && item[:method] != :get %>
-          <%= button_to item[:url], method: item[:method], class: item_class, disabled: item[:disabled], data: item_data do %>
+        <% if item.method && item.method != :get %>
+          <%= button_to item.url, method: item.method, disabled: item.disabled,
+                         **dropdown.item_attributes(item) do %>
             <%= item_content %>
           <% end %>
         <% else %>
-          <%= link_to item[:url], class: item_class, disabled: item[:disabled], data: item_data do %>
+          <%= link_to item.url, disabled: item.disabled, **dropdown.item_attributes(item) do %>
             <%= item_content %>
           <% end %>
         <% end %>
       <% end %>
     <% end %>
-  </div>
-</div>
+  <% end %>
+<% end %>

@@ -32,7 +32,8 @@ module TablerUi
         if component_class&.include?(TablerUi::Base)
           build_modern_component(component_class, name, args, kwargs)
         elsif component_class
-          build_legacy_component(component_class, args, kwargs)
+          raise ArgumentError,
+                "#{component_class} must `include TablerUi::Base` to be rendered by tabler_ui.#{name}"
         else
           build_open_struct_component(args, kwargs)
         end
@@ -77,34 +78,12 @@ module TablerUi
       component_class.new(*positional, kwargs.except(*required))
     end
 
-    # 2. Class exists but does NOT include TablerUi::Base — the old
-    # long-keyword-list convention. Currently serves all 13 existing component
-    # classes: Alert, Badge, DarkModeToggle, Dropdown, Icon, Illustration,
-    # Navbar, Placeholder, Rating, SettingsPage, Status, Tabs, Datagrid.
-    # Delete this branch (and this method) once the last one is converted to
-    # TablerUi::Base.
-    def build_legacy_component(component_class, args, kwargs)
-      init_method = component_class.instance_method(:initialize)
-
-      if init_method.parameters.any? { |type, _| type == :keyreq || type == :key }
-        # Keyword-arg constructor, e.g. Badge#initialize(text: nil, color: nil, ...)
-        component_class.new(**kwargs)
-      else
-        # Positional view_context constructor — only Dropdown today:
-        # Dropdown#initialize(view_context), attributes injected afterwards.
-        object = args.first
-        object = OpenStruct.new(kwargs) if object.nil? && kwargs.any?
-        object = OpenStruct.new(object) if object.is_a?(Hash)
-
-        component = component_class.new(@view)
-        inject_data(component, object) if object.present?
-        component
-      end
-    end
-
-    # 3. No class for this name at all — the OpenStruct fallback. Currently
-    # serves the 7 bare partials: button, card, page_header, table, stat_card,
-    # progress, avatar.
+    # 2. No class for this name at all — the OpenStruct fallback. Every
+    # component shipped by this gem is now class-backed, but this stays as a
+    # supported extension point: a host app can drop its own
+    # app/components/tabler_ui/_thing.html.erb into its tree (the engine
+    # prepends the host's view path) and call tabler_ui.thing(...) without
+    # writing a component class.
     def build_open_struct_component(args, kwargs)
       object = args.first
       object = OpenStruct.new(kwargs) if object.nil? && kwargs.any?
@@ -114,51 +93,29 @@ module TablerUi
 
     # --- Rendering -------------------------------------------------------------
 
-    # Partial path depends only on whether a component class was found: both
-    # the modern (TablerUi::Base) and legacy branches render the class-backed
-    # partial; the OpenStruct fallback renders the bare partial. Replaces the
-    # old component_class? instance-sniffing, which guessed the answer from
-    # the rendered object's class name — now that build_* above already knows
-    # which case we're in, that guesswork is unnecessary.
+    # A class-backed component renders tabler_ui/<name>/component; the
+    # OpenStruct fallback renders the bare tabler_ui/_<name> partial.
     def partial_path_for(name, component_class)
       component_class ? "tabler_ui/#{name}/component" : "tabler_ui/#{name}"
     end
 
     # Decides whether the block gets the component itself (builder style) or a
     # SlotContext, then captures and renders.
+    #
+    # Builder style is declared, not guessed: a component calls `builder_style!`
+    # in its class body. This replaced duck-typing on a fixed allowlist of
+    # method names (add/left/right/buttons/actions/item/tab), where a component
+    # defining `item` for an unrelated reason silently flipped block styles.
     def render_block(component_class, component, partial_path, name, &block)
-      if component_class&.include?(TablerUi::Base)
-        if component_class.builder_style?
-          # Modern builder-style path (component class calls builder_style!).
-          # No existing component uses this yet.
-          @view.capture(component, &block)
-          render_component(partial_path, name, component, nil)
-        else
-          # Modern slot-based path — default for TablerUi::Base components
-          # that don't declare builder_style!. No existing component uses
-          # this yet.
-          slot_context = SlotContext.new(@view)
-          @view.capture(slot_context, &block)
-          render_component(partial_path, name, component, slot_context)
-        end
+      if component_class&.builder_style?
+        @view.capture(component, &block)
+        render_component(partial_path, name, component, nil)
       else
-        # Legacy duck-typed sniffing, unchanged — serves all 13 legacy
-        # component classes and all 7 bare partials. Builder-style among
-        # these today: Navbar, Dropdown, Tabs, SettingsPage, Datagrid (they
-        # respond to one of add/left/right/buttons/actions/item/tab).
-        # Everything else uses SlotContext. Delete once every component is
-        # converted to TablerUi::Base.
-        if component.respond_to?(:add) || component.respond_to?(:left) ||
-           component.respond_to?(:right) || component.respond_to?(:buttons) ||
-           component.respond_to?(:actions) || component.respond_to?(:item) ||
-           component.respond_to?(:tab)
-          @view.capture(component, &block)
-          render_component(partial_path, name, component, nil)
-        else
-          slot_context = SlotContext.new(@view)
-          @view.capture(slot_context, &block)
-          render_component(partial_path, name, component, slot_context)
-        end
+        # Slot style: the default for components, and the only option for
+        # OpenStruct-backed bare partials.
+        slot_context = SlotContext.new(@view)
+        @view.capture(slot_context, &block)
+        render_component(partial_path, name, component, slot_context)
       end
     end
 
@@ -176,14 +133,6 @@ module TablerUi
       end
     end
 
-    # Injects data into component instance variables
-    # @param component [Object] Component instance
-    # @param data [OpenStruct, Hash] Data to inject
-    def inject_data(component, data)
-      data.to_h.each do |key, value|
-        component.public_send("#{key}=", value) if component.respond_to?("#{key}=")
-      end
-    end
   end
 
   # Slot context for content projection
