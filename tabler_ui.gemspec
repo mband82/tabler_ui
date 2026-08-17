@@ -35,6 +35,12 @@ Gem::Specification.new do |spec|
   spec.add_dependency "rails", ">= 7.0"
   spec.add_dependency "stimulus-rails"
   spec.add_dependency "ostruct"
+  # app/assets/stylesheets/tabler_ui.css is a Sprockets directive manifest
+  # (`*= require ...`), and the engine's asset initializer appends to
+  # config.assets.paths. Propshaft processes neither, so a host app on Rails 8's
+  # default pipeline is served the directive comments instead of any CSS. The
+  # gem has always required Sprockets; this says so.
+  spec.add_dependency "sprockets-rails", "~> 3.5"
 
   # Development dependencies
   spec.add_development_dependency "rspec", "~> 3.0"

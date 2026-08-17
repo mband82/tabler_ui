@@ -1,0 +1,442 @@
+# frozen_string_literal: true
+
+module TablerUi
+  module Pagination
+    # Pagination component for Tabler UI. Builder-style: the block yields the
+    # component itself, and entries are added via #item / #gap / #prev / #next.
+    #
+    # Unlike every other item-list component in this gem (breadcrumb, steps,
+    # tabs, ...) pagination has a second, much more common way in: hand it
+    # `current:`/`total:` and it works out the item list itself. That computed
+    # mode is built *on top of* the very same builder primitives described
+    # below -- see "Computed mode" -- so there is exactly one rendering path
+    # to get right.
+    #
+    # This component never touches a collection, an ORM, or `params`. Its
+    # entire input is two integers and a way to build a URL (`url:`, a
+    # callable taking a page number). How the caller arrives at those --
+    # Kaminari, Pagy, a hand-rolled `offset`, a plain array -- is none of its
+    # business, exactly as `table` and `datagrid` only ever see the rows they
+    # are handed.
+    #
+    # @example Builder mode -- full manual control
+    #   <%= tabler_ui.pagination do |p| %>
+    #     <% p.prev url: prev_path %>
+    #     <% p.item 1, url: page_path(1) %>
+    #     <% p.gap %>
+    #     <% p.item 3, url: page_path(3), active: true %>
+    #     <% p.item 4, url: page_path(4) %>
+    #     <% p.next url: next_path %>
+    #   <% end %>
+    #
+    # @example Computed mode -- the common case
+    #   <%= tabler_ui.pagination current: 3, total: 10, url: ->(n) { posts_path(page: n) } %>
+    #
+    # @example size:, circle:, outline:
+    #   <%= tabler_ui.pagination current: 1, total: 5, url: ->(n) { "?page=#{n}" },
+    #                            size: :sm, circle: true %>
+    #
+    # @example Rule 5 hooks -- root and per-item
+    #   <%= tabler_ui.pagination(html: { class: "mb-3" }) do |p| %>
+    #     <% p.item 1, url: "/1", html: { class: "fw-bold" } %>
+    #     <% p.item 2, url: "/2", html: ->(item) { { class: "text-danger" } if item.page == 2 } %>
+    #   <% end %>
+    #
+    # ## Computed mode
+    #
+    # `current:` (1-based) and `total:` (page count) together turn on computed
+    # mode: the component works out the page range itself (see
+    # #compute_pages) and calls the very same #add_page / #add_gap / #add_prev
+    # / #add_next primitives the public builder methods (#item / #gap / #prev
+    # / #next) call, just without the "no block allowed" guard those carry.
+    # `window:` (default 2) controls how many pages either side of `current`
+    # are shown; `url:` is a callable taking a page number, invoked once per
+    # link actually rendered (never for a gap, never for a disabled prev/next).
+    #
+    # `current:`/`total:` and a block are mutually exclusive -- computed mode
+    # already builds a full item list, so a block that goes on to call #item
+    # (etc) itself would silently mix the two. Rather than pick one winner
+    # quietly, calling any builder method while computed options were given
+    # raises ArgumentError immediately (see #guard_against_computed!).
+    # Passing a block that never calls a builder method (or no block at all)
+    # is fine either way.
+    #
+    # `current:` given without `total:` also raises -- there is no page range
+    # to compute without knowing how many pages there are.
+    #
+    # ### Degenerate totals
+    #
+    # `total: 0` renders an empty `<ul class="pagination">` -- there is
+    # nothing to paginate, so this is treated the same way `table`/`datagrid`
+    # treat zero rows: no error, just nothing. `current:` is not range-checked
+    # in this case (any value is accepted and ignored).
+    #
+    # `total: 1` renders a single active page 1 with both prev and next
+    # disabled, rather than nothing -- there *is* a page, it just has nowhere
+    # to go. This keeps the markup shape (prev, pages, next) uniform instead
+    # of special-casing the single-page case away.
+    #
+    # For any other total, `current:` outside `1..total` raises ArgumentError
+    # via #validate! (see also `lib/tabler_ui/ui.rb#render_block`, which calls
+    # #validate! automatically once a builder block has run -- computed mode
+    # calls it itself from #initialize, since it doesn't need to wait for a
+    # block to know its total).
+    #
+    # ## The range algorithm
+    #
+    # #compute_pages always shows page 1 and the last page, plus a window of
+    # `window:` pages either side of `current`, clamped to `1..total`. Where
+    # that leaves a run of hidden pages between two shown ones, a single
+    # hidden page is shown outright instead of a gap (a gap standing in for
+    # exactly one page is worse than just showing that page); two or more
+    # hidden pages collapse to one `:gap` marker.
+    #
+    # ## CSS surface
+    #
+    #   ul.pagination[.pagination-sm|.pagination-lg][.pagination-circle][.pagination-outline]
+    #     li.page-item[.active][.disabled][.page-prev|.page-next]
+    #       a.page-link (linkable items) or span.page-link (gaps, disabled prev/next)
+    #
+    # ## Accessibility
+    #
+    # The `<ul class="pagination">` is wrapped in a `<nav>` landmark with a
+    # translated `aria-label` (mirrors `breadcrumb`). The active page's `<li>`
+    # gets `aria-current="page"` (mirrors `breadcrumb`'s current item). An
+    # item only renders as `<a>` when it has a URL *and* isn't disabled --
+    # disabled prev/next and gaps render as `<span class="page-link">`
+    # instead, so they are never focusable links (mirrors `placeholder`'s
+    # disabled-button pattern of not shipping a dead link).
+    class Component
+      include TablerUi::Base
+      builder_style!
+
+      SIZES = %i[sm lg].freeze
+
+      # :html holds the caller's *raw* per-item hook (Hash or Proc taking the
+      # item), not resolved attributes -- see #item_attributes. :kind is one
+      # of :page, :gap, :prev, :next. :page/:active only mean anything for
+      # :page items; :label only for :prev/:next (falls back to the
+      # component-level prev_label:/next_label: option, then to a translated
+      # default -- see #item_text).
+      Item = Struct.new(:kind, :page, :label, :url, :active, :disabled, :html, keyword_init: true)
+
+      attr_reader :items, :size, :circle, :outline, :window
+
+      # @param options [Hash]
+      # @option options [Integer] :current 1-based current page. Switches on
+      #   computed mode together with :total -- see the class docs. Defaults
+      #   to 1 when :total is given without it.
+      # @option options [Integer] :total Total page count. Switches on
+      #   computed mode. Mandatory if :current is given.
+      # @option options [Integer] :window Pages shown either side of
+      #   :current in computed mode (default: 2).
+      # @option options [#call] :url Computed mode only -- a callable taking
+      #   a page number and returning its URL.
+      # @option options [Symbol, String] :size One of :sm, :lg -- pagination-sm/-lg.
+      # @option options [Boolean] :circle Pill-shaped items -- pagination-circle.
+      # @option options [Boolean] :outline Bordered items -- pagination-outline.
+      # @option options [String] :prev_label Component-wide default text for
+      #   the prev control (falls back to a translated default). A per-call
+      #   `label:` passed to #prev overrides this.
+      # @option options [String] :next_label Same as :prev_label, for #next.
+      # @option options [Hash] :html Rule 5 HTML hook for the `<ul class="pagination">` (part :root)
+      # @option options [Hash, #call] :item_html Rule 5 HTML hook applied to
+      #   every `<li class="page-item">` (part :item) -- a plain Hash, or a
+      #   callable taking the item, following `table#row_html:`'s precedent
+      #   for parts a component itself generates in bulk. Merged underneath
+      #   any per-item `html:` given to #item/#prev/#next directly -- see
+      #   #item_attributes.
+      def initialize(options = {})
+        @computed = options.key?(:total) || options.key?(:current)
+        @size = validate_size!(options[:size])
+        @circle = options[:circle]
+        @outline = options[:outline]
+        @window = options.fetch(:window, 2)
+        @prev_label = options[:prev_label]
+        @next_label = options[:next_label]
+        @items = []
+
+        initialize_html_options(options)
+
+        return unless @computed
+
+        unless options.key?(:total)
+          raise ArgumentError,
+                "pagination current: was given without total: -- computed mode needs both " \
+                "to work out a page range"
+        end
+
+        @total = options[:total]
+        @current = options.fetch(:current, 1)
+        @url_proc = options[:url]
+
+        validate!
+        build_computed!
+      end
+
+      # Adds a page entry.
+      #
+      # @param page [Integer] Page number, also used as the link text
+      # @param options [Hash]
+      # @option options [String] :url Page URL. When absent, the item renders
+      #   as plain (non-focusable) text instead of a link.
+      # @option options [Boolean] :active Marks this as the current page --
+      #   drives the `active` class and `aria-current="page"`.
+      # @option options [Boolean] :disabled Forces the item to render as
+      #   non-linkable text even if a :url was given.
+      # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
+      #   `<li class="page-item">` (part :item) -- a plain Hash, or a
+      #   callable taking the item
+      # @return [String] empty string, to avoid stray output in a capture context
+      def item(page, options = {})
+        builder_argument!(page, :page, builder: :item)
+        guard_against_computed!(:item)
+
+        add_page(page, options)
+      end
+
+      # Adds a gap ("...") between page entries. Always renders as
+      # non-linkable text.
+      #
+      # @return [String] empty string, to avoid stray output in a capture context
+      def gap
+        guard_against_computed!(:gap)
+
+        add_gap
+      end
+
+      # Adds the "previous page" control.
+      #
+      # @param options [Hash]
+      # @option options [String] :url Target URL. When absent (or when
+      #   :disabled), renders as plain (non-focusable) text.
+      # @option options [Boolean] :disabled Forces non-linkable text.
+      # @option options [String] :label Link text (default: the component's
+      #   prev_label: option, then a translated "Previous").
+      # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
+      #   `<li class="page-item page-prev">` (part :item)
+      # @return [String] empty string, to avoid stray output in a capture context
+      def prev(options = {})
+        guard_against_computed!(:prev)
+
+        add_prev(options)
+      end
+
+      # Adds the "next page" control. See #prev -- same shape, opposite end.
+      #
+      # @return [String] empty string, to avoid stray output in a capture context
+      def next(options = {})
+        guard_against_computed!(:next)
+
+        add_next(options)
+      end
+
+      # Called by TablerUi::Ui once a builder block has run (see
+      # `lib/tabler_ui/ui.rb#render_block`), and by #initialize itself in
+      # computed mode (which knows its full range immediately and doesn't
+      # need to wait for a block). A no-op outside computed mode -- builder
+      # mode has no component-wide "current page index" to range-check,
+      # only per-item `active:` flags.
+      def validate!
+        return unless @computed
+        return if @total.to_i <= 0
+        return if (1..@total).cover?(@current)
+
+        raise ArgumentError,
+              "pagination current: #{@current.inspect} is out of range -- valid: 1..#{@total}"
+      end
+
+      # @return [Hash] attributes for the `<ul class="pagination">` (part :root)
+      def root_attributes
+        html_for(:root, class: root_classes)
+      end
+
+      # @param item [Item] the item being rendered
+      # @return [Hash] attributes for this item's `<li>` (part :item),
+      #   merging three layers in order: the item's own base classes/aria,
+      #   then the component-level `item_html:` hook (a Hash applied to
+      #   every item, or a callable taking the item -- the `table#row_html:`
+      #   pattern, since computed mode never calls #item/#prev/#next itself
+      #   so there is no per-call site to hang a hook on), then this
+      #   particular item's own `html:` (set via #item/#prev/#next in
+      #   builder mode -- the `breadcrumb#item` pattern). The item's own
+      #   `html:` wins when both are given.
+      def item_attributes(item)
+        defaults = { class: item_classes(item) }
+        defaults[:"aria-current"] = "page" if current_page?(item)
+
+        TablerUi::HtmlOptions.merge_html(html_for(:item, defaults, item), resolve(item.html, item))
+      end
+
+      # @param item [Item] the item being tested
+      # @return [Boolean] whether this item renders as `<a>` (true) or
+      #   `<span>` (false, never focusable) -- needs a URL and must not be
+      #   explicitly disabled.
+      def linkable?(item)
+        item.url.present? && !item.disabled
+      end
+
+      # @param item [Item] the item being rendered
+      # @return [String] this item's visible/link text
+      def item_text(item)
+        case item.kind
+        when :page then item.page.to_s
+        when :gap then I18n.t("tabler_ui.pagination.gap")
+        when :prev then item.label || prev_label
+        when :next then item.label || next_label
+        end
+      end
+
+      # @return [String] translated aria-label for the `<nav>` landmark
+      def aria_label
+        I18n.t("tabler_ui.pagination.aria_label")
+      end
+
+      private
+
+      # @param hook [Hash, #call, nil] a raw rule-5 hook value
+      # @param item [Item] passed to +hook+ when it's callable
+      # @return [Hash] the hook resolved to a plain Hash, ready for merge_html
+      def resolve(hook, item)
+        hook.respond_to?(:call) ? hook.call(item) : hook
+      end
+
+      # @param item [Item] the item being tested
+      # @return [Boolean] whether this is the active :page item
+      def current_page?(item)
+        item.kind == :page && item.active
+      end
+
+      def prev_label
+        @prev_label || I18n.t("tabler_ui.pagination.prev")
+      end
+
+      def next_label
+        @next_label || I18n.t("tabler_ui.pagination.next")
+      end
+
+      # Guards the public builder methods (#item/#gap/#prev/#next) against
+      # being called from a caller's block when computed options were also
+      # given -- see the class docs' "Computed mode" section. #build_computed!
+      # bypasses this by calling #add_page/#add_gap/#add_prev/#add_next
+      # directly.
+      def guard_against_computed!(builder)
+        return unless @computed
+
+        raise ArgumentError,
+              "pagination current:/total: and a block are mutually exclusive -- " \
+              "got both computed options and a manual ##{builder} call"
+      end
+
+      def add_page(page, options = {})
+        @items << Item.new(kind: :page, page: page, url: options[:url], active: options[:active],
+                            disabled: options[:disabled], html: options[:html])
+        ""
+      end
+
+      def add_gap
+        @items << Item.new(kind: :gap, disabled: true)
+        ""
+      end
+
+      def add_prev(options = {})
+        @items << Item.new(kind: :prev, label: options[:label], url: options[:url],
+                            disabled: options[:disabled], html: options[:html])
+        ""
+      end
+
+      def add_next(options = {})
+        @items << Item.new(kind: :next, label: options[:label], url: options[:url],
+                            disabled: options[:disabled], html: options[:html])
+        ""
+      end
+
+      # Builds the full item list for computed mode, on top of the same
+      # #add_page/#add_gap/#add_prev/#add_next primitives the guarded public
+      # builder methods use. Total <= 0 leaves @items empty (see the class
+      # docs' "Degenerate totals" section).
+      def build_computed!
+        return if @total.to_i <= 0
+
+        prev_disabled = @current <= 1
+        next_disabled = @current >= @total
+
+        add_prev(url: prev_disabled ? nil : url_for(@current - 1), disabled: prev_disabled)
+
+        compute_pages.each do |page|
+          if page == :gap
+            add_gap
+          else
+            add_page(page, url: url_for(page), active: page == @current)
+          end
+        end
+
+        add_next(url: next_disabled ? nil : url_for(@current + 1), disabled: next_disabled)
+      end
+
+      # @param page [Integer] page number
+      # @return [String, nil] the page's URL, via the caller's :url callable
+      #   -- nil if no :url was given
+      def url_for(page)
+        @url_proc&.call(page)
+      end
+
+      # Works out which page numbers to show, and where the gaps go. Page 1
+      # and @total are always shown, plus a window: of @window pages either
+      # side of @current, clamped to 1..@total. A run of exactly one hidden
+      # page between two shown ones is shown outright instead of becoming a
+      # :gap -- see the class docs' "The range algorithm" section.
+      #
+      # @return [Array<Integer, Symbol>] page numbers interspersed with :gap markers
+      def compute_pages
+        window_start = [@current - @window, 1].max
+        window_end = [@current + @window, @total].min
+        shown = ([1] + (window_start..window_end).to_a + [@total]).uniq.sort
+
+        pages = []
+        previous = nil
+
+        shown.each do |page|
+          if previous
+            hidden = page - previous - 1
+            pages << (previous + 1) if hidden == 1
+            pages << :gap if hidden > 1
+          end
+
+          pages << page
+          previous = page
+        end
+
+        pages
+      end
+
+      def validate_size!(value)
+        return nil if value.nil?
+
+        size = value.to_sym
+        return size if SIZES.include?(size)
+
+        raise ArgumentError,
+              "unknown pagination size #{value.inspect} — valid: #{SIZES.join(', ')}"
+      end
+
+      def root_classes
+        classes = ["pagination"]
+        classes << "pagination-sm" if size == :sm
+        classes << "pagination-lg" if size == :lg
+        classes << "pagination-circle" if circle
+        classes << "pagination-outline" if outline
+        classes.join(" ")
+      end
+
+      def item_classes(item)
+        classes = ["page-item"]
+        classes << "page-prev" if item.kind == :prev
+        classes << "page-next" if item.kind == :next
+        classes << "active" if current_page?(item)
+        classes << "disabled" if item.disabled
+        classes.join(" ")
+      end
+    end
+  end
+end

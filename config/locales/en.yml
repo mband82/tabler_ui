@@ -5,6 +5,11 @@ en:
     illustration:
       not_found: "not found"
       unknown: "unknown"
+    pagination:
+      aria_label: "Pagination"
+      prev: "Previous"
+      next: "Next"
+      gap: "…"
     carousel:
       label: "Carousel"
       previous: "Previous"
