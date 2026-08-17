@@ -10,13 +10,20 @@ export default class extends Controller {
     const Bootstrap = window.tabler && window.tabler.bootstrap
     if (!Bootstrap) return
 
-    this.alert = new Bootstrap.Alert(this.element)
+    // Adopt an instance tabler.js (or another controller) may already have
+    // created for this element rather than constructing a competing one --
+    // Bootstrap only keeps one instance per element per component key, so a
+    // bare `new` here would silently orphan the existing instance. Note
+    // whether we created it so disconnect() only disposes what we own.
+    this.ownsAlert = !Bootstrap.Alert.getInstance(this.element)
+    this.alert = Bootstrap.Alert.getOrCreateInstance(this.element)
   }
 
   disconnect() {
-    if (this.alert) {
+    if (this.alert && this.ownsAlert) {
       this.alert.dispose()
-      this.alert = null
     }
+    this.alert = null
+    this.ownsAlert = false
   }
 }

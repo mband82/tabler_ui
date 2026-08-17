@@ -7,7 +7,6 @@ module TablerUi
     config.autoload_paths << root.join('app/components')
 
     initializer 'tabler_ui.assets' do |app|
-      # Add assets to the asset pipeline
       app.config.assets.paths << root.join('app/assets/stylesheets')
       app.config.assets.paths << root.join('app/assets/javascripts')
       app.config.assets.paths << root.join('app/assets/images')
@@ -41,7 +40,6 @@ module TablerUi
     end
 
     initializer 'tabler_ui.view_paths' do
-      # Make components directory available as view path
       ActiveSupport.on_load(:action_controller_base) do
         prepend_view_path(TablerUi::Engine.root.join('app/components'))
       end

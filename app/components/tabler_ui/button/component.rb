@@ -64,14 +64,12 @@ module TablerUi
         initialize_html_options(options)
       end
 
-      # Whether the button renders via `link_to` (true) or `button_to` (false).
-      # @return [Boolean]
+      # @return [Boolean] whether the button renders via `link_to` (true) or `button_to` (false)
       def get?
         @http_method.to_s == "get"
       end
 
-      # Whether the button has an icon to render before its text.
-      # @return [Boolean]
+      # @return [Boolean] whether the button has an icon to render before its text
       def has_icon?
         @icon.present?
       end

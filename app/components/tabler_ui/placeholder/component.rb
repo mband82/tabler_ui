@@ -68,11 +68,9 @@ module TablerUi
       # --- rule 5 attribute hooks ---------------------------------------
       #
       # One method per root/part the template renders. Each is the single
-      # place that calls html_for for its element, which is how the old
-      # per-type "append custom_class by hand" duplication was collapsed --
-      # see #placeholder_classes / #wrapper_classes / #avatar_classes /
-      # #button_classes below, none of which touch the caller's html: hook
-      # any more.
+      # place that calls html_for for its element -- see #placeholder_classes
+      # / #wrapper_classes / #avatar_classes / #button_classes below, none of
+      # which touch the caller's html: hook.
 
       # @return [Hash] attributes for the :text type's root wrapper <div>.
       #   Always a wrapper (even without an animation) so :text has a stable
@@ -153,10 +151,9 @@ module TablerUi
 
       # --- plain CSS class strings ----------------------------------------
       #
-      # These no longer know anything about the caller's html: hook -- that
-      # duplication (each one used to re-append custom_class by hand) is
-      # gone. They just compute the component's own base classes; the
-      # *_attributes methods above are what merge them through html_for.
+      # These don't know anything about the caller's html: hook. They just
+      # compute the component's own base classes; the *_attributes methods
+      # above are what merge them through html_for.
 
       def placeholder_classes
         classes = ["placeholder"]

@@ -1,4 +1,7 @@
-// app/javascript/controllers/tabler_ui/dark_mode_controller.js
+// Stimulus controller for the light/dark/system theme switcher. Persists the
+// chosen theme to localStorage, tracks the OS-level preference while "system"
+// is selected, and toggles data-bs-theme plus the light/dark/system icon
+// targets to match.
 import {Controller} from "@hotwired/stimulus"
 
 export default class extends Controller {

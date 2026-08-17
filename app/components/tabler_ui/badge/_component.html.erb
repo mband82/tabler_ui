@@ -1,4 +1,3 @@
-<%# Tabler UI Badge Component %>
 <% badge_tag = badge.link? ? :a : :span %>
 <%= tag.public_send(badge_tag, **badge.root_attributes) do %>
   <% if badge.has_icon? %>

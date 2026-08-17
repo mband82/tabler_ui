@@ -165,8 +165,8 @@ module TablerUi
           <svg xmlns="http://www.w3.org/2000/svg" width="200" height="150" viewBox="0 0 200 150" class="illustration-error">
             <rect width="200" height="150" fill="#f8d7da" rx="8"/>
             <text x="100" y="70" text-anchor="middle" fill="#721c24" font-size="14">Illustration</text>
-            <text x="100" y="90" text-anchor="middle" fill="#721c24" font-size="14">nicht gefunden</text>
-            <text x="100" y="115" text-anchor="middle" fill="#721c24" font-size="12" opacity="0.7">#{@name || 'unbekannt'}</text>
+            <text x="100" y="90" text-anchor="middle" fill="#721c24" font-size="14">#{I18n.t('tabler_ui.illustration.not_found')}</text>
+            <text x="100" y="115" text-anchor="middle" fill="#721c24" font-size="12" opacity="0.7">#{@name || I18n.t('tabler_ui.illustration.unknown')}</text>
           </svg>
         SVG
       end

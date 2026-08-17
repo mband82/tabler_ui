@@ -9,13 +9,20 @@ export default class extends Controller {
     const Bootstrap = window.tabler && window.tabler.bootstrap
     if (!Bootstrap) return
 
-    this.collapse = new Bootstrap.Collapse(this.element, { toggle: false })
+    // Adopt an existing instance rather than constructing a competing one --
+    // see alert_controller.js for why. Note that getOrCreateInstance only
+    // applies the `{ toggle: false }` option when it actually creates the
+    // instance; an adopted instance keeps whatever config it was made with,
+    // which is correct here.
+    this.ownsCollapse = !Bootstrap.Collapse.getInstance(this.element)
+    this.collapse = Bootstrap.Collapse.getOrCreateInstance(this.element, { toggle: false })
   }
 
   disconnect() {
-    if (this.collapse) {
+    if (this.collapse && this.ownsCollapse) {
       this.collapse.dispose()
-      this.collapse = null
     }
+    this.collapse = null
+    this.ownsCollapse = false
   }
 }

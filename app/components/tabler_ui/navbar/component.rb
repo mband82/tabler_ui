@@ -238,8 +238,8 @@ module TablerUi
 
         # Proxy for adding dropdown items, yielded by #dropdown. Deliberately
         # the *same* builder API as the standalone TablerUi::Dropdown::Component
-        # (#item / #divider / #header) -- see CLAUDE.md and the navbar
-        # conversion notes for why these two were reconciled onto one API.
+        # (#item / #divider / #header), so callers don't have to learn two
+        # different item-adding conventions for what is visually one menu.
         class DropDownProxy
           include TablerUi::Base
 

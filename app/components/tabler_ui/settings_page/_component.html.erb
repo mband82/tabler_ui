@@ -1,7 +1,5 @@
-<%# Tabler UI SettingsPage Component %>
 <%= tag.div(**settings_page.root_attributes) do %>
   <div class="row g-0">
-    <%# Sidebar Navigation %>
     <%= tag.div(**settings_page.sidebar_attributes) do %>
       <h4 class="subheader"><%= settings_page.title %></h4>
       <div class="list-group list-group-transparent" data-controller="tabler-ui--tab">
@@ -16,7 +14,6 @@
         <% end %>
       </div>
     <% end %>
-    <%# Content Area %>
     <%= tag.div(**settings_page.content_attributes) do %>
       <div class="tab-content">
         <% settings_page.items.each do |item| %>

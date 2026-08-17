@@ -56,21 +56,18 @@ module TablerUi
         initialize_html_options(options)
       end
 
-      # Whether the value has an icon to render in the colored icon box.
-      # @return [Boolean]
+      # @return [Boolean] whether the value has an icon to render in the colored icon box
       def icon?
         @icon.present?
       end
 
-      # Whether the "Details" link should render.
-      # @return [Boolean]
+      # @return [Boolean] whether the "Details" link should render
       def link?
         @url.present?
       end
 
-      # The trend as an Integer, or nil when absent or zero -- zero renders
-      # no trend indicator at all, same as a nil/blank trend.
-      # @return [Integer, nil]
+      # @return [Integer, nil] the trend as an Integer, or nil when absent or
+      #   zero -- zero renders no trend indicator at all, same as a nil/blank trend
       def trend_value
         return nil unless @trend.present?
 
@@ -78,8 +75,7 @@ module TablerUi
         int.zero? ? nil : int
       end
 
-      # Whether a trend indicator should render.
-      # @return [Boolean]
+      # @return [Boolean] whether a trend indicator should render
       def trend?
         trend_value.present?
       end

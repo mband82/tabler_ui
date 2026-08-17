@@ -58,19 +58,6 @@ module TablerUi
       @tabler_ui_html_options
     end
 
-    # Returns +defaults+ merged with whatever HTML attrs the caller supplied
-    # for +part+ (via the :html / :<part>_html hook), using
-    # TablerUi::HtmlOptions.merge_html's contract. Safe to call even if
-    # initialize_html_options was never invoked.
-    #
-    # A hook may also be a callable, for parts that repeat -- table rows,
-    # datagrid items, nav entries -- so the caller can vary attributes per
-    # item. Any extra arguments are passed to it:
-    #
-    #   tabler_ui.table row_html: ->(row) { { class: ("text-danger" if row.overdue?) } }
-    #   # component side:
-    #   html_for(:row, { class: "table-row" }, row)
-    #
     # Guards a builder method's mandatory leading argument.
     #
     # Before rule 4, builders took keyword arguments -- `item(title: "General")`.
@@ -92,6 +79,19 @@ module TablerUi
             "#{builder}(#{name.to_s.inspect}), not #{builder}(#{name}: ...)"
     end
 
+    # Returns +defaults+ merged with whatever HTML attrs the caller supplied
+    # for +part+ (via the :html / :<part>_html hook), using
+    # TablerUi::HtmlOptions.merge_html's contract. Safe to call even if
+    # initialize_html_options was never invoked.
+    #
+    # A hook may also be a callable, for parts that repeat -- table rows,
+    # datagrid items, nav entries -- so the caller can vary attributes per
+    # item. Any extra arguments are passed to it:
+    #
+    #   tabler_ui.table row_html: ->(row) { { class: ("text-danger" if row.overdue?) } }
+    #   # component side:
+    #   html_for(:row, { class: "table-row" }, row)
+    #
     # A callable returning nil is treated as an empty hash.
     def html_for(part, defaults = {}, *args)
       stored = (@tabler_ui_html_options || {})[part]

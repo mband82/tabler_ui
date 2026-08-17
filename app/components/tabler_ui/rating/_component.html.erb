@@ -1,4 +1,3 @@
-<%# Build choices array with labels and values %>
 <% choices_array = rating.choices.map { |opt| [opt[:label], opt[:value]] } %>
 <%= select_tag rating.name,
     options_for_select(choices_array, rating.value),

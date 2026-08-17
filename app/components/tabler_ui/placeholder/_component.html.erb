@@ -1,4 +1,3 @@
-<%# Tabler UI Placeholder Component %>
 <% case placeholder.type %>
 <% when :text %>
   <%# Single or multiple text placeholder lines, always inside a wrapper so
@@ -10,19 +9,15 @@
   <% end %>
 
 <% when :avatar %>
-  <%# Avatar placeholder %>
   <%= tag.div(**placeholder.avatar_attributes) %>
 
 <% when :image %>
-  <%# Image placeholder with aspect ratio %>
   <%= tag.div(**placeholder.image_attributes) %>
 
 <% when :button %>
-  <%# Button placeholder %>
   <%= tag.a(**placeholder.button_attributes) %>
 
 <% when :card %>
-  <%# Full card placeholder skeleton %>
   <%= tag.div(**placeholder.card_attributes) do %>
     <% if placeholder.show_image %>
       <%= tag.div class: "ratio ratio-21x9 card-img-top placeholder" %>
@@ -40,7 +35,6 @@
   <% end %>
 
 <% when :list %>
-  <%# List item placeholder with avatar %>
   <%= tag.div(**placeholder.list_attributes) do %>
     <div class="row align-items-center">
       <div class="col-auto">

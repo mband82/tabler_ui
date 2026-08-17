@@ -81,7 +81,6 @@ module TablerUi
           html: options[:html]
         )
 
-        # Return empty string to avoid output in capture context
         ""
       end
 

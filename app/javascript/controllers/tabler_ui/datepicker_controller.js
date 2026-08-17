@@ -1,4 +1,6 @@
-// app/javascript/controllers/tabler_ui/datepicker_controller.js
+// Stimulus controller for vanillajs-datepicker integration. Instantiates a
+// single-date or range picker (based on the element's tag) with min/max/
+// format options on connect, and destroys it on disconnect.
 import {Controller} from "@hotwired/stimulus"
 import "vanillajs-datepicker";
 

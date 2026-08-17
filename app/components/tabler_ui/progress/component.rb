@@ -75,8 +75,7 @@ module TablerUi
         initialize_html_options(options)
       end
 
-      # Whether the label row (above the bar) renders at all.
-      # @return [Boolean]
+      # @return [Boolean] whether the label row (above the bar) renders at all
       def label_row?
         @label.present?
       end

@@ -66,8 +66,7 @@ module TablerUi
         initialize_html_options(options)
       end
 
-      # Returns the default icon for the color
-      # @return [String, nil] Icon name
+      # @return [String, nil] icon name for the color, or the caller's own :icon override
       def default_icon
         return nil if icon == false
         return icon if icon.is_a?(String)
@@ -81,8 +80,7 @@ module TablerUi
         end
       end
 
-      # Check if alert has an icon
-      # @return [Boolean]
+      # @return [Boolean] whether the alert has an icon
       def has_icon?
         icon != false && default_icon.present?
       end
@@ -107,8 +105,6 @@ module TablerUi
 
       private
 
-      # CSS classes for the alert element
-      # @return [String] Combined CSS classes
       def alert_classes
         classes = ["alert", "alert-#{color}"]
         classes << "alert-dismissible" if dismissible

@@ -1,0 +1,9 @@
+en:
+  tabler_ui:
+    form:
+      error_notification: "Please review the following errors:"
+    illustration:
+      not_found: "not found"
+      unknown: "unknown"
+    dark_mode_toggle:
+      title: "Switch theme"

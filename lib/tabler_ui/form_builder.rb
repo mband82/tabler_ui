@@ -7,7 +7,6 @@ module TablerUi
     def input(method, options = {})
       @form_options = options
 
-      # Hidden fields render without wrapper
       if options[:as] == :hidden
         return hidden_field(method, merge_input_options({}, options[:input_html]))
       end
@@ -112,7 +111,7 @@ module TablerUi
     def error_notification(message: nil)
       return unless @object.respond_to?(:errors) && @object.errors.any?
 
-      message ||= 'Bitte überprüfen Sie die folgenden Fehler:'
+      message ||= I18n.t('tabler_ui.form.error_notification')
 
       tag.div(class: 'alert alert-danger mb-3', role: 'alert') do
         safe_join [
@@ -277,7 +276,6 @@ module TablerUi
     end
 
     def grouped_select_input(method, options = {})
-      # We probably need to go back later and adjust this for more customization
       collection_input(method, options) do
         grouped_collection_select(method, options[:collection], :last, :first, :to_s, :to_s, options,
                                   merge_input_options({ class: "form-select #{if has_error?(method)
@@ -307,7 +305,6 @@ module TablerUi
                                                                else raise 'Invalid input_type for collection_of, valid input_types are ":radio_buttons", ":check_boxes"'
                                                                end
 
-      # Use selectgroup styling if specified
       use_selectgroup = options[:selectgroup] || options[:selectgroup_pills] || options[:selectgroup_buttons]
 
       value_method = options[:value_method] || :to_s
@@ -403,8 +400,7 @@ module TablerUi
         # Native datetime-local input rather than routing through the
         # tabler-ui--datepicker Stimulus controller: that controller wraps
         # vanillajs-datepicker, a date-only picker with no time support, and
-        # extending it is out of scope here (touches app/, owned by another
-        # agent right now). This needs no JS at all.
+        # extending it is out of scope here. This needs no JS at all.
         datetime_local_field(method, options)
       when :time
         time_field(method, options)
@@ -544,7 +540,6 @@ module TablerUi
       end
     end
 
-    # Color input with Tabler styling
     def color_input(method, options = {})
       colors = options[:colors] || %w[#206bc4 #4299e1 #0ca678 #f59f00 #d63939 #ae3ec9]
       value_method = options[:value_method] || :to_s
@@ -600,7 +595,6 @@ module TablerUi
       end
     end
 
-    # Input group with prepend/append
     def input_group(method, options = {})
       prepend = options[:prepend]
       append = options[:append]
@@ -626,7 +620,6 @@ module TablerUi
       end
     end
 
-    # Floating label input
     def floating_input(method, options = {})
       input_type = options[:type] || :text
 

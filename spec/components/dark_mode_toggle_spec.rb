@@ -79,10 +79,10 @@ RSpec.describe "TablerUi::DarkModeToggle", type: :component do
     expect(fragment.css("svg").first["height"]).to eq("32")
   end
 
-  it "defaults the anchor's title to the German 'Theme wechseln'" do
+  it "defaults the anchor's title to the translated 'Switch theme'" do
     fragment = component_fragment(:dark_mode_toggle)
 
-    expect(fragment.css("a").first["title"]).to eq("Theme wechseln")
+    expect(fragment.css("a").first["title"]).to eq("Switch theme")
   end
 
   it "renders a custom title: on the anchor" do

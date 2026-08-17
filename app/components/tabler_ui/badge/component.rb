@@ -78,20 +78,17 @@ module TablerUi
         initialize_html_options(options)
       end
 
-      # Whether to render as a link
-      # @return [Boolean]
+      # @return [Boolean] whether the badge renders as a link
       def link?
         @url.present?
       end
 
-      # Whether the badge has an icon
-      # @return [Boolean]
+      # @return [Boolean] whether the badge has an icon
       def has_icon?
         @icon.present?
       end
 
-      # Whether the badge has visible text content
-      # @return [Boolean]
+      # @return [Boolean] whether the badge has visible text content
       def has_text?
         @text.present?
       end
@@ -107,8 +104,6 @@ module TablerUi
 
       private
 
-      # CSS classes for the badge element
-      # @return [String] Combined CSS classes
       def badge_classes
         classes = ["badge"]
 

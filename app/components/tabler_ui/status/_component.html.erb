@@ -1,15 +1,12 @@
 <% if status.indicator? %>
-  <%# Status Indicator (3 circles) %>
   <%= tag.span(**status.root_attributes) do %>
     <span class="status-indicator-circle"></span>
     <span class="status-indicator-circle"></span>
     <span class="status-indicator-circle"></span>
   <% end %>
 <% elsif status.standalone? %>
-  <%# Standalone Status Dot %>
   <%= tag.span(**status.root_attributes) %>
 <% else %>
-  <%# Regular Status (with optional dot) %>
   <%= tag.span(**status.root_attributes) do %>
     <% if status.with_dot? %>
       <%= tag.span(**status.dot_attributes) %>

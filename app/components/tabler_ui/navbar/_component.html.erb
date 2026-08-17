@@ -1,7 +1,5 @@
-<%# Tabler UI Navbar Component %>
 <%= tag.header(**navbar.root_attributes) do %>
   <div class="container-fluid">
-    <%# Logo/Brand %>
     <%= tag.div(**navbar.brand_attributes) do %>
       <%= navbar.brand %>
     <% end %>
@@ -10,7 +8,6 @@
       <span class="navbar-toggler-icon"></span>
     <% end %>
 
-    <%# Collapsible Navigation Container %>
     <%= tag.div("data-controller": "tabler-ui--collapse", **navbar.menu_attributes) do %>
       <ul class="navbar-nav">
         <% navbar.items_left.each do |item| %>

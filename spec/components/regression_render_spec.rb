@@ -110,9 +110,6 @@ RSpec.describe "TablerUi component regression render", type: :component do
     expect(fragment.text).to include("First", "First tab content")
   end
 
-  # These seven shipped as bare partials until 0.3.0 and are now component
-  # classes like the rest. The dispatcher's OpenStruct fallback still exists,
-  # but only serves partials a host app adds itself -- see ui_spec.rb.
   it "renders avatar" do
     fragment = component_fragment(:avatar, name: "Ada Lovelace", size: "md")
 

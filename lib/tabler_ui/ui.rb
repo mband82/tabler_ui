@@ -10,7 +10,6 @@ module TablerUi
     include ActionView::Helpers::TagHelper
     include ActionView::Context
 
-    # @param view_context [ActionView::Base] The view context where components are rendered
     def initialize(view_context)
       @view = view_context
     end
@@ -55,14 +54,12 @@ module TablerUi
 
     # --- Component construction ---------------------------------------------
 
-    # 1. Class exists and includes TablerUi::Base — the new convention:
-    # mandatory arguments positional, optional arguments in a trailing
-    # `options = {}` hash. Callers still pass pure keyword syntax, so incoming
-    # kwargs are split: required positional params are pulled out by name, the
-    # remainder is passed through as the options hash.
-    #
-    # No existing component uses this path yet — it activates the first time a
-    # component class is converted to `include TablerUi::Base`.
+    # 1. Class exists and includes TablerUi::Base — the convention every
+    # shipped component now follows: mandatory arguments positional, optional
+    # arguments in a trailing `options = {}` hash. Callers still pass pure
+    # keyword syntax, so incoming kwargs are split: required positional params
+    # are pulled out by name, the remainder is passed through as the options
+    # hash.
     def build_modern_component(component_class, name, args, kwargs)
       # Caller passed real positional args (rare) — honour them directly.
       return component_class.new(*args, kwargs) if args.any?
@@ -138,13 +135,11 @@ module TablerUi
   # Slot context for content projection
   # Allows components to capture and render named content blocks
   class SlotContext
-    # @param view_context [ActionView::Base] The view context
     def initialize(view_context)
       @view_context = view_context
       @slots = {}
     end
 
-    # Captures slot content via method_missing
     # @param name [Symbol] Slot name
     # @param block [Proc] Content block to capture
     # @return [String, nil] Captured content or nil
@@ -153,7 +148,6 @@ module TablerUi
         # Capture the block content - this properly handles <%= %> outputs
         content = @view_context.capture(&block)
         @slots[name] = content
-        # Return empty string to avoid output in the capture context
         ""
       else
         @slots[name]
@@ -164,8 +158,7 @@ module TablerUi
       true
     end
 
-    # Check if any slots have been defined
-    # @return [Boolean]
+    # @return [Boolean] whether any slots have been defined
     def empty?
       @slots.empty?
     end

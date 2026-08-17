@@ -21,12 +21,12 @@ module TablerUi
 
       # @param options [Hash]
       # @option options [Symbol] :size  :sm / :lg -- drives the SVG icons' pixel dimensions (default: 24)
-      # @option options [String] :title Rendered as title="..." on the <a> (default: "Theme wechseln")
+      # @option options [String] :title Rendered as title="..." on the <a> (default: "Switch theme")
       # @option options [Hash]   :html      Rule 5 HTML hook for the outer <div> (part :root)
       # @option options [Hash]   :link_html Rule 5 HTML hook for the <a> (part :link)
       def initialize(options = {})
         @size = options[:size]
-        @title = options.fetch(:title, "Theme wechseln")
+        @title = options.fetch(:title, I18n.t("tabler_ui.dark_mode_toggle.title"))
 
         initialize_html_options(options)
       end

@@ -2,17 +2,19 @@
 
 require "rails_helper"
 
-# Exercises TablerUi::Ui#method_missing's three-way dispatch (see
-# lib/tabler_ui/ui.rb):
+# Exercises TablerUi::Ui#method_missing's dispatch (see lib/tabler_ui/ui.rb):
 #
-#   1. modern  -- class exists and includes TablerUi::Base
-#   2. legacy  -- class exists but does NOT include TablerUi::Base
+#   1. modern      -- class exists and includes TablerUi::Base
+#   2. unmarked    -- class exists but does NOT include TablerUi::Base (raises)
 #   3. open struct -- no class at all, bare partial
 #
-# No real component uses the modern path yet, so those examples define
-# throwaway component classes with `stub_const`. They need a partial to
-# render against; rather than stubbing the render call, this spec adds
-# spec/internal/app/components (the combustion dummy app's own component
+# All 20 shipped components go through the modern path (see "real components
+# dispatch through the modern path" below), but most examples here still
+# define throwaway component classes with `stub_const` so they can probe
+# argument-splitting edge cases (arity, extra kwargs, positional overrides)
+# independently of any specific component's initialize signature. They need a
+# partial to render against; rather than stubbing the render call, this spec
+# adds spec/internal/app/components (the combustion dummy app's own component
 # dir -- see spec/rails_helper.rb) as a second view path alongside the
 # engine's, and ships matching fixture partials under
 # spec/internal/app/components/tabler_ui/spec_*/_component.html.erb. That
@@ -21,9 +23,9 @@ require "rails_helper"
 RSpec.describe TablerUi::Ui do
   # A view context wired up like ComponentHelper's (see
   # spec/support/component_helper.rb), but with the extra spec/internal
-  # view path needed for the modern-path fixture partials. Legacy/OpenStruct
-  # examples below use real components, which still resolve fine since the
-  # engine's app/components path is included too.
+  # view path needed for the stub_const fixture partials used by most
+  # examples below. The "real components" examples resolve fine too, since
+  # the engine's app/components path is included alongside it.
   def dispatcher_view_context
     @dispatcher_view_context ||= begin
       view_paths = ActionView::PathSet.new([
