@@ -1,0 +1,11 @@
+<%= tag.div(**dimmer.root_attributes) do %>
+  <%= tag.div(**dimmer.loader_attributes) do %>
+    <span class="visually-hidden"><%= dimmer.loader_label %></span>
+  <% end %>
+
+  <%= tag.div(**dimmer.content_attributes) do %>
+    <% if defined?(slots) && slots.present?(:content) %>
+      <%= slots.content %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -1,0 +1,10 @@
+<%= tag.div(**ribbon.root_attributes) do %>
+  <% if ribbon.has_icon? %>
+    <%= tabler_ui.icon(icon: ribbon.icon).html_safe %>
+  <% end %>
+  <% if defined?(slots) && slots.present?(:body) %>
+    <%= slots.body %>
+  <% elsif ribbon.has_text? %>
+    <%= ribbon.text %>
+  <% end %>
+<% end %>

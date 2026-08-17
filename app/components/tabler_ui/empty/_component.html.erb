@@ -1,0 +1,45 @@
+<%= tag.div(**empty.root_attributes) do %>
+  <% if (defined?(slots) && slots.present?(:img)) || empty.image.present? %>
+    <%= tag.div(**empty.img_attributes) do %>
+      <% if defined?(slots) && slots.present?(:img) %>
+        <%= slots.img %>
+      <% else %>
+        <%= tabler_ui.illustration(name: empty.image) %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if (defined?(slots) && slots.present?(:icon)) || empty.icon.present? %>
+    <%= tag.div(**empty.icon_attributes) do %>
+      <% if defined?(slots) && slots.present?(:icon) %>
+        <%= slots.icon %>
+      <% else %>
+        <%= tabler_ui.icon(icon: empty.icon) %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if (defined?(slots) && slots.present?(:header)) || empty.header.present? %>
+    <%= tag.div(**empty.header_attributes) do %>
+      <% if defined?(slots) && slots.present?(:header) %>
+        <%= slots.header %>
+      <% else %>
+        <%= empty.header %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if empty.title.present? %>
+    <%= tag.p(empty.title, **empty.title_attributes) %>
+  <% end %>
+
+  <% if empty.subtitle.present? %>
+    <%= tag.p(empty.subtitle, **empty.subtitle_attributes) %>
+  <% end %>
+
+  <% if defined?(slots) && slots.present?(:action) %>
+    <%= tag.div(**empty.action_attributes) do %>
+      <%= slots.action %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -187,6 +187,25 @@ RSpec.describe TablerUi::Ui do
   # view_context ones by inspecting initialize.parameters. Every shipped
   # component now includes TablerUi::Base, so that branch is gone and an
   # unmarked class is an error rather than a guess.
+  # A slot component's block only takes effect through `slots.<name> { }`
+  # calls; anything the block emits directly is captured and discarded. That
+  # used to render an empty component with no complaint.
+  describe "a slot block that writes content but sets no slots" do
+    it "raises instead of silently rendering nothing" do
+      expect { dispatch(:card, title: "x") { "Body text" } }
+        .to raise_error(ArgumentError, /wrote content but set no slots/)
+    end
+
+    it "allows a block that only sets slots" do
+      expect { dispatch(:card, title: "x") { |slots| slots.body { "Body text" } } }
+        .not_to raise_error
+    end
+
+    it "allows a block that does nothing at all" do
+      expect { dispatch(:card, title: "x") { } }.not_to raise_error
+    end
+  end
+
   describe "class that does not include TablerUi::Base" do
     it "raises telling the author to include TablerUi::Base" do
       stub_const("TablerUi::SpecUnmarked::Component", Class.new do

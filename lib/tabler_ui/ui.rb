@@ -111,9 +111,27 @@ module TablerUi
         # Slot style: the default for components, and the only option for
         # OpenStruct-backed bare partials.
         slot_context = SlotContext.new(@view)
-        @view.capture(slot_context, &block)
+        captured = @view.capture(slot_context, &block)
+        guard_discarded_block!(name, captured, slot_context)
         render_component(partial_path, name, component, slot_context)
       end
+    end
+
+    # A slot component's block only has an effect through `slots.<name> { }`
+    # calls -- whatever the block itself emits is captured and thrown away.
+    # So this renders nothing at all, with no error:
+    #
+    #   <%= tabler_ui.card title: "x" do %>Body text<% end %>
+    #
+    # The content is right here in `captured`, so instead of discarding it
+    # silently, say what happened.
+    def guard_discarded_block!(name, captured, slot_context)
+      return unless slot_context.empty?
+      return if captured.blank?
+
+      raise ArgumentError,
+            "tabler_ui.#{name}'s block wrote content but set no slots, so it would render " \
+            "nothing. Put it in a slot: `do |slots| slots.body { ... } end`."
     end
 
     # Renders the component partial with appropriate locals

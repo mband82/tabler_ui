@@ -7,3 +7,7 @@ en:
       unknown: "unknown"
     dark_mode_toggle:
       title: "Switch theme"
+    dimmer:
+      loader_label: "Loading..."
+    spinner:
+      label: "Loading..."
