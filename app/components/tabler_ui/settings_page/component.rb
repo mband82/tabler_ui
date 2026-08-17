@@ -2,63 +2,125 @@
 
 module TablerUi
   module SettingsPage
-    # SettingsPage component for Tabler UI
-    # Creates a settings page with sidebar navigation and content panels
+    # SettingsPage component for Tabler UI. Renders a `.card` with a sidebar
+    # list-group of items on the left and a matching tab-pane per item on the
+    # right. Builder-style: the block yields the component itself, and items
+    # are added via #item.
     #
     # @example Basic usage with block
-    #   <%= tabler_ui.settings_page(id: "my-settings", title: "Settings") do |sp| %>
-    #     <% sp.item(title: "General", icon: "settings") do %>
+    #   <%= tabler_ui.settings_page("my-settings", title: "Settings") do |sp| %>
+    #     <% sp.item("General", icon: "settings") do %>
     #       Content for general settings
     #     <% end %>
-    #     <% sp.item(title: "Security", icon: "shield") do %>
+    #     <% sp.item("Security", icon: "shield", active: true) do %>
     #       Content for security settings
     #     <% end %>
     #   <% end %>
+    #
+    # @example Rule 5 hooks -- component-level and per-item
+    #   <%= tabler_ui.settings_page("my-settings",
+    #                                html: { class: "mb-4" },
+    #                                sidebar_html: { class: "bg-dark" },
+    #                                content_html: { class: "p-0" }) do |sp| %>
+    #     <% sp.item("General", html: { class: "fw-bold" }) do %>Content<% end %>
+    #     <% sp.item("Security", html: ->(item) { { class: "text-danger" if item.title == "Security" } }) do %>
+    #       Content
+    #     <% end %>
+    #   <% end %>
     class Component
+      include TablerUi::Base
+      builder_style!
+
       attr_reader :id, :title, :items
 
-      Item = Struct.new(:id, :title, :icon, :active, :content, keyword_init: true)
+      Item = Struct.new(:id, :title, :icon, :active, :content, :html, keyword_init: true)
 
-      # Initialize settings page component
-      #
-      # @param id [String] Unique ID for the settings container (required for Bootstrap JS)
-      # @param title [String] Title displayed above the sidebar navigation
-      def initialize(id:, title: "Settings")
+      # @param id [String] Unique ID for the settings container, used to
+      #   namespace each item's list-group-item / tab-pane anchor pair.
+      # @param options [Hash]
+      # @option options [String] :title        Displayed above the sidebar navigation (default: "Settings")
+      # @option options [Hash]   :html          Rule 5 HTML hook for the outer `.card` (part :root)
+      # @option options [Hash]   :sidebar_html  Rule 5 HTML hook for the sidebar column/card-body (part :sidebar)
+      # @option options [Hash]   :content_html  Rule 5 HTML hook for the content area (part :content)
+      def initialize(id, options = {})
         @id = id
-        @title = title
+        @title = options.fetch(:title, "Settings")
         @items = []
         @item_counter = 0
+
+        initialize_html_options(options)
       end
 
-      # Add a settings item to the component
+      # Add a settings item to the component.
       #
       # @param title [String] Item title text
-      # @param icon [String, nil] Optional Tabler icon name
-      # @param active [Boolean] Whether this item is initially active (first item is active by default)
-      # @param block [Proc] Content block for the settings panel (stored as proc, captured in template)
-      def item(title:, icon: nil, active: nil, &block)
+      # @param options [Hash]
+      # @option options [String]  :icon   Optional Tabler icon name
+      # @option options [Boolean] :active Whether this item is initially active
+      #   (the first item added is active by default unless a later item is
+      #   explicitly marked active: true)
+      # @option options [Hash, Proc] :html Rule 5 HTML hook for this item's own
+      #   `a.list-group-item` (part :item). May be a plain Hash, or a callable
+      #   taking the item and returning a Hash -- see #item_attributes.
+      # @param block [Proc] Content block for the settings panel (stored as a
+      #   Proc, captured in the template)
+      def item(title, options = {}, &block)
+        builder_argument!(title, :title, builder: :item)
+
         @item_counter += 1
         item_id = "#{@id}-item-#{@item_counter}"
 
-        # First item is active by default unless explicitly set
-        is_active = active.nil? ? @items.empty? : active
+        is_active = options[:active].nil? ? @items.empty? : options[:active]
 
         @items << Item.new(
           id: item_id,
           title: title,
-          icon: icon,
+          icon: options[:icon],
           active: is_active,
-          content: block  # Store the block as a Proc, will be captured in template
+          content: block,
+          html: options[:html]
         )
 
         # Return empty string to avoid output in capture context
         ""
       end
 
-      # Check if there are any items
-      # @return [Boolean]
+      # @return [Boolean] whether there are any items
       def any?
         @items.any?
+      end
+
+      # @return [Hash] attributes for the outer element (part :root)
+      def root_attributes
+        html_for(:root, class: "card")
+      end
+
+      # @return [Hash] attributes for the sidebar column/card-body (part :sidebar)
+      def sidebar_attributes
+        html_for(:sidebar, class: "col-12 col-md-3 border-end card-body")
+      end
+
+      # @return [Hash] attributes for the content area (part :content)
+      def content_attributes
+        html_for(:content, class: "col-12 col-md-9 card-body")
+      end
+
+      # @return [Hash] attributes for a single item's `a.list-group-item`
+      #   (part :item). Items repeat, so unlike the component-level hooks
+      #   this resolves per item: the item's own :html (Hash or Proc taking
+      #   the item) is loaded into the shared html_for storage just before
+      #   resolving, then handed to html_for as normal.
+      def item_attributes(item)
+        @tabler_ui_html_options[:item] = item.html
+        html_for(:item, { class: item_classes(item) }, item)
+      end
+
+      private
+
+      def item_classes(item)
+        classes = "list-group-item list-group-item-action d-flex align-items-center"
+        classes += " active" if item.active
+        classes
       end
     end
   end

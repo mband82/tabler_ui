@@ -71,6 +71,27 @@ module TablerUi
     #   # component side:
     #   html_for(:row, { class: "table-row" }, row)
     #
+    # Guards a builder method's mandatory leading argument.
+    #
+    # Before rule 4, builders took keyword arguments -- `item(title: "General")`.
+    # They now take positionals -- `item("General")`. Ruby collapses a stale
+    # keyword call into a Hash and binds it to the positional without
+    # complaint, so the component silently renders `{title: "General"}` as its
+    # content instead of failing. That is the worst kind of migration bug: it
+    # looks like it worked. Raise instead.
+    #
+    #   def item(title, options = {})
+    #     builder_argument!(title, :title, builder: :item)
+    def builder_argument!(value, name, builder:)
+      return value unless value.is_a?(Hash)
+
+      component = self.class.name.to_s.sub(/::Component\z/, "").demodulize.underscore
+
+      raise ArgumentError,
+            "#{component}##{builder} takes #{name} positionally: " \
+            "#{builder}(#{name.to_s.inspect}), not #{builder}(#{name}: ...)"
+    end
+
     # A callable returning nil is treated as an empty hash.
     def html_for(part, defaults = {}, *args)
       stored = (@tabler_ui_html_options || {})[part]

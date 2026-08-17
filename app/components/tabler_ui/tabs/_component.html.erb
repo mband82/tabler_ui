@@ -1,36 +1,30 @@
 <%# Tabler UI Tabs Component %>
-<% if tabs.any? %>
-  <%# Tab Navigation %>
-  <ul class="<%= tabs.nav_classes %>" data-bs-toggle="tabs" role="tablist">
+<%= tag.div(**tabs.root_attributes) do %>
+  <%# TODO(rule 6): data-bs-toggle="tabs"/"tab" drive Bootstrap's Tab class
+      directly. Left as-is per instructions -- wrap this in a shared
+      tabler-ui--tab Stimulus controller once that lands. %>
+  <%= tag.ul("data-bs-toggle": "tabs", role: "tablist", **tabs.nav_attributes) do %>
     <% tabs.tabs.each do |tab| %>
       <li class="nav-item" role="presentation">
-        <a href="#<%= tab.id %>"
-           class="nav-link<%= ' active' if tab.active %>"
-           data-bs-toggle="tab"
-           aria-selected="<%= tab.active %>"
-           role="tab">
+        <%= tag.a(href: "##{tab.id}", "data-bs-toggle": "tab", role: "tab",
+                   "aria-selected": tab.active, **tabs.tab_attributes(tab)) do %>
           <% if tab.icon.present? %>
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-              <use xlink:href="/tabler-sprite.svg#tabler-<%= tab.icon %>"/>
-            </svg>
+            <%= tabler_ui.icon(icon: tab.icon, html: { class: "me-1" }) %>
           <% end %>
           <%= tab.title %>
           <% if tab.badge.present? %>
-            <span class="badge bg-<%= tab.badge_color %>-lt ms-1"><%= tab.badge %></span>
+            <span class="ms-1"><%= tabler_ui.badge(**tabs.badge_options_for(tab)) %></span>
           <% end %>
-        </a>
+        <% end %>
       </li>
     <% end %>
-  </ul>
+  <% end %>
 
-  <%# Tab Content Panels %>
-  <div class="tab-content">
+  <%= tag.div(**tabs.content_attributes) do %>
     <% tabs.tabs.each do |tab| %>
-      <div class="tab-pane<%= ' active show' if tab.active %>"
-           id="<%= tab.id %>"
-           role="tabpanel">
+      <div class="tab-pane<%= ' active show' if tab.active %>" id="<%= tab.id %>" role="tabpanel">
         <%= capture(&tab.content) if tab.content %>
       </div>
     <% end %>
-  </div>
+  <% end %>
 <% end %>

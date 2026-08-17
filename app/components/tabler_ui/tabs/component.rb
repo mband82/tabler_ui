@@ -2,77 +2,147 @@
 
 module TablerUi
   module Tabs
-    # Tabs component for Tabler UI
-    # Creates navigable tab panels with Bootstrap 5 tabs
+    # Tabs component for Tabler UI. Renders a `ul.nav` of tab links plus a
+    # matching `.tab-content` pane per tab. Builder-style: the block yields
+    # the component itself, and tabs are added via #tab.
     #
     # @example Basic usage with block
-    #   <%= tabler_ui.tabs(id: "my-tabs") do |tabs| %>
-    #     <% tabs.tab(title: "First Tab", icon: "home") do %>
+    #   <%= tabler_ui.tabs("my-tabs") do |tabs| %>
+    #     <% tabs.tab("First Tab", icon: "home") do %>
     #       Content for first tab
     #     <% end %>
-    #     <% tabs.tab(title: "Second Tab") do %>
+    #     <% tabs.tab("Second Tab") do %>
     #       Content for second tab
     #     <% end %>
     #   <% end %>
     #
-    # @example Card-style tabs
-    #   <%= tabler_ui.tabs(id: "card-tabs", style: :card) do |tabs| %>
+    # @example Card-style / pills / underline
+    #   <%= tabler_ui.tabs("card-tabs", style: :card) do |tabs| %>
     #     ...
     #   <% end %>
     #
-    # @example Pills style
-    #   <%= tabler_ui.tabs(id: "pill-tabs", style: :pills) do |tabs| %>
-    #     ...
+    # @example Badge as text (badge component's own default colour) or
+    #   forwarded badge options
+    #   <% tabs.tab("Inbox", badge: "3") %>
+    #   <% tabs.tab("Inbox", badge: { text: "3", color: "red" }) %>
+    #
+    # @example Rule 5 hooks -- component-level and per-tab
+    #   <%= tabler_ui.tabs("my-tabs", html: { class: "mb-3" },
+    #                       nav_html: { class: "mb-0" },
+    #                       content_html: { class: "p-2" }) do |tabs| %>
+    #     <% tabs.tab("First", html: { class: "fw-bold" }) %>
+    #     <% tabs.tab("Second", html: ->(tab) { { class: "text-danger" } if tab.title == "Second" }) %>
     #   <% end %>
     class Component
-      attr_reader :id, :style, :custom_class, :tabs
+      include TablerUi::Base
+      builder_style!
 
-      Tab = Struct.new(:id, :title, :icon, :badge, :badge_color, :active, :content, keyword_init: true)
+      # :html holds the caller's *raw* per-tab hook (Hash or Proc taking the
+      # tab), not resolved attributes -- see #tab_attributes.
+      Tab = Struct.new(:id, :title, :icon, :badge, :active, :content, :html, keyword_init: true)
 
-      # Initialize tabs component
-      #
-      # @param id [String] Unique ID for the tabs container (required for Bootstrap JS)
-      # @param style [Symbol] Tab style - :tabs (default), :pills, :card, :underline
-      # @param custom_class [String, nil] Additional CSS classes for the nav element
-      def initialize(id:, style: :tabs, custom_class: nil)
+      attr_reader :id, :style, :tabs
+
+      # @param id [String] Unique ID for the tabs container, used as the base
+      #   for each tab pane's anchor id ("#{id}-tab-1", ...). Mandatory --
+      #   Bootstrap's tab JS needs stable anchor targets.
+      # @param options [Hash]
+      # @option options [Symbol, String] :style Tab style -- :tabs (default), :pills, :card, :underline
+      # @option options [Hash] :html         Rule 5 HTML hook for the outer wrapper (part :root)
+      # @option options [Hash] :nav_html     Rule 5 HTML hook for the `ul.nav` (part :nav)
+      # @option options [Hash] :content_html Rule 5 HTML hook for the `.tab-content` (part :content)
+      def initialize(id, options = {})
         @id = id
-        @style = style
-        @custom_class = custom_class
+        @style = (options[:style] || :tabs).to_sym
         @tabs = []
         @tab_counter = 0
+
+        initialize_html_options(options)
       end
 
-      # Add a tab to the component
+      # Adds a tab.
       #
       # @param title [String] Tab title text
-      # @param icon [String, nil] Optional Tabler icon name
-      # @param badge [String, nil] Optional badge text
-      # @param badge_color [String] Badge color (default: "blue")
-      # @param active [Boolean] Whether this tab is initially active (first tab is active by default)
-      # @param block [Proc] Content block for the tab panel (stored as proc, captured in template)
-      def tab(title:, icon: nil, badge: nil, badge_color: "blue", active: nil, &block)
+      # @param options [Hash]
+      # @option options [String] :icon Optional Tabler icon name, rendered via tabler_ui.icon
+      # @option options [String, Hash] :badge Badge text (String -- rendered
+      #   with the badge component's own default colour) or a Hash of options
+      #   forwarded straight to the badge component, e.g. { text: "3", color: "red" }
+      # @option options [Boolean] :active Whether this tab is initially active
+      #   (the first tab added is active by default unless a later tab is
+      #   explicitly marked active: true)
+      # @option options [Hash, #call] :html Rule 5 HTML hook for this tab's
+      #   `a.nav-link` (part :tab) -- a plain Hash, or a callable taking the tab
+      # @param block [Proc] Content block for the tab panel, captured in the template
+      # @return [String] empty string, to avoid stray output in a capture context
+      def tab(title, options = {}, &block)
+        builder_argument!(title, :title, builder: :tab)
+
         @tab_counter += 1
         tab_id = "#{@id}-tab-#{@tab_counter}"
 
-        # First tab is active by default unless explicitly set
-        is_active = active.nil? ? @tabs.empty? : active
+        is_active = options[:active].nil? ? @tabs.empty? : options[:active]
 
         @tabs << Tab.new(
           id: tab_id,
           title: title,
-          icon: icon,
-          badge: badge,
-          badge_color: badge_color,
+          icon: options[:icon],
+          badge: options[:badge],
           active: is_active,
-          content: block  # Store the block as a Proc, will be captured in template
+          content: block,
+          html: options[:html]
         )
 
-        # Return empty string to avoid output in capture context
         ""
       end
 
-      # Returns the nav CSS classes based on style
-      # @return [String] Combined CSS classes
+      # @return [Boolean] whether there are any tabs
+      def any?
+        @tabs.any?
+      end
+
+      # @return [Hash] attributes for the outer wrapper (part :root)
+      def root_attributes
+        html_for(:root, class: "tabs")
+      end
+
+      # @return [Hash] attributes for the `ul.nav` (part :nav)
+      def nav_attributes
+        html_for(:nav, class: nav_classes)
+      end
+
+      # @return [Hash] attributes for the `.tab-content` (part :content)
+      def content_attributes
+        html_for(:content, class: "tab-content")
+      end
+
+      # @param tab [Tab] the tab being rendered
+      # @return [Hash] attributes for this tab's `a.nav-link` (part :tab).
+      #   Tabs repeat, so unlike the component-level hooks this resolves per
+      #   tab: the tab's own :html (Hash or Proc taking the tab) is loaded
+      #   into the shared html_for storage just before resolving, then
+      #   handed to html_for as normal.
+      def tab_attributes(tab)
+        @tabler_ui_html_options[:tab] = tab.html
+        html_for(:tab, { class: tab_link_classes(tab) }, tab)
+      end
+
+      # @param tab [Tab] the tab being rendered
+      # @return [Hash] options forwarded to the badge component for this
+      #   tab's badge -- a String becomes { text: ... }, a Hash passes
+      #   straight through.
+      def badge_options_for(tab)
+        tab.badge.is_a?(Hash) ? tab.badge : { text: tab.badge }
+      end
+
+      private
+
+      def tab_link_classes(tab)
+        classes = ["nav-link"]
+        classes << "active" if tab.active
+        classes.join(" ")
+      end
+
       def nav_classes
         classes = ["nav"]
 
@@ -80,23 +150,14 @@ module TablerUi
         when :pills
           classes << "nav-pills"
         when :card
-          classes << "nav-tabs"
-          classes << "card-header-tabs"
+          classes << "nav-tabs" << "card-header-tabs"
         when :underline
-          classes << "nav-tabs"
-          classes << "nav-tabs-alt"
+          classes << "nav-tabs" << "nav-tabs-alt"
         else
           classes << "nav-tabs"
         end
 
-        classes << custom_class if custom_class
         classes.join(" ")
-      end
-
-      # Check if there are any tabs
-      # @return [Boolean]
-      def any?
-        @tabs.any?
       end
     end
   end

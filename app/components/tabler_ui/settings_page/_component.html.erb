@@ -1,39 +1,33 @@
 <%# Tabler UI SettingsPage Component %>
-<% if settings_page.any? %>
-  <div class="card">
-    <div class="row g-0">
-      <%# Sidebar Navigation %>
-      <div class="col-12 col-md-3 border-end">
-        <div class="card-body">
-          <h4 class="subheader"><%= settings_page.title %></h4>
-          <div class="list-group list-group-transparent">
-            <% settings_page.items.each do |item| %>
-              <a href="#<%= item.id %>"
-                 class="list-group-item list-group-item-action d-flex align-items-center<%= ' active' if item.active %>"
-                 data-bs-toggle="list">
-                <% if item.icon.present? %>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <use xlink:href="/tabler-sprite.svg#tabler-<%= item.icon %>"/>
-                  </svg>
-                <% end %>
-                <%= item.title %>
-              </a>
+<%= tag.div(**settings_page.root_attributes) do %>
+  <div class="row g-0">
+    <%# Sidebar Navigation %>
+    <%= tag.div(**settings_page.sidebar_attributes) do %>
+      <h4 class="subheader"><%= settings_page.title %></h4>
+      <div class="list-group list-group-transparent">
+        <% settings_page.items.each do |item| %>
+          <%# TODO(rule 6): data-bs-toggle="list" drives Bootstrap's Tab class
+              directly. Left as-is per instructions -- once tabs is converted to
+              Stimulus, wrap this in a shared tabler-ui--tab controller, since
+              Bootstrap's Tab class backs both data-bs-toggle="tab" and "list". %>
+          <%= tag.a(href: "##{item.id}", "data-bs-toggle": "list", **settings_page.item_attributes(item)) do %>
+            <% if item.icon.present? %>
+              <%= tabler_ui.icon(icon: item.icon, html: { class: "me-2" }) %>
             <% end %>
-          </div>
-        </div>
+            <%= item.title %>
+          <% end %>
+        <% end %>
       </div>
-      <%# Content Area %>
-      <div class="col-12 col-md-9">
-        <div class="card-body">
-          <div class="tab-content">
-            <% settings_page.items.each do |item| %>
-              <div class="tab-pane<%= ' active show' if item.active %>" id="<%= item.id %>">
-                <%= capture(&item.content) if item.content %>
-              </div>
-            <% end %>
+    <% end %>
+    <%# Content Area %>
+    <%= tag.div(**settings_page.content_attributes) do %>
+      <div class="tab-content">
+        <% settings_page.items.each do |item| %>
+          <div class="tab-pane<%= ' active show' if item.active %>" id="<%= item.id %>">
+            <%= capture(&item.content) if item.content %>
           </div>
-        </div>
+        <% end %>
       </div>
-    </div>
+    <% end %>
   </div>
 <% end %>

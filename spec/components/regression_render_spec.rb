@@ -36,10 +36,10 @@ RSpec.describe "TablerUi component regression render", type: :component do
   end
 
   it "renders datagrid" do
-    fragment = component_fragment(:datagrid) { |dg| dg.item("Title", "Value") }
+    fragment = component_fragment(:datagrid) { |dg| dg.item("Title", content: "Value") }
 
     expect(fragment.css(".datagrid-item")).not_to be_empty
-    expect(fragment.to_html).not_to be_empty
+    expect(fragment.text).to include("Title", "Value")
   end
 
   it "renders dropdown" do
@@ -86,11 +86,11 @@ RSpec.describe "TablerUi component regression render", type: :component do
 
   it "renders settings_page" do
     fragment = component_fragment(:settings_page, id: "settings-1") do |sp|
-      sp.item(title: "General") { "General settings content" }
+      sp.item("General") { "General settings content" }
     end
 
     expect(fragment.css(".tab-pane")).not_to be_empty
-    expect(fragment.to_html).not_to be_empty
+    expect(fragment.text).to include("General", "General settings content")
   end
 
   it "renders status" do
@@ -102,11 +102,11 @@ RSpec.describe "TablerUi component regression render", type: :component do
 
   it "renders tabs" do
     fragment = component_fragment(:tabs, id: "tabs-1") do |tabs|
-      tabs.tab(title: "First") { "First tab content" }
+      tabs.tab("First") { "First tab content" }
     end
 
     expect(fragment.css(".tab-pane")).not_to be_empty
-    expect(fragment.to_html).not_to be_empty
+    expect(fragment.text).to include("First", "First tab content")
   end
 
   # bare partials (app/components/tabler_ui/_<name>.html.erb) -- OpenStruct
