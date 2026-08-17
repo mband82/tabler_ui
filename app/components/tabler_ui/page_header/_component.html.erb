@@ -5,6 +5,9 @@
         <%= tag.div(page_header.pretitle, **page_header.pretitle_attributes) %>
       <% end %>
       <%= tag.h2(page_header.title, **page_header.title_attributes) %>
+      <% if page_header.subtitle? %>
+        <%= tag.div(page_header.subtitle, **page_header.subtitle_attributes) %>
+      <% end %>
     </div>
     <% if defined?(slots) && slots.present?(:buttons) %>
       <%= tag.div(**page_header.buttons_attributes) do %>

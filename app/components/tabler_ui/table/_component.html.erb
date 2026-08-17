@@ -11,7 +11,7 @@
       <% table.data.each do |row| %>
         <%= tag.tr(**table.row_attributes(row)) do %>
           <% table.columns.each do |col| %>
-            <%= tag.td(col[:value].call(row), **table.cell_attributes(col)) %>
+            <%= tag.td(col[:value].call(row), **table.data_cell_attributes(col)) %>
           <% end %>
         <% end %>
       <% end %>

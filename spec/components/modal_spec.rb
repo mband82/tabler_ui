@@ -81,6 +81,47 @@ RSpec.describe "TablerUi::Modal", type: :component do
       .to raise_error(ArgumentError, /modal/)
   end
 
+  it "mentions the fullscreen breakpoint sizes in the unknown-size error message" do
+    expect { component_fragment(:modal, "my-modal", size: "not-a-real-size") }
+      .to raise_error(ArgumentError, /fullscreen-sm-down/)
+  end
+
+  %w[sm lg xl].each do |size|
+    it "still adds modal-#{size} for size: #{size}" do
+      fragment = component_fragment(:modal, "my-modal", size: size)
+
+      expect(fragment.css(".modal-dialog").first["class"].split(/\s+/)).to include("modal-#{size}")
+    end
+  end
+
+  %w[sm md lg xl xxl].each do |bp|
+    it "adds modal-fullscreen-#{bp}-down (not a bare modal-fullscreen) for size: fullscreen-#{bp}-down" do
+      fragment = component_fragment(:modal, "my-modal", size: "fullscreen-#{bp}-down")
+      classes = fragment.css(".modal-dialog").first["class"].split(/\s+/)
+
+      expect(classes).to include("modal-fullscreen-#{bp}-down")
+      expect(classes).not_to include("modal-fullscreen")
+    end
+  end
+
+  it "adds modal-full-width for full_width: true" do
+    fragment = component_fragment(:modal, "my-modal", full_width: true)
+
+    expect(fragment.css(".modal-dialog").first["class"].split(/\s+/)).to include("modal-full-width")
+  end
+
+  it "raises ArgumentError when full_width: is combined with size:" do
+    expect { component_fragment(:modal, "my-modal", full_width: true, size: "lg") }
+      .to raise_error(ArgumentError, /full_width/)
+  end
+
+  it "adds modal-full-width alongside centered: and scrollable:" do
+    fragment = component_fragment(:modal, "my-modal", full_width: true, centered: true, scrollable: true)
+    classes = fragment.css(".modal-dialog").first["class"].split(/\s+/)
+
+    expect(classes).to include("modal-full-width", "modal-dialog-centered", "modal-dialog-scrollable")
+  end
+
   it "adds modal-dialog-centered for centered: true" do
     fragment = component_fragment(:modal, "my-modal", centered: true)
 

@@ -57,9 +57,13 @@ module TablerUi
     class Component
       include TablerUi::Base
 
-      SIZES = %w[sm lg xl fullscreen].freeze
+      # Plain sizes, the bare fullscreen dialog, and a fullscreen breakpoint
+      # cutoff per TablerUi::Breakpoint (modal-fullscreen-sm-down and friends
+      # -- fullscreen below that breakpoint, normal dialog above it).
+      SIZES = (%w[sm lg xl fullscreen] +
+               TablerUi::Breakpoint::ALL.map { |bp| "fullscreen-#{bp}-down" }).freeze
 
-      attr_reader :id, :title, :size, :centered, :scrollable, :blur, :status, :close_button
+      attr_reader :id, :title, :size, :full_width, :centered, :scrollable, :blur, :status, :close_button
 
       # @param id [String] Mandatory DOM id for the `.modal` root -- the
       #   anchor a caller's own toggler points at via
@@ -67,8 +71,13 @@ module TablerUi
       # @param options [Hash]
       # @option options [String]  :title        Rendered as an `<h5 class="modal-title">`
       #   inside the header when no `header` slot is given.
-      # @option options [String, Symbol] :size  Dialog size -- "sm", "lg", "xl", or
-      #   "fullscreen" (renders `modal-fullscreen`, not `modal-modal-fullscreen`)
+      # @option options [String, Symbol] :size  Dialog size -- "sm", "lg", "xl",
+      #   "fullscreen" (renders `modal-fullscreen`, not `modal-modal-fullscreen`),
+      #   or "fullscreen-sm-down" / "-md-down" / "-lg-down" / "-xl-down" /
+      #   "-xxl-down" (renders `modal-fullscreen-<bp>-down`). Mutually
+      #   exclusive with :full_width -- both control the dialog's width.
+      # @option options [Boolean] :full_width   modal-full-width -- dialog spans the
+      #   viewport with a small margin instead of a fixed max-width (default: false)
       # @option options [Boolean] :centered     modal-dialog-centered (default: false)
       # @option options [Boolean] :scrollable   modal-dialog-scrollable (default: false)
       # @option options [Boolean] :blur         modal-blur (backdrop blur) on the root (default: false)
@@ -85,6 +94,9 @@ module TablerUi
         @id = id
         @title = options[:title]
         @size = validate_size(options[:size])
+        @full_width = options[:full_width]
+        raise ArgumentError, "modal :full_width can't be combined with :size -- both control the dialog width" if full_width && size
+
         @centered = options[:centered]
         @scrollable = options[:scrollable]
         @blur = options[:blur]
@@ -173,8 +185,12 @@ module TablerUi
         if size == "fullscreen"
           classes << "modal-fullscreen"
         elsif size.present?
+          # Covers both the plain sizes (sm/lg/xl) and the compound
+          # fullscreen-<bp>-down values -- both already read as
+          # "modal-<size>" once "modal-" is prefixed.
           classes << "modal-#{size}"
         end
+        classes << "modal-full-width" if full_width
         classes << "modal-dialog-centered" if centered
         classes << "modal-dialog-scrollable" if scrollable
         classes.join(" ")

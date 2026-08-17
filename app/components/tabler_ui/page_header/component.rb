@@ -28,10 +28,19 @@ module TablerUi
     #                             title_html: { class: "text-uppercase" },
     #                             pretitle_html: { data: { testid: "pretitle" } },
     #                             buttons_html: { class: "gap-2" } %>
+    #
+    # @example Border, large title and a subtitle
+    #   <%= tabler_ui.page_header title: "Dashboard", pretitle: "Overview",
+    #                             subtitle: "Last 30 days", border: true,
+    #                             title_size: "lg" %>
     class Component
       include TablerUi::Base
 
-      attr_reader :title, :pretitle
+      # Valid values for `title_size:`. A list rather than a boolean so it
+      # can grow if Tabler adds more `.page-title-*` size variants.
+      TITLE_SIZES = %w[lg].freeze
+
+      attr_reader :title, :pretitle, :subtitle, :title_size
 
       # @param options [Hash]
       # @option options [String] :title    Page title, rendered in an
@@ -40,6 +49,14 @@ module TablerUi
       #   title in `.page-pretitle` (part :pretitle), only when present.
       #   Matches Tabler's own `page-pretitle` CSS class and the element's
       #   position above the title -- not a subtitle.
+      # @option options [String] :subtitle Small label rendered below the
+      #   title in `.page-subtitle` (part :subtitle), only when present.
+      #   Independent of `pretitle:` -- both can be given at once.
+      # @option options [Boolean] :border  Appends `page-header-border` to
+      #   the root element (part :root) when true.
+      # @option options [String] :title_size One of {TITLE_SIZES}. Appends
+      #   `page-title-<size>` alongside `page-title` on the `h2` (part
+      #   :title). Raises ArgumentError for any other value.
       # @option options [Hash] :html          Rule 5 HTML hook for the
       #   outermost `.page-header` element (part :root)
       # @option options [Hash] :title_html    Rule 5 HTML hook for the
@@ -47,12 +64,18 @@ module TablerUi
       # @option options [Hash] :pretitle_html Rule 5 HTML hook for the
       #   `.page-pretitle` div (part :pretitle), only used when a pretitle
       #   renders
+      # @option options [Hash] :subtitle_html Rule 5 HTML hook for the
+      #   `.page-subtitle` div (part :subtitle), only used when a subtitle
+      #   renders
       # @option options [Hash] :buttons_html  Rule 5 HTML hook for the
       #   right-aligned buttons column (part :buttons), only used when the
       #   `buttons` slot has content
       def initialize(options = {})
         @title = options[:title]
         @pretitle = options[:pretitle]
+        @subtitle = options[:subtitle]
+        @border = options[:border]
+        @title_size = validate_title_size(options[:title_size])
 
         initialize_html_options(options)
       end
@@ -62,16 +85,27 @@ module TablerUi
         @pretitle.present?
       end
 
+      # @return [Boolean] whether a subtitle should be rendered
+      def subtitle?
+        @subtitle.present?
+      end
+
+      # @return [Boolean] whether the root element carries the
+      #   `page-header-border` class
+      def border?
+        @border.present?
+      end
+
       # @return [Hash] attributes for the outermost element (part :root),
       #   merged with whatever the caller supplied via html:.
       def root_attributes
-        html_for(:root, class: "page-header d-print-none mb-3")
+        html_for(:root, class: root_classes)
       end
 
       # @return [Hash] attributes for the `h2.page-title` (part :title),
       #   merged with whatever the caller supplied via title_html:.
       def title_attributes
-        html_for(:title, class: "page-title")
+        html_for(:title, class: title_classes)
       end
 
       # @return [Hash] attributes for the `.page-pretitle` div (part
@@ -81,11 +115,46 @@ module TablerUi
         html_for(:pretitle, class: "page-pretitle")
       end
 
+      # @return [Hash] attributes for the `.page-subtitle` div (part
+      #   :subtitle), merged with whatever the caller supplied via
+      #   subtitle_html:. Only used when subtitle? is true.
+      def subtitle_attributes
+        html_for(:subtitle, class: "page-subtitle")
+      end
+
       # @return [Hash] attributes for the right-aligned buttons column (part
       #   :buttons), merged with whatever the caller supplied via
       #   buttons_html:. Only used when the buttons slot has content.
       def buttons_attributes
         html_for(:buttons, class: "col-auto ms-auto d-print-none")
+      end
+
+      private
+
+      # @return [String] classes for the outermost element (part :root)
+      def root_classes
+        classes = ["page-header", "d-print-none", "mb-3"]
+        classes << "page-header-border" if border?
+        classes.join(" ")
+      end
+
+      # @return [String] classes for the `h2.page-title` (part :title)
+      def title_classes
+        classes = ["page-title"]
+        classes << "page-title-#{@title_size}" if @title_size
+        classes.join(" ")
+      end
+
+      # Validates `title_size:` against {TITLE_SIZES}, raising ArgumentError
+      # naming the offender and the valid values. Passing nil returns nil
+      # (title_size is optional).
+      def validate_title_size(value)
+        return nil if value.nil?
+
+        value = value.to_s
+        return value if TITLE_SIZES.include?(value)
+
+        raise ArgumentError, "unknown title_size #{value.inspect} for page_header — valid: #{TITLE_SIZES.join(', ')}"
       end
     end
   end

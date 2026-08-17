@@ -160,4 +160,136 @@ RSpec.describe "TablerUi::Table", type: :component do
     expect(fragment.css(".card")).to be_empty
     expect(fragment.css(".table-responsive table")).not_to be_empty
   end
+
+  describe "responsive:" do
+    it "defaults to plain table-responsive on the wrapper, and no data-label on cells" do
+      columns = [{ label: "Name", value: ->(row) { row[:name] } }]
+      fragment = component_fragment(:table, columns: columns, data: [{ name: "Ada" }])
+
+      expect(fragment.css(".table-responsive")).not_to be_empty
+      expect(fragment.css("td[data-label]")).to be_empty
+    end
+
+    TablerUi::Breakpoint::ALL.each do |breakpoint|
+      it "responsive: #{breakpoint.inspect} emits table-responsive-#{breakpoint} and not plain table-responsive" do
+        fragment = component_fragment(:table, responsive: breakpoint)
+
+        wrapper = fragment.css(".card .table-responsive-#{breakpoint}")
+        expect(wrapper).not_to be_empty
+
+        classes = wrapper.first["class"].split(/\s+/)
+        expect(classes).to include("table-responsive-#{breakpoint}")
+        expect(classes).not_to include("table-responsive")
+      end
+    end
+
+    it "raises ArgumentError for an invalid breakpoint" do
+      expect {
+        component_fragment(:table, responsive: "huge")
+      }.to raise_error(ArgumentError, /unknown breakpoint/)
+    end
+
+    it "responsive: false emits neither class, with card: true" do
+      fragment = component_fragment(:table, responsive: false)
+
+      expect(fragment.css(".card")).not_to be_empty
+      expect(fragment.css(".table-responsive")).to be_empty
+      expect(fragment.css("[class*='table-responsive-']")).to be_empty
+    end
+
+    it "responsive: false emits neither class, with card: false" do
+      fragment = component_fragment(:table, responsive: false, card: false)
+
+      expect(fragment.css(".table-responsive")).to be_empty
+      expect(fragment.css("[class*='table-responsive-']")).to be_empty
+      expect(fragment.css("table")).not_to be_empty
+    end
+  end
+
+  describe "mobile:" do
+    let(:columns) do
+      [
+        { label: "Name", value: ->(row) { row[:name] } },
+        { label: "Age", value: ->(row) { row[:age].to_s } },
+      ]
+    end
+    let(:data) { [{ name: "Ada", age: 36 }, { name: "Grace", age: 85 }] }
+
+    it "mobile: true puts table-mobile on the <table>, not on the wrapper" do
+      fragment = component_fragment(:table, columns: columns, data: data, mobile: true)
+
+      table_el = fragment.css("table").first
+      expect(table_el["class"].split(/\s+/)).to include("table-mobile")
+      expect(fragment.css(".table-responsive")[0]["class"].split(/\s+/)).not_to include("table-mobile")
+    end
+
+    it "mobile: true gives every <td> a data-label matching its column, aligned by position" do
+      fragment = component_fragment(:table, columns: columns, data: data, mobile: true)
+
+      rows = fragment.css("tbody tr")
+      expect(rows.size).to eq(2)
+
+      rows.each do |row|
+        cells = row.css("td")
+        expect(cells.map { |td| td["data-label"] }).to eq(%w[Name Age])
+      end
+    end
+
+    it "mobile: true does not add data-label to <th> cells" do
+      fragment = component_fragment(:table, columns: columns, data: data, mobile: true)
+
+      expect(fragment.css("thead th[data-label]")).to be_empty
+    end
+
+    TablerUi::Breakpoint::ALL.each do |breakpoint|
+      it "mobile: #{breakpoint.inspect} emits table-mobile-#{breakpoint} on the <table>" do
+        fragment = component_fragment(:table, mobile: breakpoint)
+
+        classes = fragment.css("table").first["class"].split(/\s+/)
+        expect(classes).to include("table-mobile-#{breakpoint}")
+        expect(classes).not_to include("table-mobile")
+      end
+    end
+
+    it "raises ArgumentError for an invalid breakpoint" do
+      expect {
+        component_fragment(:table, mobile: "huge")
+      }.to raise_error(ArgumentError, /unknown breakpoint/)
+    end
+
+    it "omits data-label for a column with a nil label, but still labels the others" do
+      columns_with_blank = [
+        { label: nil, value: ->(row) { row[:actions] } },
+        { label: "Name", value: ->(row) { row[:name] } },
+      ]
+      data_rows = [{ actions: "edit", name: "Ada" }]
+
+      fragment = component_fragment(:table, columns: columns_with_blank, data: data_rows, mobile: true)
+      cells = fragment.css("tbody tr").first.css("td")
+
+      expect(cells[0].attribute("data-label")).to be_nil
+      expect(cells[1]["data-label"]).to eq("Name")
+    end
+
+    it "omits data-label for a column with a blank string label" do
+      columns_with_blank = [{ label: "", value: ->(row) { row[:name] } }]
+      data_rows = [{ name: "Ada" }]
+
+      fragment = component_fragment(:table, columns: columns_with_blank, data: data_rows, mobile: true)
+
+      expect(fragment.css("tbody td").first.attribute("data-label")).to be_nil
+    end
+
+    it "combines with responsive: and the boolean style modifiers" do
+      fragment = component_fragment(:table, columns: columns, data: data,
+                                             mobile: "md", responsive: "lg", striped: true, hover: true)
+
+      table_el = fragment.css("table").first
+      classes = table_el["class"].split(/\s+/)
+
+      expect(classes).to include("table-mobile-md", "table-striped", "table-hover")
+      expect(fragment.css(".table-responsive-lg")).not_to be_empty
+      expect(fragment.css("tbody td").first["data-label"]).to eq("Name")
+    end
+  end
 end

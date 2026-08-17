@@ -29,11 +29,73 @@ RSpec.describe "TablerUi::PageHeader", type: :component do
     expect(fragment.css(".page-pretitle")).to be_empty
   end
 
-  it "no longer accepts subtitle: -- passing it renders no pretitle (rename regression)" do
-    fragment = component_fragment(:page_header, title: "Dashboard", subtitle: "Overview")
+  it "renders subtitle: in .page-subtitle, after the title and separate from pretitle" do
+    fragment = component_fragment(:page_header, title: "Dashboard", subtitle: "Last 30 days")
 
+    expect(fragment.css(".page-subtitle").text).to eq("Last 30 days")
     expect(fragment.css(".page-pretitle")).to be_empty
-    expect(fragment.to_html).not_to include("Overview")
+  end
+
+  it "renders no subtitle element when subtitle: is omitted" do
+    fragment = component_fragment(:page_header, title: "Dashboard")
+
+    expect(fragment.css(".page-subtitle")).to be_empty
+  end
+
+  it "positions .page-subtitle immediately after h2.page-title, inside the same .col" do
+    fragment = component_fragment(:page_header, title: "Dashboard", subtitle: "Last 30 days")
+    col = fragment.css(".col").first
+    children = col.css("> *")
+
+    expect(children.map(&:name)).to eq(%w[h2 div])
+    expect(children.last["class"].to_s.split(/\s+/)).to include("page-subtitle")
+  end
+
+  it "renders pretitle before the title and subtitle after it when both are present" do
+    fragment = component_fragment(:page_header, title: "Dashboard", pretitle: "Overview", subtitle: "Last 30 days")
+    col = fragment.css(".col").first
+    children = col.css("> *")
+
+    expect(children.map { |el| el["class"] }).to eq(%w[page-pretitle page-title page-subtitle])
+  end
+
+  it "appends page-header-border to the root when border: true" do
+    fragment = component_fragment(:page_header, title: "Dashboard", border: true)
+    element = fragment.css(".page-header").first
+
+    expect(element["class"].to_s.split(/\s+/)).to include("page-header-border")
+  end
+
+  it "does not add page-header-border by default" do
+    fragment = component_fragment(:page_header, title: "Dashboard")
+    element = fragment.css(".page-header").first
+
+    expect(element["class"].to_s.split(/\s+/)).not_to include("page-header-border")
+  end
+
+  it "appends page-title-lg alongside page-title when title_size: 'lg'" do
+    fragment = component_fragment(:page_header, title: "Dashboard", title_size: "lg")
+    element = fragment.css("h2.page-title").first
+
+    classes = element["class"].to_s.split(/\s+/)
+    expect(classes).to include("page-title")
+    expect(classes).to include("page-title-lg")
+  end
+
+  it "raises ArgumentError for an invalid title_size:" do
+    expect do
+      component_fragment(:page_header, title: "Dashboard", title_size: "xl")
+    end.to raise_error(ArgumentError, /xl/)
+  end
+
+  it "leaves existing output unchanged when none of the new options are passed" do
+    fragment = component_fragment(:page_header, title: "Dashboard", pretitle: "Overview")
+    element = fragment.css(".page-header").first
+    title = fragment.css("h2.page-title").first
+
+    expect(element["class"].to_s.split(/\s+/)).to eq(%w[page-header d-print-none mb-3])
+    expect(title["class"].to_s.split(/\s+/)).to eq(%w[page-title])
+    expect(fragment.css(".page-subtitle")).to be_empty
   end
 
   it_behaves_like "an element with an html hook", :page_header, {},
@@ -44,6 +106,9 @@ RSpec.describe "TablerUi::PageHeader", type: :component do
 
   it_behaves_like "an element with an html hook", :page_header, { title: "Dashboard", pretitle: "Overview" },
     hook: :pretitle_html, selector: ".page-pretitle"
+
+  it_behaves_like "an element with an html hook", :page_header, { title: "Dashboard", subtitle: "Last 30 days" },
+    hook: :subtitle_html, selector: ".page-subtitle"
 
   it "passes id/data/class through buttons_html: onto the buttons column" do
     fragment = component_fragment(:page_header, title: "Dashboard",

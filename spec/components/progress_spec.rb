@@ -157,4 +157,61 @@ RSpec.describe "TablerUi::Progress", type: :component do
       expect(bar["aria-valuemax"]).to eq("100")
     end
   end
+
+  describe "indeterminate: true" do
+    it "adds progress-bar-indeterminate to the bar" do
+      fragment = component_fragment(:progress, indeterminate: true)
+      classes = fragment.css(".progress-bar").first["class"].split(/\s+/)
+
+      expect(classes).to include("progress-bar-indeterminate")
+    end
+
+    it "omits the inline width style and aria-valuenow" do
+      fragment = component_fragment(:progress, indeterminate: true)
+      bar = fragment.css(".progress-bar").first
+
+      expect(bar["style"]).to be_nil
+      expect(bar["aria-valuenow"]).to be_nil
+    end
+
+    it "keeps role and aria-valuemin/aria-valuemax" do
+      fragment = component_fragment(:progress, indeterminate: true)
+      bar = fragment.css(".progress-bar").first
+
+      expect(bar["role"]).to eq("progressbar")
+      expect(bar["aria-valuemin"]).to eq("0")
+      expect(bar["aria-valuemax"]).to eq("100")
+    end
+
+    it "raises ArgumentError when combined with percent:" do
+      expect { component_fragment(:progress, indeterminate: true, percent: 50) }
+        .to raise_error(ArgumentError, /percent/)
+    end
+
+    it "does not add progress-bar-indeterminate by default" do
+      fragment = component_fragment(:progress)
+
+      expect(fragment.css(".progress-bar").first["class"].split(/\s+/)).not_to include("progress-bar-indeterminate")
+    end
+  end
+
+  describe "separated: true" do
+    it "adds progress-separated to the outer .progress track" do
+      fragment = component_fragment(:progress, separated: true)
+
+      expect(fragment.css(".progress").first["class"].split(/\s+/)).to include("progress-separated")
+    end
+
+    it "does not add progress-separated to the bar" do
+      fragment = component_fragment(:progress, separated: true)
+
+      expect(fragment.css(".progress-bar").first["class"].split(/\s+/)).not_to include("progress-separated")
+    end
+
+    it "does not add progress-separated by default" do
+      fragment = component_fragment(:progress)
+
+      expect(fragment.css(".progress").first["class"].split(/\s+/)).not_to include("progress-separated")
+    end
+  end
 end

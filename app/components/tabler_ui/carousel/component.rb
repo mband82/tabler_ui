@@ -96,6 +96,8 @@ module TablerUi
       # @param options [Hash]
       # @option options [Boolean] :fade Cross-fade between slides instead of
       #   sliding (`carousel-fade`, default: false)
+      # @option options [Boolean] :dark Dark-variant controls/indicators/caption
+      #   for use over light backgrounds (`carousel-dark`, default: false)
       # @option options [Boolean, Symbol] :indicators Indicator dots below the
       #   slides -- `true` (default), `false`, or a variant: `:dot`, `:thumb`
       #   (renders each indicator as a background-image thumbnail from that
@@ -119,6 +121,7 @@ module TablerUi
       def initialize(id, options = {})
         @id = id
         @fade = options[:fade]
+        @dark = options[:dark]
         @indicators = validate_indicators!(options.fetch(:indicators, true))
         @controls = options.fetch(:controls, true)
         @interval = options[:interval]
@@ -304,6 +307,7 @@ module TablerUi
       def root_classes
         classes = ["carousel", "slide"]
         classes << "carousel-fade" if @fade
+        classes << "carousel-dark" if @dark
         classes.join(" ")
       end
 

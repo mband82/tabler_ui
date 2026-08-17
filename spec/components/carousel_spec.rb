@@ -202,6 +202,38 @@ RSpec.describe "TablerUi::Carousel", type: :component do
     end
   end
 
+  describe "dark:" do
+    it "adds carousel-dark" do
+      fragment = component_fragment(:carousel, "my-carousel", dark: true)
+
+      expect(fragment.css(".carousel").first["class"].split(/\s+/)).to include("carousel-dark")
+    end
+
+    it "omits carousel-dark by default" do
+      fragment = component_fragment(:carousel, "my-carousel")
+
+      expect(fragment.css(".carousel").first["class"].split(/\s+/)).not_to include("carousel-dark")
+    end
+
+    it "combines with fade: true" do
+      fragment = component_fragment(:carousel, "my-carousel", dark: true, fade: true)
+
+      classes = fragment.css(".carousel").first["class"].split(/\s+/)
+      expect(classes).to include("carousel-fade", "carousel-dark")
+    end
+
+    it "still renders indicators and controls as usual" do
+      fragment = component_fragment(:carousel, "my-carousel", dark: true) do |carousel|
+        carousel.item(image: "a.jpg")
+        carousel.item(image: "b.jpg")
+      end
+
+      expect(fragment.css(".carousel-indicators button").size).to eq(2)
+      expect(fragment.css(".carousel-control-prev")).not_to be_empty
+      expect(fragment.css(".carousel-control-next")).not_to be_empty
+    end
+  end
+
   describe "interval: / wrap: / keyboard:" do
     it "sets data-bs-interval when interval: is given, including false" do
       fragment = component_fragment(:carousel, "my-carousel", interval: 3000)
