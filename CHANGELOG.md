@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-17
+
+No breaking changes in this release.
+
+### Added
+
+- 13 new components, taking the gem from 20 to 33: `spinner`, `ribbon`, `dimmer`, `empty`,
+  `breadcrumb`, `timeline`, `steps`, `modal`, `offcanvas`, `toast`, `accordion`, `carousel`,
+  `pagination`.
+- `config/locales/en.yml`, routing every user-visible default string the gem renders through
+  I18n under a `tabler_ui` namespace; auto-loaded by the engine, and overridable by a host app
+  the normal Rails way.
+- Four Stimulus controllers for the new overlay/carousel components -- `modal_controller`,
+  `offcanvas_controller`, `toast_controller`, `carousel_controller` -- bringing the total to 14
+  (up from 10). `accordion` reuses the existing `collapse_controller` rather than adding a
+  redundant one of its own.
+- A dispatcher `validate!` hook: a component class may define it, and the dispatcher calls it
+  once a builder block has finished running, before rendering -- used by `steps` (`current:`
+  range), `carousel` (exactly one active slide) and `accordion` (single-open constraint).
+- A dispatcher guard that raises `ArgumentError` when a slot-style component's block writes
+  content but sets no slots, instead of silently rendering nothing.
+- A `showcase/` app (dev-only, excluded from the packaged gem) rendering every component
+  alongside its source snippet -- `cd showcase && bin/rails server -p 3561`.
+- `sprockets-rails ~> 3.5` declared as a gem dependency -- the CSS asset manifest
+  (`app/assets/stylesheets/tabler_ui.css`) has always required Sprockets; Propshaft, Rails 8's
+  default pipeline, cannot process it.
+
+### Fixed
+
+- **FormBuilder**: `as: :input_group` raised `ArgumentError` for every caller -- the private
+  method backing it was named `input_group`, missing the `_input` suffix the dispatcher's
+  string-based method lookup requires. Renamed to `input_group_input`.
+- **FormBuilder**: automatic column-type detection (native `number`/`datetime-local`/`time`
+  inputs, the `:date` datepicker) only worked against ActiveRecord's instance-level
+  `type_for_attribute`/`column_for_attribute`. A plain `ActiveModel::Attributes` object exposes
+  those at the class level instead, so every field on a non-ActiveRecord model silently fell
+  back to a text input; `object_type_for_method` now also checks the class-level
+  `attribute_types`.
+- **Stimulus**: `alert_controller`, `collapse_controller`, `dropdown_menu_controller` and
+  `tab_controller` each constructed their own Bootstrap JS instance with `new Bootstrap.X(...)`,
+  competing with the instance `tabler.js`'s own bundle already creates at import time. All four
+  now adopt the existing instance via `getOrCreateInstance` and dispose only an instance they
+  created themselves.
+- Four previously-hardcoded German UI strings (the form error heading, the illustration
+  not-found/unknown text, the dark mode toggle's title) now render in English by default and are
+  translatable like every other string added this release.
+
+### Changed
+
+- `config/locales/en.yml` gained keys for every new component's default strings (`pagination`,
+  `carousel`, `breadcrumb`, `dimmer`, `offcanvas`, `modal`, `toast`, `spinner`, `steps`)
+  alongside the four moved out of hardcoded German.
+
 ## [0.3.0] - 2026-08-17
 
 All 20 components were rewritten across eight commits: a shared foundation

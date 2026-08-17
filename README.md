@@ -20,6 +20,12 @@ bundle install
 
 ### Asset setup
 
+**Requires Sprockets — Propshaft is not supported.** `app/assets/stylesheets/tabler_ui.css`
+is a Sprockets directive manifest (`*= require`), which Propshaft cannot process; the gem
+declares `sprockets-rails ~> 3.5` as a dependency for this reason. Rails 8's default new-app
+pipeline is Propshaft, so an app generated with `rails new` needs Sprockets added
+(`bundle add sprockets-rails` is usually enough) before this gem's assets will compile.
+
 Add the stylesheet to `app/assets/stylesheets/application.css`:
 
 ```css
@@ -38,7 +44,7 @@ Just import it:
 import "tabler_ui"
 ```
 
-`tabler_ui.js` self-registers all ten Stimulus controllers against
+`tabler_ui.js` self-registers all 14 Stimulus controllers against
 `window.Stimulus`, so make sure it's imported after your `controllers/application.js`
 sets that up.
 
@@ -72,11 +78,43 @@ Over 260 flag SVGs, `app/assets/images/tabler_ui/flags/`.
 
 See `CLAUDE.md` in this repo for fuller ApexCharts examples.
 
+### I18n
+
+Every user-visible default string the gem renders (form error headings, close-button labels,
+carousel/pagination/breadcrumb aria-labels, the dark mode toggle's title, and so on) lives in
+`config/locales/en.yml` under a `tabler_ui` namespace. Rails' `Rails::Engine` auto-loads it into
+`I18n.load_path`, so there's nothing to require. A host app overrides any string the normal Rails
+way — add the same key to its own locale file:
+
+```yaml
+# config/locales/en.yml
+en:
+  tabler_ui:
+    dark_mode_toggle:
+      title: "Toggle theme"
+    modal:
+      close: "Dismiss"
+```
+
+Components that take a `title:`/`text:` option (e.g. `alert`, `modal`) let the caller's value
+override the translation on a per-call basis regardless.
+
+### Showcase app
+
+`showcase/` is a small, dev-only Rails app that renders every component with its source snippet
+next to it. It ships in the repo but is excluded from the packaged gem. To run it:
+
+```bash
+cd showcase
+bundle install
+bin/rails server -p 3561
+```
+
 ## Conventions
 
 Every component is called as `tabler_ui.<name>(...)` from a view (the `tabler_ui`
 helper is injected into `ActionController::Base` and `ActionMailer::Base` by the
-engine). Read this section once; it applies to all 20 components below.
+engine). Read this section once; it applies to all 33 components below.
 
 **Mandatory vs. optional.** A component's one or two mandatory values (an icon
 name, a tabs container's `id`) are positional. Everything else is keyword
@@ -149,7 +187,54 @@ Builder methods that take a title/label take it **positionally**
 the old keyword form raises `ArgumentError` naming the method rather than
 silently rendering a Hash as content.
 
+**A discarded slot block raises.** For a slot-style component, whatever the block itself
+outputs (outside of `slots.<name> { ... }` calls) is captured and thrown away — only content
+placed into a slot renders. If a block writes visible content but never calls a slot method,
+that content would previously vanish silently; the dispatcher now raises `ArgumentError`
+instead, naming the component:
+
+```erb
+<%= tabler_ui.card title: "x" do %>Body text<% end %>
+<%# ArgumentError: tabler_ui.card's block wrote content but set no slots... %>
+```
+
+**`validate!`.** A component class may define a `validate!` instance method; the dispatcher
+calls it after a builder block has finished running (so it can check things that are only known
+once every item has been added — `steps`' `current:` index, `carousel`'s single active slide,
+`accordion`'s single-open constraint) and before the component renders. Raising there surfaces a
+plain `ArgumentError` instead of one wrapped in `ActionView::Template::Error`.
+
 ## Component reference
+
+### accordion
+
+Builder style. Mandatory `id`.
+
+```erb
+<%= tabler_ui.accordion("my-accordion") do |accordion| %>
+  <% accordion.item("First item", open: true) do %>
+    Content for the first item
+  <% end %>
+  <% accordion.item("Second item") do %>
+    Content for the second item
+  <% end %>
+<% end %>
+```
+
+Single-open by default — each pane closes its siblings via `data-bs-parent`; pass
+`multiple: true` to allow more than one open at once. More than one item marked
+`open: true` without `multiple: true` raises `ArgumentError` (checked after the block runs).
+
+| Option | Notes |
+|---|---|
+| `flush:` | removes the default borders/rounded corners |
+| `inverted:` | toggle icon before the title |
+| `style:` | `:tabs` for the card-like `accordion-tabs` variant |
+| `toggle_style:` | `:chevron` (default) or `:plus` |
+| `multiple:` | allow more than one item open at once (default `false`) |
+| `html:` | hook |
+
+`item(title, open:, icon:, html:, header_html:, body_html:) { content }`.
 
 ### alert
 
@@ -217,6 +302,30 @@ deterministic generated identicon `<svg>` seeded from `name:`.
 | `content:` | escaped like any `<%=`, unless already an `ActiveSupport::SafeBuffer` |
 | `html:` | hook |
 
+### breadcrumb
+
+Builder style.
+
+```erb
+<%= tabler_ui.breadcrumb do |breadcrumb| %>
+  <% breadcrumb.item("Home", url: "/") %>
+  <% breadcrumb.item("Library", url: "/library") %>
+  <% breadcrumb.item("Data") %>
+<% end %>
+```
+
+Wrapped in a `<nav>` landmark. The *last* item added is treated as the current page
+automatically (plain text, `aria-current="page"`, no link) unless any item is marked
+`active: true` explicitly — as soon as one is, only explicitly-marked items are current.
+
+| Option | Notes |
+|---|---|
+| `style:` | `:dots` / `:arrows` / `:bullets` divider glyph; default plain "/" |
+| `muted:` | `breadcrumb-muted`, renders links in a muted colour |
+| `html:` | hook |
+
+`item(title, url:, active:, html:)`. Per-item `html:` may be a Hash or a `Proc` taking the item.
+
 ### button
 
 Renders `link_to` for `method: :get` (the default), `button_to` for anything
@@ -268,6 +377,35 @@ A `header` slot overrides `title:`. `size:`, `status:` (a colour strip),
 
 Slots: `header`, `body`, `footer`.
 
+### carousel
+
+Builder style. Mandatory `id`.
+
+```erb
+<%= tabler_ui.carousel("my-carousel") do |carousel| %>
+  <% carousel.item(image: image_path("slide1.jpg")) %>
+  <% carousel.item(image: image_path("slide2.jpg"), active: true) %>
+  <% carousel.item(image: image_path("slide3.jpg")) %>
+<% end %>
+```
+
+Requires **exactly one** active slide — zero or more than one raises `ArgumentError`
+naming the carousel's id (checked after the block runs, since Bootstrap fails silently
+on both: zero shows a blank carousel, several show them stacked). The first slide added
+is active by default when nothing is marked `active:` explicitly.
+
+| Option | Notes |
+|---|---|
+| `fade:` | cross-fade instead of sliding |
+| `indicators:` | `true` (default) / `false` / `:dot` / `:thumb` / `:vertical` |
+| `controls:` | prev/next arrow buttons (default `true`) |
+| `interval:` | ms between autoplay slides, or `false` to disable autoplay |
+| `wrap:`, `keyboard:` | booleans, map to `data-bs-wrap` / `data-bs-keyboard` |
+| `html:`, `inner_html:`, `indicators_html:`, `prev_html:`, `next_html:` | hooks |
+
+`item(image:, caption:, caption_background:, active:, html:, caption_html:) { content }` —
+a block replaces `image:` entirely.
+
 ### dark_mode_toggle
 
 ```erb
@@ -294,6 +432,24 @@ Builder style.
 addition to (or instead of) the builder. Hooks: `html:`, and `item_html:` /
 `title_html:` / `content_html:` (each a Hash or a `Proc` taking the item).
 
+### dimmer
+
+A plain server-side toggle, not a Stimulus controller — flip `active:` and re-render (e.g.
+after a Turbo Stream update once a background job finishes).
+
+```erb
+<%= tabler_ui.dimmer active: @loading do |slots| %>
+  <% slots.content { "Table rows go here" } %>
+<% end %>
+```
+
+| Option | Notes |
+|---|---|
+| `active:` | shows the `.loader` and dims content to 10% opacity (default `false`) |
+| `html:`, `loader_html:`, `content_html:` | hooks |
+
+Slot: `content`.
+
 ### dropdown
 
 Builder style.
@@ -316,6 +472,30 @@ Builder style.
 
 `item(title, url:, method:, active:, disabled:, icon:, html:)`, `divider`,
 `header(title)`. Per-item `html:` may be a Hash or a `Proc` taking the item.
+
+### empty
+
+No-results / empty-state panel.
+
+```erb
+<%= tabler_ui.empty title: "No results found",
+                     subtitle: "Try adjusting your search or filter." %>
+<%= tabler_ui.empty image: "empty", title: "No results found" do |slots| %>
+  <% slots.action { tabler_ui.button text: "New item", url: "#" } %>
+<% end %>
+```
+
+| Option | Notes |
+|---|---|
+| `title:`, `subtitle:` | text parts |
+| `header:` | large lead text (e.g. an error code) |
+| `icon:` | Tabler icon name, rendered via `tabler_ui.icon` |
+| `image:` | Tabler illustration name, rendered via `tabler_ui.illustration` |
+| `bordered:` | `empty-bordered` |
+| `html:`, `img_html:`, `icon_html:`, `header_html:`, `title_html:`, `subtitle_html:`, `action_html:` | hooks |
+
+Slots: `img`, `icon`, `header`, `title`, `subtitle`, `action` — each overrides its
+equivalent plain option.
 
 ### icon
 
@@ -354,6 +534,30 @@ unknown name.
 | `size:` | named (`:xs` .. `:xxl`) or a raw pixel width; height scales proportionally |
 | `html:` | hook |
 
+### modal
+
+Renders no trigger — wire your own `data-bs-toggle="modal" data-bs-target="#<id>"`,
+exactly like Bootstrap's own docs. Mandatory `id`.
+
+```erb
+<button data-bs-toggle="modal" data-bs-target="#my-modal">Open</button>
+<%= tabler_ui.modal "my-modal", title: "Confirm" do |slots| %>
+  <% slots.body { "Are you sure?" } %>
+  <% slots.footer { tabler_ui.button text: "Yes", color: "primary" } %>
+<% end %>
+```
+
+| Option | Notes |
+|---|---|
+| `title:` | `h5.modal-title` in the header, unless a `header` slot is given |
+| `size:` | `"sm"` / `"lg"` / `"xl"` / `"fullscreen"` |
+| `centered:`, `scrollable:`, `blur:` | booleans |
+| `status:` | colour for a `.modal-status` strip |
+| `close_button:` | default `true` |
+| `html:`, `dialog_html:`, `content_html:`, `header_html:`, `body_html:`, `footer_html:` | hooks |
+
+Slots: `header`, `body`, `footer`.
+
 ### navbar
 
 Builder style.
@@ -386,6 +590,31 @@ standalone `dropdown` component — there is no `.add` / `.add_divider` on it.
 Hooks: `html:` (outer `header.navbar`), `brand_html:`, `toggler_html:`,
 `menu_html:`, and per-item `html:` (Hash or Proc taking the item).
 
+### offcanvas
+
+Renders no trigger, same as `modal` — wire your own `data-bs-toggle="offcanvas"
+data-bs-target="#<id>"`. Mandatory `id`.
+
+```erb
+<button data-bs-toggle="offcanvas" data-bs-target="#my-offcanvas">Open</button>
+<%= tabler_ui.offcanvas "my-offcanvas", title: "Filters" do |slots| %>
+  <% slots.body { "Filter form here" } %>
+  <% slots.footer { tabler_ui.button text: "Apply", color: "primary" } %>
+<% end %>
+```
+
+| Option | Notes |
+|---|---|
+| `title:` | `h5.offcanvas-title` in the header, unless a `header` slot is given |
+| `position:` | `:start` (default) / `:end` / `:top` / `:bottom` |
+| `narrow:` | fixed 20rem width |
+| `backdrop:` | `false` or `:static`, maps to `data-bs-backdrop` |
+| `scroll:` | allow body scrolling while open, maps to `data-bs-scroll` |
+| `close_button:` | default `true` |
+| `html:`, `header_html:`, `body_html:`, `footer_html:` | hooks |
+
+Slots: `header`, `body`, `footer`.
+
 ### page_header
 
 ```erb
@@ -401,6 +630,41 @@ Hooks: `html:` (outer `header.navbar`), `brand_html:`, `toggler_html:`,
 | `html:`, `title_html:`, `pretitle_html:`, `buttons_html:` | hooks |
 
 Slot: `buttons` (right-aligned column).
+
+### pagination
+
+Never touches a collection, an ORM, or `params` — its entire input is two integers
+(`current:`, `total:`) and a `url:` callable taking a page number.
+
+```erb
+<%= tabler_ui.pagination current: 3, total: 10, url: ->(n) { posts_path(page: n) } %>
+```
+
+Builder mode is also available for full manual control (`p.item`, `p.gap`, `p.prev`,
+`p.next`), but mixing computed options (`current:`/`total:`) with builder calls raises
+`ArgumentError` — the two are mutually exclusive.
+
+```erb
+<%= tabler_ui.pagination do |p| %>
+  <% p.prev url: prev_path %>
+  <% p.item 1, url: page_path(1) %>
+  <% p.gap %>
+  <% p.item 3, url: page_path(3), active: true %>
+  <% p.next url: next_path %>
+<% end %>
+```
+
+| Option | Notes |
+|---|---|
+| `current:`, `total:` | together switch on computed mode; `current:` given without `total:` raises |
+| `window:` | pages shown either side of `current` in computed mode (default 2) |
+| `size:` | `:sm` / `:lg` |
+| `circle:`, `outline:` | booleans |
+| `prev_label:`, `next_label:` | override the translated "Previous"/"Next" defaults |
+| `html:`, `item_html:` | hooks (`item_html:` a Hash or `Proc` applied to every item) |
+
+`total: 0` renders an empty list; out-of-range `current:` for any other total raises
+`ArgumentError`.
 
 ### placeholder
 
@@ -469,6 +733,27 @@ Renders a `<select>`, replaced client-side by star-rating.js via
 | `max_stars:` | default 5 |
 | `html:` | hook |
 
+### ribbon
+
+A small label pinned to a corner of a `position: relative` parent (typically a card).
+
+```erb
+<%= tabler_ui.ribbon text: "New", color: "blue" %>
+<%= tabler_ui.ribbon text: "Sale", color: "red", position: :bottom, align: :start %>
+```
+
+| Option | Notes |
+|---|---|
+| `text:` | label; a block (via the `body` slot) overrides it for rich content |
+| `color:` | validated, rendered as `bg-<color>` |
+| `position:` | `:top` (default) / `:bottom` |
+| `align:` | `:start` / `:end` (default) |
+| `bookmark:` | `ribbon-bookmark` shape |
+| `icon:` | Tabler icon name |
+| `html:` | hook |
+
+Slot: `body`.
+
 ### settings_page
 
 Builder style. Mandatory `id`.
@@ -483,6 +768,21 @@ Builder style. Mandatory `id`.
 `title:` defaults to `"Settings"`. `item(title, icon:, active:, html:) { content }`
 — the first item added is active by default. Hooks: `html:` (outer `.card`),
 `sidebar_html:`, `content_html:`, per-item `html:`.
+
+### spinner
+
+```erb
+<%= tabler_ui.spinner %>
+<%= tabler_ui.spinner type: :grow, size: "sm", color: "blue" %>
+```
+
+| Option | Notes |
+|---|---|
+| `type:` | `:border` (default) / `:grow` |
+| `size:` | `"sm"` |
+| `color:` | validated, rendered as `text-<color>` (the spinner's border colour is `currentcolor`) |
+| `label:` | visually-hidden text, `role="status"`, defaults to a translated "Loading..." |
+| `html:` | hook |
 
 ### stat_card
 
@@ -519,6 +819,35 @@ Builder style. Mandatory `id`.
 | `standalone:` | dot only, no text |
 | `indicator:` | 3-circle status indicator style |
 | `html:`, `dot_html:` | hooks (`dot_html:` only when a dot renders alongside text) |
+
+### steps
+
+Builder style.
+
+```erb
+<%= tabler_ui.steps(current: 2) do |steps| %>
+  <% steps.item("Account") %>
+  <% steps.item("Profile") %>
+  <% steps.item("Confirm") %>
+<% end %>
+```
+
+Takes a single 1-based `current:` index for the whole component rather than a
+per-item `active:` flag — the CSS's dimming rule only makes sense with one active step.
+Out-of-range `current:` raises `ArgumentError` once every item is known (checked after
+the block runs).
+
+| Option | Notes |
+|---|---|
+| `current:` | 1-based index of the active step (default 1) |
+| `vertical:` | `steps-vertical` |
+| `counter:` | numbered dots instead of plain dots |
+| `color:` | Tabler palette only (`TablerUi::Color::TABLER`) — Bootstrap semantic names raise |
+| `light:` | `steps-<color>-lt`; only has an effect together with `color:` |
+| `html:` | hook |
+
+`item(title, url:, html:)` — `url:` renders an `<a>` (letting earlier steps link back), a
+plain `<li>` otherwise.
 
 ### table
 
@@ -563,6 +892,55 @@ default. `badge:` is a String (rendered with the badge component's own default
 colour) or a Hash forwarded to `tabler_ui.badge`, e.g. `{ text: "3", color:
 "red" }` (**not** `badge_color:`).
 
+### timeline
+
+Builder style.
+
+```erb
+<%= tabler_ui.timeline do |t| %>
+  <% t.item icon: "check" do %>
+    <strong>Order placed</strong>
+    <div class="text-secondary">2 hours ago</div>
+  <% end %>
+  <% t.item icon: "truck", color: "blue" do %>
+    Shipped
+  <% end %>
+<% end %>
+```
+
+An item's card content is entirely up to the caller — nest a `tabler_ui.card` yourself if
+you want one; the component does not bake card structure into `.timeline-event-card`.
+
+| Option | Notes |
+|---|---|
+| `simple:` | hides the icon column entirely, drops the card's left margin |
+| `html:`, `item_html:` | hooks |
+
+`item(icon:, color:, icon_html:, card_html:) { content }` — no mandatory positional
+argument; content comes entirely from the block.
+
+### toast
+
+Renders no trigger — if you want click-to-show behaviour, put
+`data-bs-toggle="toast" data-bs-target="#<id>"` on your own element.
+
+```erb
+<%= tabler_ui.toast title: "Success", color: "success" do |slots| %>
+  <% slots.body { "Changes saved." } %>
+<% end %>
+```
+
+| Option | Notes |
+|---|---|
+| `title:` | `strong.me-auto` in the header, unless a `header` slot is given |
+| `color:` | validated (Tabler palette + Bootstrap semantic names both work here) |
+| `autohide:`, `delay:` | map to `data-bs-autohide` / `data-bs-delay`; only rendered when given explicitly |
+| `close_button:` | default `true` |
+| `position:` | e.g. `"top-right"` — wraps the toast in a fixed `.toast-container`; omitted by default so several toasts can share one caller-provided container |
+| `html:`, `header_html:`, `body_html:`, `container_html:` | hooks |
+
+Slots: `header`, `body`.
+
 ## Forms
 
 ```erb
@@ -606,26 +984,34 @@ every error as a Tabler alert.
 
 ## Stimulus controllers
 
-Ten controllers ship under `controllers/tabler_ui/`, self-registered by
+14 controllers ship under `controllers/tabler_ui/`, self-registered by
 `tabler_ui.js` against `window.Stimulus`:
 
 | Controller | Identifier | Purpose |
 |---|---|---|
 | `alert_controller.js` | `tabler-ui--alert` | dismissible alerts (Bootstrap `Alert`) |
+| `carousel_controller.js` | `tabler-ui--carousel` | drives `carousel` (Bootstrap `Carousel`) |
 | `chart_controller.js` | `tabler-ui--chart` | ApexCharts init from `data-*-value` attrs |
-| `collapse_controller.js` | `tabler-ui--collapse` | navbar mobile menu (Bootstrap `Collapse`) |
+| `collapse_controller.js` | `tabler-ui--collapse` | navbar mobile menu and `accordion` panes (Bootstrap `Collapse`) |
 | `dark_mode_controller.js` | `tabler-ui--dark-mode` | light/dark/system theme cycling, `localStorage`-backed |
 | `datepicker_controller.js` | `tabler-ui--datepicker` | wraps `vanillajs-datepicker` (CDN-pinned) |
 | `dropdown_menu_controller.js` | `tabler-ui--dropdown-menu` | dropdown open/close (Bootstrap `Dropdown`), used by both `dropdown` and `navbar` |
 | `filter_controller.js` | `tabler-ui--filter` | debounced auto-submit for filter forms |
+| `modal_controller.js` | `tabler-ui--modal` | drives `modal` (Bootstrap `Modal`) |
+| `offcanvas_controller.js` | `tabler-ui--offcanvas` | drives `offcanvas` (Bootstrap `Offcanvas`) |
 | `rating_controller.js` | `tabler-ui--rating` | wraps `star-rating.js` |
 | `tab_controller.js` | `tabler-ui--tab` | tab/list-group switching (Bootstrap `Tab`), used by `tabs` and `settings_page` |
+| `toast_controller.js` | `tabler-ui--toast` | drives `toast` (Bootstrap `Toast`) |
 | `toggle_button_controller.js` | `tabler-ui--toggle-button` | `FormBuilder#toggle_button`'s filled/outline state |
 
-Each wraps a Bootstrap JS object with matching `connect()`/`disconnect()`
-lifecycle so Turbo doesn't leak instances across reconnects; they're wired
-onto the markup automatically by the components above, no manual
-`data-controller` needed except for `tabler-ui--chart` and `tabler-ui--filter`.
+Eight of these (`alert`, `carousel`, `collapse`, `dropdown_menu`, `modal`, `offcanvas`, `tab`,
+`toast`) wrap a Bootstrap JS object with matching `connect()`/`disconnect()` lifecycle so Turbo
+doesn't leak instances across reconnects. Each *adopts* an existing Bootstrap instance via
+`getOrCreateInstance` rather than constructing a second one over whatever `tabler.js`'s own
+bundle already created at import time, and only disposes an instance it created itself — this
+fixed a real bug where every one of these controllers used to instantiate its own competing
+Bootstrap object. They're wired onto the markup automatically by the components above, no
+manual `data-controller` needed except for `tabler-ui--chart` and `tabler-ui--filter`.
 
 ## Upgrading from 0.2.x
 
