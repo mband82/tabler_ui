@@ -102,6 +102,119 @@ module ShowcaseHelper
       <% end %>
     ERBSRC
 
+    layout_10: <<~'ERBSRC',
+      <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), expand: "sm") do |navbar| %>
+        <% navbar.left do |nav| %>
+          <% nav.add "Home", url: "#", active: true %>
+          <% nav.add "Reports", url: "#" %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    layout_11: <<~'ERBSRC',
+      <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), dark: true, html: { class: "bg-primary" }) do |navbar| %>
+        <% navbar.left do |nav| %>
+          <% nav.add "Home", url: "#", active: true %>
+          <% nav.add "Reports", url: "#" %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    layout_12: <<~'ERBSRC',
+      <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), transparent: true) do |navbar| %>
+        <% navbar.left do |nav| %>
+          <% nav.add "Home", url: "#", active: true %>
+          <% nav.add "Reports", url: "#" %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    layout_13: <<~'ERBSRC',
+      <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), overlap: true) do |navbar| %>
+        <% navbar.left do |nav| %>
+          <% nav.add "Home", url: "#", active: true %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    layout_14: <<~'ERBSRC',
+      <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), nav_scroll: true,
+                            menu_html: { style: "--tblr-scroll-height: 300px" }) do |navbar| %>
+        <% navbar.left do |nav| %>
+          <% (1..10).each do |n| %>
+            <% nav.add "Item #{n}", url: "#" %>
+          <% end %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    layout_15: <<~'ERBSRC',
+      <%= tabler_ui.page_header title: "Dashboard", border: true %>
+    ERBSRC
+    layout_16: <<~'ERBSRC',
+      <%= tabler_ui.page_header title: "Dashboard", title_size: "lg" %>
+    ERBSRC
+    layout_17: <<~'ERBSRC',
+      <%= tabler_ui.page_header title: "Dashboard", pretitle: "Overview", subtitle: "Last 30 days" %>
+    ERBSRC
+    layout_18: <<~'ERBSRC',
+      <%= tabler_ui.card title: "Top strip", status: "danger", status_position: "top" do |slots| %>
+        <% slots.body { "Status strip along the top edge." } %>
+      <% end %>
+    ERBSRC
+    layout_19: <<~'ERBSRC',
+      <%= tabler_ui.card title: "Start strip", status: "azure", status_position: "start" do |slots| %>
+        <% slots.body { "Status strip along the leading edge." } %>
+      <% end %>
+    ERBSRC
+    layout_20: <<~'ERBSRC',
+      <%= tabler_ui.card title: "Bottom strip", status: "success", status_position: "bottom" do |slots| %>
+        <% slots.body { "Status strip along the bottom edge." } %>
+      <% end %>
+    ERBSRC
+    layout_21: <<~'ERBSRC',
+      <%= tabler_ui.card_group do |slots| %>
+        <% slots.body do %>
+          <%= tabler_ui.card title: "One" do |c| %>
+            <% c.body { "First card in the group." } %>
+          <% end %>
+          <%= tabler_ui.card title: "Two" do |c| %>
+            <% c.body { "Second card in the group." } %>
+          <% end %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    layout_22: <<~'ERBSRC',
+      <%= tabler_ui.table columns: columns, data: rows, responsive: "sm" %>
+    ERBSRC
+    layout_23: <<~'ERBSRC',
+      <%= tabler_ui.table columns: columns, data: rows, responsive: false %>
+    ERBSRC
+    layout_24: <<~'ERBSRC',
+      <%= tabler_ui.table columns: mobile_columns, data: mobile_rows, mobile: true %>
+    ERBSRC
+    layout_25: <<~'ERBSRC',
+      <%= tabler_ui.tabs("demo-tabs") do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+      <% end %>
+
+      <%# style: also accepts :pills, :underline, :bordered, :segmented %>
+      <%= tabler_ui.tabs("demo-tabs-pills", style: :pills) do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+      <% end %>
+    ERBSRC
+    layout_26: <<~'ERBSRC',
+      <%= tabler_ui.tabs("fill-tabs-demo", fill: true) do |tabs| %>
+        <% tabs.tab("Inbox") { "First" } %>
+        <% tabs.tab("Sent") { "Second" } %>
+        <% tabs.tab("Archive") { "Third" } %>
+      <% end %>
+    ERBSRC
+    layout_27: <<~'ERBSRC',
+      <%= tabler_ui.tabs("segmented-vertical-demo", style: :segmented, vertical: true) do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+        <% tabs.tab("Three") { "Third" } %>
+      <% end %>
+    ERBSRC
+
     content_1: <<~'ERBSRC',
       <%= tabler_ui.badge text: "New", color: "blue" %>
       <%= tabler_ui.badge text: "Pending", color: "yellow", light: true %>
@@ -246,6 +359,67 @@ module ShowcaseHelper
                             max_stars: 3, color: "yellow", value: 2 %>
     ERBSRC
 
+    content_24: <<~'ERBSRC',
+      <%= tabler_ui.badge color: "red", dot: true %>
+      <%= tabler_ui.badge color: "green", dot: true %>
+    ERBSRC
+    content_25: <<~'ERBSRC',
+      <%= tabler_ui.badge color: "blue", icon: "star", icon_only: true %>
+    ERBSRC
+    content_26: <<~'ERBSRC',
+      <%= tabler_ui.badge_list do |slots| %>
+        <% slots.body do %>
+          <%= tabler_ui.badge text: "New" %>
+          <%= tabler_ui.badge text: "Hot" %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    content_27: <<~'ERBSRC',
+      <%= tabler_ui.alert color: "info", text: "Minor style alert.", minor: true %>
+    ERBSRC
+    content_28: <<~'ERBSRC',
+      <%= tabler_ui.alert color: "muted", text: "Muted alert." %>
+    ERBSRC
+    content_29: <<~'ERBSRC',
+      <%= tabler_ui.alert color: "info", text: "New update available.", url: "#",
+                           link_text: "See what's new", link_style: :action %>
+    ERBSRC
+    content_30: <<~'ERBSRC',
+      <%= tabler_ui.avatar initials: "JD", size: "xl", cover: true %>
+    ERBSRC
+    content_31: <<~'ERBSRC',
+      <%= tabler_ui.avatar initials: "JD", size: "md" do |slots| %>
+        <% slots.overlay do %><%= tag.span(class: "badge bg-success") %><% end %>
+      <% end %>
+    ERBSRC
+    content_32: <<~'ERBSRC',
+      <%= tabler_ui.progress indeterminate: true %>
+    ERBSRC
+    content_33: <<~'ERBSRC',
+      <%= tabler_ui.progress percent: 60, separated: true %>
+    ERBSRC
+    content_34: <<~'ERBSRC',
+      <%= tabler_ui.button text: "Default", color: "primary" %>
+      <%= tabler_ui.button text: "Pill", color: "primary", shape: "pill" %>
+    ERBSRC
+    content_35: <<~'ERBSRC',
+      <%= tabler_ui.button text: "Saving...", color: "primary", loading: true, disabled: true %>
+    ERBSRC
+    content_36: <<~'ERBSRC',
+      <%= tabler_ui.button text: "Next", color: "primary", icon: "arrow-right", animate_icon: true %>
+      <%= tabler_ui.button text: "Refresh", color: "primary", icon: "refresh", animate_icon: "rotate" %>
+    ERBSRC
+    content_37: <<~'ERBSRC',
+      <%= tabler_ui.button text: "Ghost", color: "primary", ghost: true %>
+    ERBSRC
+    content_38: <<~'ERBSRC',
+      <%= tabler_ui.button text: "GitHub", color: "github" %>
+      <%= tabler_ui.button text: "Facebook", color: "facebook", outline: true %>
+    ERBSRC
+    content_39: <<~'ERBSRC',
+      <%= tabler_ui.button text: "Add", color: "primary", icon: "plus", floating: true %>
+    ERBSRC
+
     overlays_1: <<~'ERBSRC',
       <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#demo-modal">
         Open modal
@@ -327,6 +501,94 @@ module ShowcaseHelper
         <% carousel.item(image: "https://picsum.photos/id/1016/900/300", caption: "Canyon",
                          caption_background: true) %>
         <% carousel.item(image: "https://picsum.photos/id/1018/900/300", caption: "River",
+                         caption_background: true) %>
+      <% end %>
+    ERBSRC
+
+    overlays_9: <<~'ERBSRC',
+      <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#demo-modal-full-width">
+        Open full-width modal
+      </button>
+
+      <%= tabler_ui.modal "demo-modal-full-width", title: "Full width", full_width: true do |slots| %>
+        <% slots.body { "This dialog fills the viewport width with a small margin instead of a fixed max-width." } %>
+      <% end %>
+    ERBSRC
+    overlays_10: <<~'ERBSRC',
+      <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#demo-modal-fullscreen-md">
+        Open responsive fullscreen modal
+      </button>
+
+      <%= tabler_ui.modal "demo-modal-fullscreen-md", title: "Responsive fullscreen",
+                           size: "fullscreen-md-down" do |slots| %>
+        <% slots.body { "Below the md breakpoint this fills the screen; at md and above it's a normal dialog." } %>
+      <% end %>
+    ERBSRC
+    overlays_11: <<~'ERBSRC',
+      <button class="btn btn-outline-primary" data-bs-toggle="offcanvas" data-bs-target="#demo-offcanvas-expand">
+        Open expandable sidebar
+      </button>
+
+      <%= tabler_ui.offcanvas "demo-offcanvas-expand", title: "Sidebar", expand: "lg" do |slots| %>
+        <% slots.body { "Sidebar content." } %>
+      <% end %>
+    ERBSRC
+    overlays_12: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Actions", dark: true) do |dropdown| %>
+        <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+        <% dropdown.item("Duplicate", url: "#", icon: "copy") %>
+        <% dropdown.divider %>
+        <% dropdown.item("Delete", url: "#", icon: "trash") %>
+      <% end %>
+    ERBSRC
+    overlays_13: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Choose", scrollable: true) do |dropdown| %>
+        <% (1..12).each do |n| %>
+          <% dropdown.item("Item #{n}", url: "#") %>
+        <% end %>
+      <% end %>
+    ERBSRC
+    overlays_14: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Actions", arrow: true) do |dropdown| %>
+        <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+        <% dropdown.item("Delete", url: "#", icon: "trash") %>
+      <% end %>
+    ERBSRC
+    overlays_15: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Actions", arrow: true, align: :end) do |dropdown| %>
+        <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+        <% dropdown.item("Delete", url: "#", icon: "trash") %>
+      <% end %>
+    ERBSRC
+    overlays_16: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Actions", direction: "end") do |dropdown| %>
+        <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+        <% dropdown.item("Delete", url: "#", icon: "trash") %>
+      <% end %>
+    ERBSRC
+    overlays_17: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Actions", direction: "start") do |dropdown| %>
+        <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+        <% dropdown.item("Delete", url: "#", icon: "trash") %>
+      <% end %>
+    ERBSRC
+    overlays_18: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Actions", direction: "up") do |dropdown| %>
+        <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+        <% dropdown.item("Delete", url: "#", icon: "trash") %>
+      <% end %>
+    ERBSRC
+    overlays_19: <<~'ERBSRC',
+      <%= tabler_ui.dropdown(label: "Actions", align: :end, align_breakpoint: "md") do |dropdown| %>
+        <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+        <% dropdown.item("Delete", url: "#", icon: "trash") %>
+      <% end %>
+    ERBSRC
+    overlays_20: <<~'ERBSRC',
+      <%= tabler_ui.carousel("demo-carousel-dark", dark: true, indicators: :thumb) do |carousel| %>
+        <% carousel.item(image: "https://picsum.photos/id/1039/900/300", caption: "Snow",
+                         caption_background: true, active: true) %>
+        <% carousel.item(image: "https://picsum.photos/id/1043/900/300", caption: "Desert",
                          caption_background: true) %>
       <% end %>
     ERBSRC

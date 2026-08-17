@@ -9,11 +9,41 @@
   <%= tabler_ui.badge color: "red", notification: true, blink: true %>
 <% end %>
 
+<%= render layout: "showcase/example", locals: { title: "badge - dot: true (fixed 10px dot; raises if combined with text/icon/content)", code: snippet(:content_24) } do %>
+  <%= tabler_ui.badge color: "red", dot: true %>
+  <%= tabler_ui.badge color: "green", dot: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "badge - icon_only: true (zeroes horizontal padding; raises if combined with text)", code: snippet(:content_25) } do %>
+  <%= tabler_ui.badge color: "blue", icon: "star", icon_only: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "badge_list - wraps several badges in a flex .badges-list container", code: snippet(:content_26) } do %>
+  <%= tabler_ui.badge_list do |slots| %>
+    <% slots.body do %>
+      <%= tabler_ui.badge text: "New" %>
+      <%= tabler_ui.badge text: "Hot" %>
+    <% end %>
+  <% end %>
+<% end %>
+
 <%= render layout: "showcase/example", locals: { title: "alert - colors, dismissible, important, icon, action link", code: snippet(:content_2) } do %>
   <%= tabler_ui.alert color: "success", text: "Your changes have been saved!" %>
   <%= tabler_ui.alert color: "danger", title: "Error", text: "Something went wrong.", dismissible: true %>
   <%= tabler_ui.alert color: "warning", text: "Your trial expires in 3 days.", important: true %>
   <%= tabler_ui.alert color: "info", text: "New update available.", url: "#", link_text: "See what's new" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "alert - minor: true (transparent background, neutral border)", code: snippet(:content_27) } do %>
+  <%= tabler_ui.alert color: "info", text: "Minor style alert.", minor: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "alert - color: 'muted' (alert-only colour value)", code: snippet(:content_28) } do %>
+  <%= tabler_ui.alert color: "muted", text: "Muted alert." %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "alert - link_style: :action (underlined action link instead of the default alert-link)", code: snippet(:content_29) } do %>
+  <%= tabler_ui.alert color: "info", text: "New update available.", url: "#", link_text: "See what's new", link_style: :action %>
 <% end %>
 
 <%= render layout: "showcase/example", locals: { title: "avatar - initials, image, generated identicon, sizes, show_details", code: snippet(:content_3) } do %>
@@ -22,6 +52,22 @@
   <%= tabler_ui.avatar name: "Ada Lovelace", size: "md" %>
   <%= tabler_ui.avatar initials: "SM", size: "xl" %>
   <%= tabler_ui.avatar initials: "JD", show_details: true, title: "Jane Doe", subtitle: "Admin" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "avatar - cover: true (pulls the avatar up over a banner via negative margin)", code: snippet(:content_30) } do %>
+  <div>
+    <div class="bg-blue" style="height: 60px; border-radius: 4px;"></div>
+    <%= tabler_ui.avatar initials: "JD", size: "xl", cover: true %>
+  </div>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "avatar - overlay slot for a status dot, shown at size md and xl to compare scaling", code: snippet(:content_31) } do %>
+  <span class="me-3"><%= tabler_ui.avatar initials: "JD", size: "md" do |slots| %>
+    <% slots.overlay do %><%= tag.span(class: "badge bg-success") %><% end %>
+  <% end %></span>
+  <span><%= tabler_ui.avatar initials: "SM", size: "xl" do |slots| %>
+    <% slots.overlay do %><%= tag.span(class: "badge bg-success") %><% end %>
+  <% end %></span>
 <% end %>
 
 <%= render layout: "showcase/example", locals: { title: "icon - outline/filled, color, animations, rule 5 html:", code: snippet(:content_4) } do %>
@@ -53,6 +99,45 @@
   <%= tabler_ui.progress percent: 95, color: "auto" %>
   <%= tabler_ui.progress percent: 60, striped: true, animated: true %>
   <%= tabler_ui.progress percent: 60, label: "Uploading", show_percent: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "progress - indeterminate: true (animated unknown-progress bar; raises if combined with percent:)", code: snippet(:content_32) } do %>
+  <%= tabler_ui.progress indeterminate: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "progress - separated: true (draws a ring per bar; only visible with several bars on one track, which is progress-stacked and not built yet -- inert here for now)", code: snippet(:content_33) } do %>
+  <%= tabler_ui.progress percent: 60, separated: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "button - shape: 'pill' (btn-pill, wider padding) vs. default", code: snippet(:content_34) } do %>
+  <%= tabler_ui.button text: "Default", color: "primary" %>
+  <%= tabler_ui.button text: "Pill", color: "primary", shape: "pill" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "button - loading: true (sets pointer-events: none only; pair with disabled: true for a real disable)", code: snippet(:content_35) } do %>
+  <%= tabler_ui.button text: "Saving...", color: "primary", loading: true, disabled: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "button - animate_icon (hover to see the effect): true = default slide, plus named modifiers", code: snippet(:content_36) } do %>
+  <%= tabler_ui.button text: "Next", color: "primary", icon: "arrow-right", animate_icon: true %>
+  <%= tabler_ui.button text: "Refresh", color: "primary", icon: "refresh", animate_icon: "rotate" %>
+  <%= tabler_ui.button text: "Notify", color: "primary", icon: "bell", animate_icon: "shake" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "button - ghost: true (transparent until hovered; combines with color:, raises with outline: true)", code: snippet(:content_37) } do %>
+  <%= tabler_ui.button text: "Ghost", color: "primary", ghost: true %>
+  <%= tabler_ui.button text: "Ghost danger", color: "danger", ghost: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "button - brand colors (buttons only), plain and outlined", code: snippet(:content_38) } do %>
+  <%= tabler_ui.button text: "GitHub", color: "github" %>
+  <%= tabler_ui.button text: "Twitter", color: "twitter" %>
+  <%= tabler_ui.button text: "Facebook", color: "facebook", outline: true %>
+  <%= tabler_ui.button text: "Muted", color: "muted" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "button - floating: true (position: fixed -- pinned to the viewport's bottom-left corner, not to this card; shown once)", code: snippet(:content_39) } do %>
+  <%= tabler_ui.button text: "Add", color: "primary", icon: "plus", floating: true %>
 <% end %>
 
 <div class="row row-cards">

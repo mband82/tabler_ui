@@ -18,12 +18,77 @@
   <% end %>
 <% end %>
 
+<%= render layout: "showcase/example", locals: { title: "navbar - expand: \"sm\" (collapses above sm, instead of the lg default)", code: snippet(:layout_10) } do %>
+  <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), expand: "sm") do |navbar| %>
+    <% navbar.left do |nav| %>
+      <% nav.add "Home", url: "#", active: true %>
+      <% nav.add "Reports", url: "#" %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "navbar - dark: true (text/icons only -- paired with bg-primary via html:)", code: snippet(:layout_11) } do %>
+  <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), dark: true, html: { class: "bg-primary" }) do |navbar| %>
+    <% navbar.left do |nav| %>
+      <% nav.add "Home", url: "#", active: true %>
+      <% nav.add "Reports", url: "#" %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "navbar - transparent: true", code: snippet(:layout_12) } do %>
+  <div class="bg-blue-lt p-3">
+    <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), transparent: true) do |navbar| %>
+      <% navbar.left do |nav| %>
+        <% nav.add "Home", url: "#", active: true %>
+        <% nav.add "Reports", url: "#" %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "navbar - overlap: true (background extends 9rem below it; content sits on top)", code: snippet(:layout_13) } do %>
+  <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), overlap: true) do |navbar| %>
+    <% navbar.left do |nav| %>
+      <% nav.add "Home", url: "#", active: true %>
+    <% end %>
+  <% end %>
+  <div class="container-xl mt-n5">
+    <div class="card">
+      <div class="card-body">This card overlaps the navbar's extended background.</div>
+    </div>
+  </div>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "navbar - nav_scroll: true, menu_html: custom --tblr-scroll-height (collapse below lg to see it scroll)", code: snippet(:layout_14) } do %>
+  <%= tabler_ui.navbar(brand: link_to("MyApp", "#"), nav_scroll: true,
+                        menu_html: { style: "--tblr-scroll-height: 300px" }) do |navbar| %>
+    <% navbar.left do |nav| %>
+      <% (1..10).each do |n| %>
+        <% nav.add "Item #{n}", url: "#" %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
 <%= render layout: "showcase/example", locals: { title: "page_header", code: snippet(:layout_2) } do %>
   <%= tabler_ui.page_header title: "Dashboard", pretitle: "Overview" do |slots| %>
     <% slots.buttons do %>
       <%= tabler_ui.button text: "New report", color: "primary", icon: "plus" %>
     <% end %>
   <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "page_header - border: true", code: snippet(:layout_15) } do %>
+  <%= tabler_ui.page_header title: "Dashboard", border: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "page_header - title_size: \"lg\"", code: snippet(:layout_16) } do %>
+  <%= tabler_ui.page_header title: "Dashboard", title_size: "lg" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "page_header - pretitle: (above title) + subtitle: (below title)", code: snippet(:layout_17) } do %>
+  <%= tabler_ui.page_header title: "Dashboard", pretitle: "Overview", subtitle: "Last 30 days" %>
 <% end %>
 
 <div class="row row-cards">
@@ -44,6 +109,46 @@
   </div>
 </div>
 
+<div class="row row-cards">
+  <div class="col-md-4">
+    <%= render layout: "showcase/example", locals: { title: "card - status_position: \"top\" (default)", code: snippet(:layout_18) } do %>
+      <%= tabler_ui.card title: "Top strip", status: "danger", status_position: "top" do |slots| %>
+        <% slots.body { "Status strip along the top edge." } %>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="col-md-4">
+    <%= render layout: "showcase/example", locals: { title: "card - status_position: \"start\"", code: snippet(:layout_19) } do %>
+      <%= tabler_ui.card title: "Start strip", status: "azure", status_position: "start" do |slots| %>
+        <% slots.body { "Status strip along the leading edge." } %>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="col-md-4">
+    <%= render layout: "showcase/example", locals: { title: "card - status_position: \"bottom\"", code: snippet(:layout_20) } do %>
+      <%= tabler_ui.card title: "Bottom strip", status: "success", status_position: "bottom" do |slots| %>
+        <% slots.body { "Status strip along the bottom edge." } %>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<%= render layout: "showcase/example", locals: { title: "card_group - cards as direct children (not wrapped in a column/div)", code: snippet(:layout_21) } do %>
+  <%= tabler_ui.card_group do |slots| %>
+    <% slots.body do %>
+      <%= tabler_ui.card title: "One" do |c| %>
+        <% c.body { "First card in the group." } %>
+      <% end %>
+      <%= tabler_ui.card title: "Two" do |c| %>
+        <% c.body { "Second card in the group." } %>
+      <% end %>
+      <%= tabler_ui.card title: "Three" do |c| %>
+        <% c.body { "Third card in the group." } %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
 <% columns = [
   { label: "Name", value: ->(row) { row[:name] } },
   { label: "Role", value: ->(row) { row[:role] } },
@@ -58,6 +163,31 @@
 <%= render layout: "showcase/example", locals: { title: "table - striped, hover, row_html:", code: snippet(:layout_5) } do %>
   <%= tabler_ui.table columns: columns, data: rows, striped: true, hover: true,
                       row_html: ->(row) { { class: "table-warning" } if row[:status] == "Away" } %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "table - responsive: \"sm\" (scrolls only below sm, instead of at every width)", code: snippet(:layout_22) } do %>
+  <%= tabler_ui.table columns: columns, data: rows, responsive: "sm" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "table - responsive: false (no scroll wrapper)", code: snippet(:layout_23) } do %>
+  <%= tabler_ui.table columns: columns, data: rows, responsive: false %>
+<% end %>
+
+<% mobile_columns = [
+  { label: "Name", value: ->(row) { row[:name] } },
+  { label: "Role", value: ->(row) { row[:role] } },
+  { label: "Department", value: ->(row) { row[:department] } },
+  { label: "Location", value: ->(row) { row[:location] } },
+  { label: "Status", class: "text-end",
+    value: ->(row) { tabler_ui.status(text: row[:status], color: row[:status] == "Active" ? "success" : "secondary", dot: true) } }
+] %>
+<% mobile_rows = [
+  { name: "Ada Lovelace", role: "Engineer", department: "Platform", location: "London", status: "Active" },
+  { name: "Grace Hopper", role: "Admiral", department: "Navy", location: "Virginia", status: "Active" },
+  { name: "Alan Turing", role: "Researcher", department: "Cryptography", location: "Bletchley", status: "Away" }
+] %>
+<%= render layout: "showcase/example", locals: { title: "table - mobile: true (card-stacked at all widths; data-label draws the headings)", code: snippet(:layout_24) } do %>
+  <%= tabler_ui.table columns: mobile_columns, data: mobile_rows, mobile: true %>
 <% end %>
 
 <%= render layout: "showcase/example", locals: { title: "datagrid", code: snippet(:layout_6) } do %>
@@ -81,6 +211,62 @@
     <% tabs.tab("Archive", badge: { text: "12", color: "red" }) do %>
       12 archived threads.
     <% end %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "tabs - style: :tabs, :pills, :underline, :bordered, :segmented side by side", code: snippet(:layout_25) } do %>
+  <div class="row row-cards">
+    <div class="col">
+      <div class="text-secondary mb-2">style: :tabs (default)</div>
+      <%= tabler_ui.tabs("style-tabs-demo") do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+      <% end %>
+    </div>
+    <div class="col">
+      <div class="text-secondary mb-2">style: :pills</div>
+      <%= tabler_ui.tabs("style-pills-demo", style: :pills) do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+      <% end %>
+    </div>
+    <div class="col">
+      <div class="text-secondary mb-2">style: :underline</div>
+      <%= tabler_ui.tabs("style-underline-demo", style: :underline) do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+      <% end %>
+    </div>
+    <div class="col">
+      <div class="text-secondary mb-2">style: :bordered</div>
+      <%= tabler_ui.tabs("style-bordered-demo", style: :bordered) do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+      <% end %>
+    </div>
+    <div class="col">
+      <div class="text-secondary mb-2">style: :segmented</div>
+      <%= tabler_ui.tabs("style-segmented-demo", style: :segmented) do |tabs| %>
+        <% tabs.tab("One") { "First" } %>
+        <% tabs.tab("Two") { "Second" } %>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "tabs - fill: true (equal-width tabs)", code: snippet(:layout_26) } do %>
+  <%= tabler_ui.tabs("fill-tabs-demo", fill: true) do |tabs| %>
+    <% tabs.tab("Inbox") { "First" } %>
+    <% tabs.tab("Sent") { "Second" } %>
+    <% tabs.tab("Archive") { "Third" } %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "tabs - style: :segmented, vertical: true", code: snippet(:layout_27) } do %>
+  <%= tabler_ui.tabs("segmented-vertical-demo", style: :segmented, vertical: true) do |tabs| %>
+    <% tabs.tab("One") { "First" } %>
+    <% tabs.tab("Two") { "Second" } %>
+    <% tabs.tab("Three") { "Third" } %>
   <% end %>
 <% end %>
 
