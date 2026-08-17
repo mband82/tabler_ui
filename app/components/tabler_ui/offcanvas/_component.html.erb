@@ -1,0 +1,32 @@
+<% header_slot = defined?(slots) && slots.present?(:header) %>
+<% title_visible = !header_slot && offcanvas.title.present? %>
+<% header_visible = header_slot || offcanvas.title.present? || offcanvas.close_button %>
+
+<%= tag.div(**offcanvas.root_attributes(title_visible: title_visible)) do %>
+  <% if header_visible %>
+    <%= tag.div(**offcanvas.header_attributes) do %>
+      <% if header_slot %>
+        <%= slots.header %>
+      <% else %>
+        <% if offcanvas.title.present? %>
+          <%= tag.h5(offcanvas.title, class: "offcanvas-title", id: offcanvas.title_id) %>
+        <% end %>
+        <% if offcanvas.close_button %>
+          <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="<%= offcanvas.close_label %>"></button>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if defined?(slots) && slots.present?(:body) %>
+    <%= tag.div(**offcanvas.body_attributes) do %>
+      <%= slots.body %>
+    <% end %>
+  <% end %>
+
+  <% if defined?(slots) && slots.present?(:footer) %>
+    <%= tag.div(**offcanvas.footer_attributes) do %>
+      <%= slots.footer %>
+    <% end %>
+  <% end %>
+<% end %>

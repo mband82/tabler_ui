@@ -19,6 +19,9 @@ import DarkModeController from "controllers/tabler_ui/dark_mode_controller"
 import DatepickerController from "controllers/tabler_ui/datepicker_controller"
 import DropdownMenuController from "controllers/tabler_ui/dropdown_menu_controller"
 import FilterController from "controllers/tabler_ui/filter_controller"
+import ModalController from "controllers/tabler_ui/modal_controller"
+import OffcanvasController from "controllers/tabler_ui/offcanvas_controller"
+import ToastController from "controllers/tabler_ui/toast_controller"
 import RatingController from "controllers/tabler_ui/rating_controller"
 import TabController from "controllers/tabler_ui/tab_controller"
 import ToggleButtonController from "controllers/tabler_ui/toggle_button_controller"
@@ -32,6 +35,9 @@ if (window.Stimulus) {
   app.register("tabler-ui--datepicker", DatepickerController)
   app.register("tabler-ui--dropdown-menu", DropdownMenuController)
   app.register("tabler-ui--filter", FilterController)
+  app.register("tabler-ui--modal", ModalController)
+  app.register("tabler-ui--offcanvas", OffcanvasController)
+  app.register("tabler-ui--toast", ToastController)
   app.register("tabler-ui--rating", RatingController)
   app.register("tabler-ui--tab", TabController)
   app.register("tabler-ui--toggle-button", ToggleButtonController)

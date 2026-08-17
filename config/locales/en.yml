@@ -11,6 +11,14 @@ en:
       title: "Switch theme"
     dimmer:
       loader_label: "Loading..."
+    offcanvas:
+      close: "Close"
+      dialog_label: "Dialog"
+    modal:
+      close: "Close"
+      dialog_label: "Dialog"
+    toast:
+      close: "Close"
     spinner:
       label: "Loading..."
     steps:

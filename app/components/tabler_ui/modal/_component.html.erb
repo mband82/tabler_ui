@@ -1,0 +1,38 @@
+<% header_slot = defined?(slots) && slots.present?(:header) %>
+<% title_visible = !header_slot && modal.title.present? %>
+
+<%= tag.div(**modal.root_attributes(title_visible: title_visible)) do %>
+  <%= tag.div(**modal.dialog_attributes) do %>
+    <%= tag.div(**modal.content_attributes) do %>
+      <% if modal.status? %>
+        <%= tag.div("", class: "modal-status bg-#{modal.status}") %>
+      <% end %>
+
+      <% if modal.close_button %>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="<%= modal.close_label %>"></button>
+      <% end %>
+
+      <% if header_slot || modal.title.present? %>
+        <%= tag.div(**modal.header_attributes) do %>
+          <% if header_slot %>
+            <%= slots.header %>
+          <% else %>
+            <%= tag.h5(modal.title, class: "modal-title", id: modal.title_id) %>
+          <% end %>
+        <% end %>
+      <% end %>
+
+      <% if defined?(slots) && slots.present?(:body) %>
+        <%= tag.div(**modal.body_attributes) do %>
+          <%= slots.body %>
+        <% end %>
+      <% end %>
+
+      <% if defined?(slots) && slots.present?(:footer) %>
+        <%= tag.div(**modal.footer_attributes) do %>
+          <%= slots.footer %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

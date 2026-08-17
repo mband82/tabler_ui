@@ -1,0 +1,33 @@
+<% header_slot = defined?(slots) && slots.present?(:header) %>
+<% show_header = header_slot || toast.title.present? || toast.close_button %>
+
+<% toast_markup = capture do %>
+  <%= tag.div(**toast.root_attributes) do %>
+    <% if show_header %>
+      <%= tag.div(**toast.header_attributes) do %>
+        <% if header_slot %>
+          <%= slots.header %>
+        <% elsif toast.title.present? %>
+          <%= tag.strong(toast.title, class: "me-auto") %>
+        <% end %>
+        <% if toast.close_button %>
+          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="<%= toast.close_label %>"></button>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <% if defined?(slots) && slots.present?(:body) %>
+      <%= tag.div(**toast.body_attributes) do %>
+        <%= slots.body %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if toast.positioned? %>
+  <%= tag.div(**toast.container_attributes) do %>
+    <%= toast_markup %>
+  <% end %>
+<% else %>
+  <%= toast_markup %>
+<% end %>
