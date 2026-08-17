@@ -1,0 +1,5 @@
+<%= tag.div(**card_group.root_attributes) do %>
+  <% if defined?(slots) && slots.present?(:body) %>
+    <%= slots.body %>
+  <% end %>
+<% end %>
