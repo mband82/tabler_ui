@@ -75,7 +75,7 @@
 
   # Render icon HTML if icon name is present
   icon_html = if icon_name.present?
-    icon_component = TablerUi::Icon::Component.new(icon: icon_name)
+    icon_component = TablerUi::Icon::Component.new(icon_name)
     icon_component.icon_data
   end
 %>

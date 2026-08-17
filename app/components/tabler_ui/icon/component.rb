@@ -1,64 +1,149 @@
+# frozen_string_literal: true
+
 module TablerUi
   module Icon
+    # Icon component for Tabler UI. Reads a raw Tabler SVG icon off disk (gem
+    # assets first, then the host app's app/assets/icons/<variant>/ as an
+    # override hook) and emits it with `raw`.
+    #
+    # @example Basic usage
+    #   <%= tabler_ui.icon icon: "user" %>
+    #
+    # @example Filled variant, colored, animated
+    #   <%= tabler_ui.icon icon: "heart", filled: true, color: "danger", pulse: true %>
+    #
+    # @example Rule 5 hook on the root <svg>
+    #   <%= tabler_ui.icon icon: "user", html: { class: "me-2", data: { testid: "user-icon" } } %>
     class Component
-      def initialize(icon:, filled: false, color: nil, pulse: false, tada: false, rotate: false, size: nil, class: nil, title: nil)
+      include TablerUi::Base
+      # Only used for TagBuilder#attributes below, to serialize the merged
+      # root-tag attribute hash the same way Rails' own `tag` helper would
+      # (handles class arrays, data-/aria-* hashes, escaping, ...). No new
+      # runtime dependency: ActionView ships with the engine already.
+      include ActionView::Helpers::TagHelper
+
+      # Matches only the SVG's opening root tag, anchored to the start of the
+      # file. Used with String#match (not #gsub) so exactly one, bounded
+      # rewrite happens -- see #rewrite_root_tag.
+      ROOT_SVG_TAG = /\A<svg\b[^>]*>/m
+
+      # Matches a single name="value" attribute pair inside an opening tag.
+      ATTRIBUTE = /([a-zA-Z_:][-\w:.]*)\s*=\s*"([^"]*)"/
+
+      # @param icon [String] Tabler icon name, e.g. "user". Interpolated into
+      #   a filesystem path, so it must not contain "/" or "..".
+      # @param options [Hash]
+      # @option options [Boolean] :filled Use the filled variant instead of outline (default: false)
+      # @option options [String]  :color  Tabler color name, rendered as "text-<color>" on the root svg
+      # @option options [Boolean] :pulse  Adds the "icon-pulse" animation class
+      # @option options [Boolean] :tada   Adds the "icon-tada" animation class
+      # @option options [Boolean] :rotate Adds the "icon-rotate" animation class
+      # @option options [String]  :size   Rendered as "icon-<size>" on the root svg
+      # @option options [String]  :title  Rendered as a title="..." attribute on the root svg
+      # @option options [Hash]    :html   Rule 5 HTML hook for the root <svg> element
+      def initialize(icon, options = {})
         @icon = icon
-        @filled = filled
-        @color = color
-        @pulse = pulse
-        @tada = tada
-        @rotate = rotate
-        @size = size
-        @title = title
-        @custom_class = binding.local_variable_get(:class)
+        @filled = options[:filled]
+        @color = options[:color]
+        @pulse = options[:pulse]
+        @tada = options[:tada]
+        @rotate = options[:rotate]
+        @size = options[:size]
+        @title = options[:title]
+
+        initialize_html_options(options)
       end
 
+      # @return [String] the icon's SVG markup, or the fallback bug icon.
       def icon_data
-        if @icon.blank?
-          draw_error_icon
-          return
-        end
+        svg = read_svg
+        return draw_error_icon unless svg
 
-        variant = @filled.blank? ? "outline" : "filled"
-
-        # Erst im Gem-Verzeichnis suchen, dann in der App
-        gem_icon_path = File.expand_path("../../../assets/icons/#{variant}/#{@icon}.svg", __dir__)
-        app_icon_path = Rails.root.join("app", "assets", "icons", variant, "#{@icon}.svg")
-
-        icon_path = if File.exist?(gem_icon_path)
-                      gem_icon_path
-                    elsif File.exist?(app_icon_path)
-                      app_icon_path
-                    else
-                      nil
-                    end
-
-        if icon_path && File.exist?(icon_path)
-          data = File.read(icon_path)
-          data = add_animation_classes(data)
-
-          # Wrap with span if color or title is present
-          if @color || @title
-            title_attr = @title.present? ? " title=\"#{ERB::Util.html_escape(@title)}\"" : ""
-            color_class = @color.present? ? " class=\"text-#{@color}\"" : ""
-            "<span#{color_class}#{title_attr}>#{data}</span>"
-          else
-            data
-          end
-        else
-          draw_error_icon
-        end
+        rewrite_root_tag(svg)
       end
 
       private
 
-      def add_animation_classes(data)
-        data = data.gsub(/(class="([a-zA-Z -]*))/) { |s| s + ' icon-pulse' } if @pulse
-        data = data.gsub(/(class="([a-zA-Z -]*))/) { |s| s + ' icon-tada' } if @tada
-        data = data.gsub(/(class="([a-zA-Z -]*))/) { |s| s + ' icon-rotate' } if @rotate
-        data = data.gsub(/(class="([a-zA-Z -]*))/) { |s| s + " icon-#{@size}" } if @size.present?
-        data = data.gsub(/(class="([a-zA-Z -]*))/) { |s| s + " #{@custom_class}" } if @custom_class.present?
-        data
+      # --- lookup ---------------------------------------------------------
+
+      def read_svg
+        return nil if @icon.blank? || !safe_icon_name?
+
+        path = icon_path
+        path && File.read(path)
+      end
+
+      # Path-traversal guard. @icon comes straight from the caller and is
+      # interpolated into a filesystem path in #icon_path below, so any name
+      # carrying a path separator or ".." is rejected outright rather than
+      # sanitised -- there is no legitimate icon name that needs either.
+      def safe_icon_name?
+        name = @icon.to_s
+        !name.include?("/") && !name.include?("..")
+      end
+
+      def icon_path
+        variant = @filled.present? ? "filled" : "outline"
+
+        # Gem's own icons first, then the host app's override directory.
+        gem_path = File.expand_path("../../../assets/icons/#{variant}/#{@icon}.svg", __dir__)
+        return gem_path if File.exist?(gem_path)
+
+        app_path = Rails.root.join("app", "assets", "icons", variant, "#{@icon}.svg")
+        return app_path if File.exist?(app_path)
+
+        nil
+      end
+
+      # --- rendering --------------------------------------------------------
+
+      # Rewrites *only* the opening <svg ...> tag -- matched once via
+      # String#match, never a global gsub -- so nested elements inside the
+      # icon (e.g. the <path> children) are never touched. Everything from
+      # that tag's closing ">" onward is passed through byte-for-byte.
+      def rewrite_root_tag(svg)
+        match = ROOT_SVG_TAG.match(svg)
+        return svg unless match
+
+        opening_tag = match[0]
+        rest_of_file = svg[opening_tag.length..]
+
+        "<svg #{root_attributes(opening_tag)}>#{rest_of_file}"
+      end
+
+      # Builds the final attribute hash for the root <svg>: the tag's own
+      # existing attributes (width, viewBox, stroke, ... and its own class),
+      # plus this component's computed classes/title, merged with whatever
+      # the caller passed via the html: hook (rule 5 -- see TablerUi::Base
+      # and TablerUi::HtmlOptions.merge_html: caller class is appended, other
+      # attributes overwrite).
+      def root_attributes(opening_tag)
+        existing = parse_attributes(opening_tag)
+        own_class = existing.delete("class")
+
+        defaults = existing.transform_keys(&:to_sym)
+        defaults[:title] = @title if @title.present?
+        defaults[:class] = icon_classes(own_class)
+
+        tag.attributes(html_for(:root, defaults))
+      end
+
+      def parse_attributes(opening_tag)
+        opening_tag.scan(ATTRIBUTE).each_with_object({}) { |(name, value), attrs| attrs[name] = value }
+      end
+
+      # The icon's own classes: whatever was already baked into the SVG file,
+      # plus the animation/size/color modifiers. This is the "base" class
+      # string handed to html_for(:root, ...), which is what caller-supplied
+      # html: { class: ... } gets appended to rather than replacing.
+      def icon_classes(own_class)
+        classes = [own_class]
+        classes << "icon-pulse" if @pulse
+        classes << "icon-tada" if @tada
+        classes << "icon-rotate" if @rotate
+        classes << "icon-#{@size}" if @size.present?
+        classes << "text-#{@color}" if @color.present?
+        classes.select(&:present?).join(" ")
       end
 
       def draw_error_icon
