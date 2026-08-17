@@ -229,8 +229,9 @@ the switch.
 - Constructors follow rule 4: mandatory arguments positional, everything else in a
   trailing `options = {}` hash. See rule 4 for how the dispatcher resolves the caller's
   keyword syntax onto these positional parameters.
-- Only `Dropdown` still uses the legacy positional `initialize(view_context)`, and it
-  ignores the argument — do not copy it.
+- Every component now uses the modern shape (`include TablerUi::Base` + rule 4 constructor).
+  The legacy positional `initialize(view_context)` is gone; the dispatcher raises on a
+  component class that does not include `TablerUi::Base`.
 - The partial receives the component under its snake_case name (`alert`, `badge`, `navbar`).
 - Computed CSS classes belong on the component as a method (`alert.alert_classes`), not in the ERB.
 - `Icon`, `Illustration` and `DarkModeToggle` accept a `class:` kwarg, which collides with

@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-17
+
+Closes every gap an audit of all 33 components against the bundled Tabler v1.4.0 stylesheet
+rated XS or S -- 42 features the CSS supported that the Ruby API could not reach. Three of
+those turned out to be bugs rather than gaps, and fixing them changes rendered output.
+
+### Fixed
+
+- `card`'s `status:` option never worked. `card-status-top` is a bare selector setting
+  `position: absolute; height: 2px`, and it was being applied to the `.card` element itself,
+  collapsing the whole card into a 2px sliver. The strip is now a dedicated empty child element,
+  which is what Tabler's markup expects.
+- `tabs` with `style: :underline` emitted `nav-tabs nav-tabs-alt`. `nav-tabs-alt` does not exist
+  anywhere in the bundled stylesheet, so the style rendered as a plain tab bar. It now emits
+  `nav-underline`, replacing `nav-tabs` rather than adding to it.
+- `button` with `shape: "pill"` emitted Bootstrap's `rounded-pill`, which only sets a border
+  radius. It now emits Tabler's `btn-pill`, which also widens the horizontal padding and carries
+  the padding fix for icon-only pill buttons.
+
+### Added
+
+- Two components, taking the gem from 33 to 35: `badge_list` (`badges-list`) and `card_group`.
+- `alert`: `minor:`, `link_style:` (`:link` / `:action`), and `color: "muted"`.
+- `avatar`: `cover:`, and an `overlay` slot for nesting a status dot or brand chip. Not supported
+  on generated identicon avatars, which raise -- an HTML overlay cannot be nested in `<svg>`.
+- `badge`: `dot:` and `icon_only:`.
+- `button`: `loading:`, `floating:`, `animate_icon:`, `ghost:`, and the brand colour palette
+  (`facebook`, `github`, `x`, ... plus `muted`), accepted on buttons only.
+- `card`: `status_position:` (`"top"` / `"start"` / `"bottom"`) and a `status_html:` hook.
+- `carousel`: `dark:`.
+- `dropdown`: `dark:`, `scrollable:`, `arrow:`, `direction:` (`"up"`, `"end"`, `"start"`,
+  `"up-center"`, `"down-center"`) and `align_breakpoint:`.
+- `modal`: `full_width:`, and `size:` now accepts `fullscreen-<breakpoint>-down`.
+- `navbar`: `expand:`, `dark:`, `transparent:`, `overlap:`, `nav_scroll:`.
+- `offcanvas`: `expand:`.
+- `page_header`: `border:`, `title_size:`, `subtitle:` (rendered below the title, distinct from
+  `pretitle:`) and a `subtitle_html:` hook.
+- `progress`: `indeterminate:` and `separated:`.
+- `table`: `responsive:` (`true` / breakpoint / `false`) and `mobile:`, which stacks rows as cards
+  and derives each cell's `data-label` from its column heading.
+- `tabs`: `style: :bordered`, `style: :segmented` (with `vertical:`), `fill:` and `justified:`.
+- `TablerUi::Breakpoint`, a shared `sm`/`md`/`lg`/`xl`/`xxl` vocabulary that raises on unknown
+  values, mirroring `TablerUi::Color` and `TablerUi::Align`.
+
+### Changed
+
+- `TablerUi::Color.validate!` takes an optional `extra:` keyword listing additional values valid
+  at that call site. `Color::ALL` is deliberately unchanged, so brand names and `muted` stay
+  invalid for components that have no matching CSS -- `bg-facebook` does not exist.
+- `dropdown` item icons now carry Tabler's `dropdown-item-icon` class instead of an ad-hoc `me-1`
+  margin utility.
+- `page_header` accepts `subtitle:` again. It was removed in 0.4.0 as a mislabelled alias for
+  `pretitle:`; it now means something different -- text *below* the title.
+
+### Known limitation
+
+- `progress`'s `separated:` emits the correct class but has no visible effect yet. The CSS draws a
+  separating ring around each bar, which only shows once several bars share one track. That is
+  `progress-stacked`, which is not implemented.
+
 ## [0.4.0] - 2026-08-17
 
 No breaking changes in this release.
