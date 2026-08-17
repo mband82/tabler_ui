@@ -7,10 +7,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-17
+
+All 20 components were rewritten across eight commits: a shared foundation
+(`TablerUi::Base`, HTML-hook merging, colour validation), then every
+component converted to the options-hash convention, then Stimulus/form
+builder fixes. See `CLAUDE.md` rules 4-7 for the conventions behind this.
+
+### Breaking changes
+
+- **All components**: component classes must now `include TablerUi::Base`;
+  the dispatcher raises `ArgumentError` if a class exists but doesn't.
+- **All components**: unknown `color:`/`status:` values now raise
+  `ArgumentError` instead of silently falling back to a default.
+- **All components**: `custom_class:` and `class:` are gone. Use `html:`
+  (single-element components) or `<part>_html:` (multi-part components),
+  e.g. `header_html:`, `body_html:`, `footer_html:`.
+- **Builder methods** (`item`, `tab`, `add`, `dropdown`, `header`): title is
+  now the mandatory positional argument -- `item("General")`, not
+  `item(title: "General")`. Passing the old keyword form now raises instead
+  of silently rendering wrong content.
+- **alert**: `variant:` -> `color:`; `message:` -> `text:`; `link:` ->
+  `url:`; the `content` accessor is gone (use `text:` or the `body` slot).
+- **badge**: `variant:` -> `color:`.
+- **button**: `variant:` -> `color:`; `to:` is gone, `url:` is canonical.
+- **dropdown**: `variant:`/`button_variant:` -> `color:`; `align:` now takes
+  `:start`/`:end` (`"left"`/`"right"` silently fall back to `:start`).
+- **illustration**: `variant:` -> `theme:` (it always selected the asset
+  folder, "light"/"dark", never a colour).
+- **navbar**: nested dropdowns now use the same `.item`/`.divider`/`.header`
+  API as the standalone dropdown, replacing `.add`/`.add_divider`; `align:`
+  takes `:start`/`:end` like dropdown.
+- **page_header**: `subtitle:` -> `pretitle:`, matching the `.page-pretitle`
+  class it renders.
+- **placeholder**: `variant:` -> `color:`.
+- **rating**: `options:` -> `choices:`; `variant:` -> `color:`.
+- **status**: `lite:` -> `light:`.
+- **tabs**: `badge_color:` is gone -- pass `badge: { color: "red" }` (or a
+  plain string for the badge's own default colour).
+- **Stimulus**: the hand-rolled `tabler-ui--dropdown` controller is gone,
+  replaced by `tabler-ui--dropdown-menu`, a thin lifecycle wrapper around
+  Bootstrap's own dropdown JS.
+
+### Fixed
+
+- **card**: every card rendered `class="card OpenStruct"` and discarded any
+  class the caller passed in.
+- **avatar**: reseeded Ruby's *global* RNG via `srand` on every render,
+  perturbing unrelated `rand` calls elsewhere in the process; also defined
+  `rand_color` onto the shared view class from inside its own template on
+  every render. Both are now scoped correctly.
+- **rating**: could not render at all with its own defaults (choices were
+  computed before `max_stars` was set).
+- **status**: silently rendered unknown colours as blue.
+- **progress**: percent clamping returned the wrong type at the boundaries.
+- **icon**: appended caller classes to every nested `<svg>` element via a
+  global `gsub`, not just the root; now scoped to the root tag only.
+- **icon, illustration**: interpolated unsanitised names into a filesystem
+  path; names containing `/` or `..` are now rejected outright.
+- **JavaScript**: `chart_controller` was pinned and precompiled but never
+  registered with Stimulus; `toggle_button_controller` was registered but
+  never added to the precompile list. Both now work.
+- **datepicker controller**: leaked a datepicker instance on every Turbo
+  navigation instead of destroying it on `disconnect()`.
+- **filter controller**: shipped `console.log` debug output and never
+  cleared its debounce timer on `disconnect()`.
+- **FormBuilder**: `:decimal`, `:float`, `:datetime` and `:time` columns
+  raised `NoMethodError`; all four now render (numeric field with
+  `step: "any"`, native `datetime-local`/`time` inputs).
+
 ### Added
-- ApexCharts 5.4.0 integration for data visualization (453 KB JS, 14.5 KB CSS)
-- Chart Stimulus controller for easy ApexCharts integration
-- Comprehensive ApexCharts documentation with examples in CLAUDE.md
+
+- Rule-5 `html:`/`<part>_html:` hooks across all 20 components -- ten
+  (avatar, badge, button, datagrid, navbar, page_header, placeholder,
+  progress, stat_card, table) had no class hook at all before this release.
+- **avatar**: `image:` option (previously documented, never implemented).
+- **badge**: `outline:` option (`badge-outline`).
+- **card**: `status:`, `borderless:`, `stacked:` options.
+- **progress**: `striped:`, `animated:` options.
+- **table**: `bordered`, `sm`, `nowrap`, `vcenter` options; `card: false` to
+  opt out of the wrapping `.card`; `row_html:` now also accepts a callable
+  for per-row conditional styling.
+- Four Stimulus controllers wrapping Bootstrap's own JS: `tab_controller`,
+  `collapse_controller`, `dropdown_menu_controller`, `alert_controller`.
+- ApexCharts 5.4.0 integration (453 KB JS, 14.5 KB CSS) and its
+  `chart_controller`, now fully wired (registered + precompiled).
+- RSpec + Combustion test suite -- the gem had no tests before this release.
+
+### Changed
+
+- The component dispatcher (`lib/tabler_ui/ui.rb`) selects modern vs. legacy
+  behaviour from a `TablerUi::Base` marker and `builder_style!` declaration,
+  not reflection/duck-typing on method names.
+- All seven bare partials (`button`, `card`, `page_header`, `table`,
+  `stat_card`, `progress`, `avatar`) became component classes.
+- Bootstrap's own JS (tabs, collapse, dropdowns, alerts) is now driven
+  through thin Stimulus lifecycle wrappers instead of raw `data-bs-*`
+  markup alone.
 
 ## [0.2.0] - 2026-02-03
 

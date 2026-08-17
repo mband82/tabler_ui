@@ -10,7 +10,7 @@ require "rails_helper"
 # comes later, per component) -- it only proves the plumbing still works, so
 # that later refactor batches have a baseline to break loudly against.
 RSpec.describe "TablerUi component regression render", type: :component do
-  # class-backed components (app/components/tabler_ui/<name>/component.rb)
+  # Every shipped component is class-backed: app/components/tabler_ui/<name>/component.rb
   it "renders alert" do
     fragment = component_fragment(:alert, color: "success", text: "Saved!")
 
@@ -110,8 +110,9 @@ RSpec.describe "TablerUi component regression render", type: :component do
     expect(fragment.text).to include("First", "First tab content")
   end
 
-  # bare partials (app/components/tabler_ui/_<name>.html.erb) -- OpenStruct
-  # fallback, so `component_fragment` builds each straight from kwargs.
+  # These seven shipped as bare partials until 0.3.0 and are now component
+  # classes like the rest. The dispatcher's OpenStruct fallback still exists,
+  # but only serves partials a host app adds itself -- see ui_spec.rb.
   it "renders avatar" do
     fragment = component_fragment(:avatar, name: "Ada Lovelace", size: "md")
 

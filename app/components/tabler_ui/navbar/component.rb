@@ -173,7 +173,7 @@ module TablerUi
         # @param options [Hash]
         # @option options [Symbol, String] :align Dropdown menu alignment -- :start (default) or :end.
         #   Also tolerates the strings "start"/"end". Any other value (including the old "left"/"right")
-        #   falls back to :start.
+        #   raises ArgumentError -- see TablerUi::Align.validate!.
         # @option options [Hash, #call] :html Rule 5 HTML hook for this item's `li.nav-item` (part :item)
         # @yield [DropDownProxy]
         def dropdown(title, options = {})
@@ -186,7 +186,7 @@ module TablerUi
             type: :dropdown,
             title: title,
             submenu: proxy.items,
-            align: normalize_align(options[:align]),
+            align: TablerUi::Align.validate!(options[:align], context: "navbar dropdown"),
             html: options[:html]
           )
 
@@ -235,11 +235,6 @@ module TablerUi
         end
 
         private
-
-        def normalize_align(value)
-          sym = value.to_s.to_sym
-          %i[start end].include?(sym) ? sym : :start
-        end
 
         # Proxy for adding dropdown items, yielded by #dropdown. Deliberately
         # the *same* builder API as the standalone TablerUi::Dropdown::Component

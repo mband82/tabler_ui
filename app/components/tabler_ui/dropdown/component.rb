@@ -31,6 +31,7 @@ module TablerUi
       include TablerUi::Base
       builder_style!
 
+      # Alignment vocabulary lives in TablerUi::Align, shared with Navbar.
       # :html holds the caller's *raw* per-item hook (Hash or Proc taking the
       # item), not resolved attributes -- see #item_attributes.
       Item = Struct.new(:type, :title, :url, :method, :active, :disabled, :icon, :html, keyword_init: true)
@@ -42,14 +43,14 @@ module TablerUi
       # @option options [String] :color Tabler colour name for the toggle button (default: "primary")
       # @option options [Symbol, String] :align Menu alignment -- :start (default) or :end.
       #   The strings "start"/"end" are also accepted; anything else (including
-      #   the old "right"/"left") falls back to :start.
+      #   the old "right"/"left") raises ArgumentError.
       # @option options [Hash] :html         Rule 5 HTML hook for the outer wrapper (part :root)
       # @option options [Hash] :toggle_html  Rule 5 HTML hook for the toggle button (part :toggle)
       # @option options [Hash] :menu_html    Rule 5 HTML hook for the `.dropdown-menu` (part :menu)
       def initialize(options = {})
         @label = options[:label]
         @color = TablerUi::Color.validate!(options[:color], context: "dropdown") || "primary"
-        @align = normalize_align(options[:align])
+        @align = TablerUi::Align.validate!(options[:align], context: "dropdown")
         @items = []
 
         initialize_html_options(options)
@@ -128,10 +129,6 @@ module TablerUi
       end
 
       private
-
-      def normalize_align(value)
-        value.to_s == "end" ? :end : :start
-      end
 
       def menu_classes
         classes = ["dropdown-menu"]

@@ -68,10 +68,26 @@ RSpec.describe "TablerUi::Dropdown", type: :component do
     expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).not_to include("dropdown-menu-end")
   end
 
-  it "align: \"right\" no longer produces dropdown-menu-end -- regression" do
-    fragment = component_fragment(:dropdown, align: "right")
+  it "align: nil does not produce dropdown-menu-end" do
+    fragment = component_fragment(:dropdown, align: nil)
 
     expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).not_to include("dropdown-menu-end")
+  end
+
+  it 'align: "end" (string) produces dropdown-menu-end' do
+    fragment = component_fragment(:dropdown, align: "end")
+
+    expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).to include("dropdown-menu-end")
+  end
+
+  it 'align: "right" raises ArgumentError -- the old vocabulary is no longer silently coerced' do
+    expect { component_fragment(:dropdown, align: "right") }
+      .to raise_error(ArgumentError, /:start.*:end/)
+  end
+
+  it "align: :middle raises ArgumentError" do
+    expect { component_fragment(:dropdown, align: :middle) }
+      .to raise_error(ArgumentError, /:start.*:end/)
   end
 
   it "color: produces btn-<color> on the toggle button" do

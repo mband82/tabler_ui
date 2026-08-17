@@ -474,14 +474,12 @@ module TablerUi
       button_text = options.fetch(:text, method.to_s.humanize)
       icon_name = options[:icon]
       size = options[:size]
-      custom_class = options[:custom_class]
 
       checked = @object.respond_to?(method) ? !!@object.send(method) : false
 
       btn_classes = ["btn"]
       btn_classes << "btn-#{size}" if size
       btn_classes << (checked ? "btn-#{color}" : "btn-outline-#{color}")
-      btn_classes << custom_class if custom_class
 
       icon_html = icon_name ? @template.tabler_ui.icon(icon: icon_name) : nil
 
@@ -507,13 +505,18 @@ module TablerUi
                                data: { "tabler-ui--toggle-button-target": "input" } },
                              options[:input_html]
                            )),
-              tag.button(button_content,
-                         type: "button",
-                         class: btn_classes.join(" "),
-                         data: {
-                           "tabler-ui--toggle-button-target": "button",
-                           action: "click->tabler-ui--toggle-button#toggle"
-                         })
+              # Rule 5: button_html: is the hook for this element, merged so a
+              # caller's class appends to the btn-* classes above rather than
+              # replacing them. Replaces the old custom_class: option.
+              tag.button(button_content, **merge_input_options(
+                { type: "button",
+                  class: btn_classes.join(" "),
+                  data: {
+                    "tabler-ui--toggle-button-target": "button",
+                    action: "click->tabler-ui--toggle-button#toggle"
+                  } },
+                options[:button_html]
+              ))
             ]
           end
         ].compact

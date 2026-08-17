@@ -103,14 +103,54 @@ RSpec.describe "TablerUi::Navbar", type: :component do
     expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).to include("dropdown-menu-end")
   end
 
-  it "align: \"right\" no longer produces dropdown-menu-end -- regression" do
+  it "align: :start does not produce dropdown-menu-end" do
     fragment = component_fragment(:navbar) do |navbar|
       navbar.left do |nav|
-        nav.dropdown("Admin", align: "right") { |dd| dd.item("Users", url: "/admin/users", active: false) }
+        nav.dropdown("Admin", align: :start) { |dd| dd.item("Users", url: "/admin/users", active: false) }
       end
     end
 
     expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).not_to include("dropdown-menu-end")
+  end
+
+  it "align: nil does not produce dropdown-menu-end" do
+    fragment = component_fragment(:navbar) do |navbar|
+      navbar.left do |nav|
+        nav.dropdown("Admin", align: nil) { |dd| dd.item("Users", url: "/admin/users", active: false) }
+      end
+    end
+
+    expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).not_to include("dropdown-menu-end")
+  end
+
+  it 'align: "end" (string) produces dropdown-menu-end' do
+    fragment = component_fragment(:navbar) do |navbar|
+      navbar.left do |nav|
+        nav.dropdown("Admin", align: "end") { |dd| dd.item("Users", url: "/admin/users", active: false) }
+      end
+    end
+
+    expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).to include("dropdown-menu-end")
+  end
+
+  it 'align: "right" raises ArgumentError -- the old vocabulary is no longer silently coerced' do
+    expect {
+      component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin", align: "right") { |dd| dd.item("Users", url: "/admin/users", active: false) }
+        end
+      end
+    }.to raise_error(ArgumentError, /:start.*:end/)
+  end
+
+  it "align: :middle raises ArgumentError" do
+    expect {
+      component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin", align: :middle) { |dd| dd.item("Users", url: "/admin/users", active: false) }
+        end
+      end
+    }.to raise_error(ArgumentError, /:start.*:end/)
   end
 
   it_behaves_like "an element with an html hook", :navbar, {},
