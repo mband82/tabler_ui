@@ -12,10 +12,13 @@ require "rails_helper"
 RSpec.describe "TablerUi component regression render", type: :component do
   # class-backed components (app/components/tabler_ui/<name>/component.rb)
   it "renders alert" do
-    fragment = component_fragment(:alert, variant: "success", message: "Saved!")
+    fragment = component_fragment(:alert, color: "success", text: "Saved!")
 
-    expect(fragment.css(".alert")).not_to be_empty
-    expect(fragment.to_html).not_to be_empty
+    # Assert the options actually took effect. The previous version passed the
+    # since-renamed variant:/message: and still went green, because checking
+    # only that ".alert" exists cannot tell a working option from a dead one.
+    expect(fragment.css(".alert-success")).not_to be_empty
+    expect(fragment.text).to include("Saved!")
   end
 
   it "renders badge" do
@@ -123,17 +126,15 @@ RSpec.describe "TablerUi component regression render", type: :component do
   end
 
   it "renders card" do
-    # _card.html.erb:6 has a pre-existing bug: `card.respond_to?(:class)` is
-    # always true (Object#class), so `card.class` returns the OpenStruct
-    # class itself rather than a caller-supplied `class:` string, producing
-    # a literal "OpenStruct" token in the rendered class list (e.g.
-    # "card OpenStruct"). Scheduled to be fixed in a later batch -- this spec
-    # only asserts the component still renders, not that today's (buggy)
-    # class list is correct.
     fragment = component_fragment(:card, title: "Card title") { |slots| slots.body { "Body content" } }
 
     expect(fragment.css(".card")).not_to be_empty
     expect(fragment.to_html).not_to be_empty
+    # Was `class="card OpenStruct"` before card became a real component:
+    # `card.respond_to?(:class)` is always true, so the old bare partial
+    # leaked Object#class into the class list. See card_spec.rb for the
+    # full regression.
+    expect(fragment.to_html).not_to include("OpenStruct")
   end
 
   it "renders page_header" do

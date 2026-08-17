@@ -1,53 +1,32 @@
-<!-- Tabler UI Alert Component -->
-<div class="<%= alert.alert_classes %>" role="alert">
+<%# Tabler UI Alert Component %>
+<%= tag.div(**alert.root_attributes) do %>
   <% if alert.dismissible %>
+    <%# TODO(rule 6): this drives Bootstrap's alert dismiss directly via data-bs-dismiss;
+        wrap it with a tabler-ui--alert Stimulus controller once that lands. %>
     <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
   <% end %>
 
   <div class="d-flex">
     <% if alert.has_icon? %>
-      <div>
-        <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <% case alert.default_icon %>
-          <% when "check" %>
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M5 12l5 5l10 -10" />
-          <% when "info-circle" %>
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
-            <path d="M12 9h.01" />
-            <path d="M11 12h1v4h1" />
-          <% when "alert-triangle" %>
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M12 9v4" />
-            <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" />
-            <path d="M12 16h.01" />
-          <% when "alert-circle" %>
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
-            <path d="M12 8v4" />
-            <path d="M12 16h.01" />
-          <% end %>
-        </svg>
-      </div>
+      <%= tag.div(**alert.icon_attributes) do %>
+        <%= tabler_ui.icon(icon: alert.default_icon, html: { class: "alert-icon" }) %>
+      <% end %>
     <% end %>
 
     <div>
       <% if alert.title.present? %>
-        <h4 class="alert-title"><%= alert.title %></h4>
+        <%= tag.h4(alert.title, **alert.title_attributes) %>
       <% end %>
 
-      <% if alert.content.present? %>
-        <%= alert.content.html_safe %>
-      <% elsif alert.message.present? %>
-        <div class="text-secondary"><%= alert.message %></div>
-      <% elsif slots&.body %>
+      <% if alert.text.present? %>
+        <div class="text-secondary"><%= alert.text %></div>
+      <% elsif defined?(slots) && slots.present?(:body) %>
         <%= slots.body %>
       <% end %>
 
-      <% if alert.link.present? %>
-        <%= link_to alert.link_text, alert.link, class: "alert-link" %>
+      <% if alert.url.present? %>
+        <%= link_to alert.link_text, alert.url, class: "alert-link" %>
       <% end %>
     </div>
   </div>
-</div>
+<% end %>

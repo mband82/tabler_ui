@@ -1,0 +1,18 @@
+<%# Page Header Component %>
+<%= tag.div(**page_header.root_attributes) do %>
+  <div class="row g-2 align-items-center">
+    <div class="col">
+      <% if page_header.pretitle? %>
+        <%= tag.div(page_header.pretitle, **page_header.pretitle_attributes) %>
+      <% end %>
+      <%= tag.h2(page_header.title, **page_header.title_attributes) %>
+    </div>
+    <% if defined?(slots) && slots.present?(:buttons) %>
+      <%= tag.div(**page_header.buttons_attributes) do %>
+        <div class="btn-list">
+          <%= slots.buttons %>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

@@ -1,0 +1,24 @@
+<%# Card Component %>
+<%= tag.div(**card.root_attributes) do %>
+  <% if (defined?(slots) && slots.present?(:header)) || card.title.present? %>
+    <%= tag.div(**card.header_attributes) do %>
+      <% if defined?(slots) && slots.present?(:header) %>
+        <%= slots.header %>
+      <% else %>
+        <%= tag.h3(card.title, class: "card-title") %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if defined?(slots) && slots.present?(:body) %>
+    <%= tag.div(**card.body_attributes) do %>
+      <%= slots.body %>
+    <% end %>
+  <% end %>
+
+  <% if defined?(slots) && slots.present?(:footer) %>
+    <%= tag.div(**card.footer_attributes) do %>
+      <%= slots.footer %>
+    <% end %>
+  <% end %>
+<% end %>
