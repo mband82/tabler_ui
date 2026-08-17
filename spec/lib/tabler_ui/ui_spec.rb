@@ -218,16 +218,16 @@ RSpec.describe TablerUi::Ui do
 
   describe "OpenStruct fallback (no class for this name)" do
     it "wraps kwargs in an OpenStruct and renders the bare partial" do
-      # No TablerUi::Progress::Component class exists -- that's what routes
-      # this through the OpenStruct fallback and its bare "tabler_ui/_progress"
-      # partial rather than a class-backed "tabler_ui/progress/component" one.
-      expect("TablerUi::Progress::Component".safe_constantize).to be_nil
+      # Uses a dedicated fixture partial with no backing class, rather than a
+      # real component: real ones get promoted to classes as the refactor
+      # proceeds, which would silently move this spec onto a different branch.
+      expect("TablerUi::SpecBare::Component".safe_constantize).to be_nil
 
       expect(OpenStruct).to receive(:new).with({ percent: 42, label: "Loading" }).and_call_original
 
-      fragment = fragment_for(:progress, percent: 42, label: "Loading")
+      fragment = fragment_for(:spec_bare, percent: 42, label: "Loading")
 
-      expect(fragment.css(".progress-bar")).not_to be_empty
+      expect(fragment.css(".spec-bare").attr("data-percent").value).to eq("42")
       expect(fragment.text).to include("Loading")
     end
   end

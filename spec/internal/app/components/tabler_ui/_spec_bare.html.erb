@@ -1,0 +1,8 @@
+<%# Fixture for the dispatcher's OpenStruct fallback path.
+    Deliberately has no TablerUi::SpecBare::Component class, so this partial is
+    only reachable via TablerUi::Ui's bare-partial branch. Real components get
+    promoted to classes over time; this one never will, which keeps the
+    fallback spec stable. %>
+<div class="spec-bare" data-percent="<%= spec_bare.percent %>">
+  <%= spec_bare.label %>
+</div>

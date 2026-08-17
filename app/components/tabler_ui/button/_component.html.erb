@@ -1,0 +1,14 @@
+<%# Tabler UI Button Component %>
+<% icon_html = tabler_ui.icon(icon: button.icon).html_safe if button.has_icon? %>
+
+<% if button.get? %>
+  <%= link_to button.url, **button.root_attributes do %>
+    <%= icon_html if icon_html %>
+    <%= button.text %>
+  <% end %>
+<% else %>
+  <%= button_to button.url, button.root_attributes.merge(method: button.http_method) do %>
+    <%= icon_html if icon_html %>
+    <%= button.text %>
+  <% end %>
+<% end %>

@@ -62,8 +62,20 @@ module TablerUi
     # for +part+ (via the :html / :<part>_html hook), using
     # TablerUi::HtmlOptions.merge_html's contract. Safe to call even if
     # initialize_html_options was never invoked.
-    def html_for(part, defaults = {})
+    #
+    # A hook may also be a callable, for parts that repeat -- table rows,
+    # datagrid items, nav entries -- so the caller can vary attributes per
+    # item. Any extra arguments are passed to it:
+    #
+    #   tabler_ui.table row_html: ->(row) { { class: ("text-danger" if row.overdue?) } }
+    #   # component side:
+    #   html_for(:row, { class: "table-row" }, row)
+    #
+    # A callable returning nil is treated as an empty hash.
+    def html_for(part, defaults = {}, *args)
       stored = (@tabler_ui_html_options || {})[part]
+      stored = stored.call(*args) if stored.respond_to?(:call)
+
       TablerUi::HtmlOptions.merge_html(defaults, stored)
     end
   end

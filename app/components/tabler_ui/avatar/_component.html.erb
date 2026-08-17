@@ -1,0 +1,35 @@
+<%# Avatar Component %>
+<% if avatar.image? %>
+  <%= tag.span(**avatar.root_attributes) %>
+<% elsif avatar.initials? %>
+  <%= tag.span(**avatar.root_attributes) do %>
+    <%= avatar.initials %>
+  <% end %>
+<% else %>
+  <%= tag.svg(**avatar.root_attributes, viewBox: "0 0 40 40", xmlns: "http://www.w3.org/2000/svg") do %>
+    <% avatar.identicon_shapes.each do |shape| %>
+      <% if shape[:type] == :circle %>
+        <circle cx="<%= shape[:cx] %>" cy="<%= shape[:cy] %>" r="<%= shape[:r] %>" fill="<%= shape[:fill] %>"/>
+      <% else %>
+        <rect
+          x="<%= shape[:cx] %>"
+          y="<%= shape[:cy] %>"
+          width="<%= shape[:size] %>"
+          height="<%= shape[:size] %>"
+          fill="<%= shape[:fill] %>"
+          transform="rotate(<%= shape[:rotate] %>, <%= shape[:cx] %>, <%= shape[:cy] %>)"
+          />
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+<% if avatar.show_details? %>
+  <%= tag.div(**avatar.details_attributes) do %>
+    <% if avatar.title.present? %>
+      <%= tag.div(avatar.title) %>
+    <% end %>
+    <% if avatar.subtitle.present? %>
+      <%= tag.div(avatar.subtitle, class: "mt-1 small text-secondary") %>
+    <% end %>
+  <% end %>
+<% end %>

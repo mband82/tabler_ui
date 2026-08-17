@@ -1,0 +1,29 @@
+<%# Table Component %>
+<% table_markup = capture do %>
+  <%= tag.table(**table.table_attributes) do %>
+    <%= tag.thead(**table.thead_attributes) do %>
+      <%= tag.tr do %>
+        <% table.columns.each do |col| %>
+          <%= tag.th(col[:label], **table.cell_attributes(col)) %>
+        <% end %>
+      <% end %>
+    <% end %>
+    <%= tag.tbody(**table.tbody_attributes) do %>
+      <% table.data.each do |row| %>
+        <%= tag.tr(**table.row_attributes(row)) do %>
+          <% table.columns.each do |col| %>
+            <%= tag.td(col[:value].call(row), **table.cell_attributes(col)) %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if table.card? %>
+  <%= tag.div(**table.root_attributes) do %>
+    <%= tag.div(table_markup, **table.responsive_attributes) %>
+  <% end %>
+<% else %>
+  <%= tag.div(table_markup, **table.root_attributes) %>
+<% end %>

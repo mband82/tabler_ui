@@ -1,0 +1,16 @@
+<%# Progress Component %>
+<% if progress.label_row? %>
+  <%= tag.div(**progress.label_attributes) do %>
+    <div><%= progress.label %></div>
+    <% if progress.show_percent %>
+      <div class="ms-auto text-secondary"><%= progress.rounded_percent %>%</div>
+    <% end %>
+  <% end %>
+<% end %>
+<%= tag.div(**progress.root_attributes) do %>
+  <%= tag.div(**progress.bar_attributes) do %>
+    <% if progress.show_percent && progress.label.blank? %>
+      <span class="visually-hidden"><%= progress.rounded_percent %>%</span>
+    <% end %>
+  <% end %>
+<% end %>

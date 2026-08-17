@@ -1,0 +1,32 @@
+<%# Stat Card Component %>
+<%= tag.div(**stat_card.root_attributes) do %>
+  <%= tag.div(**stat_card.body_attributes) do %>
+    <%= tag.div class: "d-flex align-items-center" do %>
+      <%= tag.div stat_card.label, class: "subheader" %>
+      <% if stat_card.trend? %>
+        <%= tag.span class: "ms-auto lh-1 text-#{stat_card.trend_color} d-inline-flex align-items-center" do %>
+          <%= tabler_ui.icon(icon: stat_card.trend_icon, size: "sm", html: { class: "me-1" }) %>
+          <%= stat_card.trend_prefix %><%= stat_card.trend_value %>%
+        <% end %>
+      <% end %>
+    <% end %>
+    <%= tag.div class: "d-flex align-items-center pt-2" do %>
+      <% if stat_card.icon? %>
+        <%= tag.span class: "icon-box bg-#{stat_card.icon_color}-lt me-3" do %>
+          <%= tabler_ui.icon(icon: stat_card.icon, color: stat_card.icon_color) %>
+        <% end %>
+      <% end %>
+      <%= tag.div do %>
+        <%= tag.div stat_card.value, **stat_card.value_attributes %>
+        <% if stat_card.description.present? %>
+          <%= tag.div stat_card.description, class: "text-secondary small" %>
+        <% end %>
+      <% end %>
+      <% if stat_card.link? %>
+        <%= tag.div class: "ms-auto" do %>
+          <%= tag.a "Details", **stat_card.link_attributes %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
