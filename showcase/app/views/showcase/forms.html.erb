@@ -1,0 +1,177 @@
+<%= tabler_ui.page_header title: "Forms", pretitle: "TablerUi::FormBuilder" %>
+
+<p class="text-secondary">
+  Backed by a plain <code>ActiveModel::Model</code> double (<code>PersonForm</code>, in
+  <code>app/controllers/showcase_controller.rb</code>) -- no database. Append
+  <code>?with_errors=1</code> to the URL to see <code>f.error_notification</code> and inline field
+  errors.
+</p>
+
+<% if params[:with_errors] %>
+  <%= tabler_ui.alert color: "info", text: "Forced an email error via ?with_errors=1 -- see the error notification and the email field below." %>
+<% else %>
+  <%= link_to "Show validation errors", forms_path(with_errors: 1), class: "btn btn-outline-secondary mb-3" %>
+<% end %>
+
+<%= tabler_form_with model: @person, url: forms_path, method: :get, scope: :person, local: true do |f| %>
+  <%= f.error_notification %>
+
+  <div class="row row-cards">
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :name -- default :string", code: snippet(:forms_1) } do %>
+        <%= f.input :name, hint: "Full legal name", required: true %>
+      <% end %>
+    </div>
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :email -- name-pattern email_field", code: snippet(:forms_2) } do %>
+        <%= f.input :email, label_description: "we'll never share it" %>
+      <% end %>
+    </div>
+  </div>
+
+  <%= render layout: "showcase/example", locals: { title: "f.input :bio, as: :text", code: snippet(:forms_3) } do %>
+    <%= f.input :bio, as: :text, input_html: { rows: 3 } %>
+  <% end %>
+
+  <div class="row row-cards">
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :birthday, as: :date_picker", code: snippet(:forms_4) } do %>
+        <%= f.input :birthday, as: :date_picker %>
+      <% end %>
+    </div>
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :phone -- name-pattern telephone_field", code: snippet(:forms_5) } do %>
+        <%= f.input :phone %>
+      <% end %>
+    </div>
+  </div>
+
+  <%= render layout: "showcase/example", locals: { title: "f.input :website, as: :floating", code: snippet(:forms_6) } do %>
+    <%= f.input :website, as: :floating, label: "Website" %>
+  <% end %>
+
+  <div class="row row-cards">
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.toggle_switch :newsletter", code: snippet(:forms_7) } do %>
+        <%= f.toggle_switch :newsletter, description: "Product updates, once a month" %>
+      <% end %>
+    </div>
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.toggle_button :bio_notifications, color:, icon:", code: snippet(:forms_8) } do %>
+        <%= f.toggle_button :bio_notifications, color: "success", icon: "bell", text: "Notify on profile views" %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="row row-cards">
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :plan, as: :radio_buttons, selectgroup_buttons: true", code: snippet(:forms_9) } do %>
+        <%= f.input :plan, as: :radio_buttons, collection: %w[free pro enterprise], selectgroup_buttons: true %>
+      <% end %>
+    </div>
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :interests, as: :check_boxes, selectgroup_pills: true", code: snippet(:forms_10) } do %>
+        <%= f.input :interests, as: :check_boxes,
+                                collection: %w[Design Engineering Marketing Sales], selectgroup_pills: true %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="row row-cards">
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :role, as: :select", code: snippet(:forms_11) } do %>
+        <%= f.input :role, as: :select, collection: %w[admin editor viewer] %>
+      <% end %>
+    </div>
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :team, as: :grouped_select", code: snippet(:forms_12) } do %>
+        <%= f.input :team, as: :grouped_select,
+                           collection: { "Engineering" => %w[backend frontend], "Product" => %w[design research] } %>
+      <% end %>
+    </div>
+  </div>
+
+  <%= render layout: "showcase/example", locals: { title: "f.association :manager_id -- no reflection, falls back to select", code: snippet(:forms_13) } do %>
+    <%= f.association :manager_id, collection: %w[Alice Bob Carol] %>
+  <% end %>
+
+  <div class="row row-cards">
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :color, as: :color", code: snippet(:forms_14) } do %>
+        <%= f.input :color, as: :color %>
+      <% end %>
+    </div>
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :avatar_rating, as: :rating", code: snippet(:forms_15) } do %>
+        <%= f.input :avatar_rating, as: :rating, max_stars: 5, color: "yellow" %>
+      <% end %>
+    </div>
+  </div>
+
+  <%= render layout: "showcase/example", locals: { title: "f.input :theme, as: :imagecheck", code: snippet(:forms_16) } do %>
+    <%= f.input :theme, as: :imagecheck, show_text: true,
+                        value_method: :id, image_method: :image_url, text_method: :label,
+                        collection: [
+                          OpenStruct.new(id: "blue", image_url: "https://picsum.photos/seed/blue/80", label: "Blue"),
+                          OpenStruct.new(id: "green", image_url: "https://picsum.photos/seed/green/80", label: "Green")
+                        ] %>
+  <% end %>
+
+  <div class="row row-cards">
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input :resume, as: :file", code: snippet(:forms_17) } do %>
+        <%= f.input :resume, as: :file, hint: "PDF, up to 5MB" %>
+      <% end %>
+    </div>
+    <div class="col-md-6">
+      <%= render layout: "showcase/example", locals: { title: "f.input_field -- naked input, no wrapper/label", code: snippet(:forms_18) } do %>
+        <%= f.input_field :search_query, input_html: { placeholder: "Naked input, no label/wrapper" } %>
+      <% end %>
+    </div>
+  </div>
+
+  <%= render layout: "showcase/example", locals: { title: "f.input :appointment_at / :salary -- plain text (see note)", code: snippet(:forms_19) } do %>
+    <p class="text-secondary">
+      <code>appointment_at</code> is a <code>:datetime</code> attribute and <code>salary</code> a
+      <code>:decimal</code> one, but <code>TablerUi::FormBuilder</code> only special-cases those
+      types (native <code>datetime-local</code>/<code>number step="any"</code> inputs) when
+      <code>object_type_for_method</code> can see the real column type via
+      <code>type_for_attribute</code>/<code>column_for_attribute</code> -- both ActiveRecord instance
+      methods. A plain <code>ActiveModel::Attributes</code> object only exposes
+      <code>type_for_attribute</code> at the class level, so <code>respond_to?</code> is false and
+      both fields render as plain text below, unlike a real ActiveRecord-backed form. There is also
+      no <code>as:</code> value that reaches those two branches directly (only <code>:date</code>
+      has <code>:date_picker</code>) -- see the showcase build report for details.
+    </p>
+    <%= f.input :appointment_at %>
+    <%= f.input :salary %>
+  <% end %>
+
+  <%
+    input_group_error = nil
+    input_group_markup = capture do
+      f.input :salary, as: :input_group, prepend: "$", label: "Salary (as: :input_group)"
+    end
+  rescue ArgumentError => e
+    input_group_error = e.message
+  %>
+  <%= render layout: "showcase/example", locals: { title: "f.input as: :input_group -- gem finding, see note", code: snippet(:forms_20) } do %>
+    <% if input_group_error %>
+      <%= tabler_ui.alert color: "danger", title: "as: :input_group raises ArgumentError", text: input_group_error %>
+      <p class="text-secondary mb-0">
+        README.md documents <code>:input_group</code> as a valid <code>as:</code> value, but
+        <code>FormBuilder#input</code> dispatches to <code>"#{resolved_input_type}_input"</code> --
+        i.e. it looks for a method named <code>input_group_input</code>. The private method is
+        actually named <code>input_group</code>, with no <code>_input</code> suffix (unlike every
+        other private helper in the file), so this path can never be reached through the public
+        API. See the showcase build report for the exact fix.
+      </p>
+    <% else %>
+      <%= input_group_markup %>
+    <% end %>
+  <% end %>
+
+  <div class="mt-3">
+    <%= tabler_ui.button text: "Save (demo only, method: :get)", color: "primary", method: :get %>
+  </div>
+<% end %>

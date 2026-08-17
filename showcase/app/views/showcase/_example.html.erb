@@ -1,0 +1,11 @@
+<%# locals: title:, code: -- renders tabler_ui.card framing a rendered example plus its ERB source %>
+<%= tabler_ui.card title: title do |s| %>
+  <% s.body do %>
+    <div class="showcase-example">
+      <%= yield %>
+    </div>
+    <% if defined?(code) && code.present? %>
+      <pre class="bg-dark-lt rounded p-2 mb-0"><code><%= code.strip %></code></pre>
+    <% end %>
+  <% end %>
+<% end %>

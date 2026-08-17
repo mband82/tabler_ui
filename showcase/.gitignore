@@ -1,0 +1,6 @@
+/log/*
+!/log/.keep
+/tmp/*
+!/tmp/.keep
+/public/assets
+.bundle/

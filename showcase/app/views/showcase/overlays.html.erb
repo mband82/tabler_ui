@@ -1,0 +1,119 @@
+<%= tabler_ui.page_header title: "Overlays", pretitle: "Components" %>
+
+<p class="text-secondary">
+  Modal, offcanvas and toast render no trigger of their own -- the caller supplies
+  <code>data-bs-toggle</code>/<code>data-bs-target</code>. Dropdown, carousel, accordion and tabs
+  render their own trigger elements. Every trigger below is wired to a real Stimulus controller
+  from the gem (<code>app/javascript/application.js</code> sets <code>window.Stimulus</code> before
+  <code>import "tabler_ui"</code>, so the controllers self-register).
+</p>
+
+<div class="row row-cards">
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "modal - title, body/footer slots, trigger", code: snippet(:overlays_1) } do %>
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#demo-modal">
+        Open modal
+      </button>
+
+      <%= tabler_ui.modal "demo-modal", title: "Confirm" do |slots| %>
+        <% slots.body { "Are you sure you want to continue?" } %>
+        <% slots.footer do %>
+          <button class="btn btn-link link-secondary" data-bs-dismiss="modal">Cancel</button>
+          <%= tabler_ui.button text: "Yes, continue", color: "primary" %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "modal - size: lg, centered, blur, status strip", code: snippet(:overlays_2) } do %>
+      <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#demo-modal-danger">
+        Delete item
+      </button>
+
+      <%= tabler_ui.modal "demo-modal-danger", title: "Delete item", size: "lg",
+                          centered: true, blur: true, status: "danger" do |slots| %>
+        <% slots.body { "This action cannot be undone." } %>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<div class="row row-cards">
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "offcanvas - position: :end, trigger", code: snippet(:overlays_3) } do %>
+      <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#demo-offcanvas">
+        Open filters
+      </button>
+
+      <%= tabler_ui.offcanvas "demo-offcanvas", title: "Filters", position: :end do |slots| %>
+        <% slots.body { "Filter form goes here." } %>
+        <% slots.footer do %>
+          <%= tabler_ui.button text: "Apply", color: "primary" %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "offcanvas - position: :bottom, narrow, backdrop: :static", code: snippet(:overlays_4) } do %>
+      <button class="btn btn-outline-primary" data-bs-toggle="offcanvas" data-bs-target="#demo-offcanvas-bottom">
+        Open panel
+      </button>
+
+      <%= tabler_ui.offcanvas "demo-offcanvas-bottom", title: "Details", position: :bottom,
+                              backdrop: :static do |slots| %>
+        <% slots.body { "This offcanvas won't close on backdrop click." } %>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<div class="row row-cards">
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "toast - color, trigger via html: { id: }", code: snippet(:overlays_5) } do %>
+      <button class="btn btn-success" data-bs-toggle="toast" data-bs-target="#demo-toast">
+        Show toast
+      </button>
+
+      <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <%= tabler_ui.toast title: "Success", color: "success", html: { id: "demo-toast" } do |slots| %>
+          <% slots.body { "Changes saved." } %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "toast - position:, autohide: false, delay:", code: snippet(:overlays_6) } do %>
+      <button class="btn btn-outline-warning" data-bs-toggle="toast" data-bs-target="#demo-toast-warning">
+        Show sticky warning
+      </button>
+
+      <%= tabler_ui.toast title: "Heads up", color: "warning", autohide: false,
+                          position: "top-right", html: { id: "demo-toast-warning" } do |slots| %>
+        <% slots.body { "This toast stays until dismissed." } %>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<%= render layout: "showcase/example", locals: { title: "dropdown - color, align: :end, self-triggering", code: snippet(:overlays_7) } do %>
+  <%= tabler_ui.dropdown(label: "Actions", color: "secondary", align: :end) do |dropdown| %>
+    <% dropdown.item("Edit", url: "#", icon: "pencil") %>
+    <% dropdown.item("Duplicate", url: "#", icon: "copy") %>
+    <% dropdown.divider %>
+    <% dropdown.item("Delete", url: "#", icon: "trash") %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "carousel - captions, indicators: :thumb", code: snippet(:overlays_8) } do %>
+  <%= tabler_ui.carousel("demo-carousel", indicators: :thumb) do |carousel| %>
+    <% carousel.item(image: "https://picsum.photos/id/1015/900/300", caption: "Mountains",
+                     caption_background: true, active: true) %>
+    <% carousel.item(image: "https://picsum.photos/id/1016/900/300", caption: "Canyon",
+                     caption_background: true) %>
+    <% carousel.item(image: "https://picsum.photos/id/1018/900/300", caption: "River",
+                     caption_background: true) %>
+  <% end %>
+<% end %>

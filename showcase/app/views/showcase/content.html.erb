@@ -1,0 +1,184 @@
+<%= tabler_ui.page_header title: "Content", pretitle: "Components" %>
+
+<%= render layout: "showcase/example", locals: { title: "badge - colors, light, pill, outline, icon, notification", code: snippet(:content_1) } do %>
+  <%= tabler_ui.badge text: "New", color: "blue" %>
+  <%= tabler_ui.badge text: "Pending", color: "yellow", light: true %>
+  <%= tabler_ui.badge text: "4", color: "red", pill: true %>
+  <%= tabler_ui.badge text: "Draft", color: "secondary", outline: true %>
+  <%= tabler_ui.badge text: "Star", color: "yellow", icon: "star" %>
+  <%= tabler_ui.badge color: "red", notification: true, blink: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "alert - colors, dismissible, important, icon, action link", code: snippet(:content_2) } do %>
+  <%= tabler_ui.alert color: "success", text: "Your changes have been saved!" %>
+  <%= tabler_ui.alert color: "danger", title: "Error", text: "Something went wrong.", dismissible: true %>
+  <%= tabler_ui.alert color: "warning", text: "Your trial expires in 3 days.", important: true %>
+  <%= tabler_ui.alert color: "info", text: "New update available.", url: "#", link_text: "See what's new" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "avatar - initials, image, generated identicon, sizes, show_details", code: snippet(:content_3) } do %>
+  <%= tabler_ui.avatar initials: "JD", size: "md" %>
+  <%= tabler_ui.avatar image: "https://picsum.photos/200", size: "md" %>
+  <%= tabler_ui.avatar name: "Ada Lovelace", size: "md" %>
+  <%= tabler_ui.avatar initials: "SM", size: "xl" %>
+  <%= tabler_ui.avatar initials: "JD", show_details: true, title: "Jane Doe", subtitle: "Admin" %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "icon - outline/filled, color, animations, rule 5 html:", code: snippet(:content_4) } do %>
+  <span class="me-3"><%= tabler_ui.icon icon: "heart" %></span>
+  <span class="me-3"><%= tabler_ui.icon icon: "heart", filled: true, color: "danger" %></span>
+  <span class="me-3"><%= tabler_ui.icon icon: "star", filled: true, color: "yellow", pulse: true %></span>
+  <span class="me-3"><%= tabler_ui.icon icon: "refresh", rotate: true %></span>
+  <span class="me-3"><%= tabler_ui.icon icon: "bell", tada: true %></span>
+  <span class="me-3"><%= tabler_ui.icon icon: "user", html: { class: "me-2", data: { testid: "user-icon" } } %></span>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "illustration - light/dark theme, sized", code: snippet(:content_5) } do %>
+  <%= tabler_ui.illustration name: "search", size: :sm %>
+  <%= tabler_ui.illustration name: "search", theme: "dark", size: :sm %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "status - dot, animated, standalone, indicator, light", code: snippet(:content_6) } do %>
+  <%= tabler_ui.status text: "Active", color: "green" %>
+  <%= tabler_ui.status text: "Online", color: "green", dot: true %>
+  <%= tabler_ui.status text: "Processing", color: "blue", dot: true, animated: true %>
+  <%= tabler_ui.status text: "Pending", color: "yellow", light: true %>
+  <%= tabler_ui.status color: "green", dot: true, standalone: true %>
+  <%= tabler_ui.status color: "red", indicator: true, animated: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "progress - auto color, striped/animated, labeled", code: snippet(:content_7) } do %>
+  <%= tabler_ui.progress percent: 42 %>
+  <%= tabler_ui.progress percent: 82, color: "auto" %>
+  <%= tabler_ui.progress percent: 95, color: "auto" %>
+  <%= tabler_ui.progress percent: 60, striped: true, animated: true %>
+  <%= tabler_ui.progress percent: 60, label: "Uploading", show_percent: true %>
+<% end %>
+
+<div class="row row-cards">
+  <div class="col-md-4">
+    <%= render layout: "showcase/example", locals: { title: "stat_card - positive trend", code: snippet(:content_8) } do %>
+      <%= tabler_ui.stat_card label: "Sales", value: "456", icon: "shopping-cart", trend: 12 %>
+    <% end %>
+  </div>
+  <div class="col-md-4">
+    <%= render layout: "showcase/example", locals: { title: "stat_card - negative trend, description, link", code: snippet(:content_9) } do %>
+      <%= tabler_ui.stat_card label: "New clients", value: "18", trend: -8,
+                              description: "vs. last month", url: "#" %>
+    <% end %>
+  </div>
+  <div class="col-md-4">
+    <%= render layout: "showcase/example", locals: { title: "stat_card - colored icon", code: snippet(:content_10) } do %>
+      <%= tabler_ui.stat_card label: "Revenue", value: "$9,600", icon: "currency-dollar", color: "green" %>
+    <% end %>
+  </div>
+</div>
+
+<%= render layout: "showcase/example", locals: { title: "placeholder - text, avatar, image, button, list, animation", code: snippet(:content_11) } do %>
+  <%= tabler_ui.placeholder type: :text, lines: [10, 11, 8] %>
+  <%= tabler_ui.placeholder type: :avatar %>
+  <div class="mb-2"><%= tabler_ui.placeholder type: :image, ratio: "21x9" %></div>
+  <%= tabler_ui.placeholder type: :button, width: 4, color: "primary" %>
+  <%= tabler_ui.placeholder type: :text, width: 6, animation: :glow %>
+<% end %>
+
+<div class="row row-cards">
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "ribbon - corner label on a card", code: snippet(:content_12) } do %>
+      <div class="card position-relative">
+        <%= tabler_ui.ribbon text: "New", color: "blue" %>
+        <div class="card-body">Ribbon pinned to the card's top-right corner.</div>
+      </div>
+    <% end %>
+  </div>
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "ribbon - bookmark shape, bottom/start", code: snippet(:content_13) } do %>
+      <div class="card position-relative">
+        <%= tabler_ui.ribbon text: "Sale", color: "red", position: :bottom, align: :start, bookmark: true %>
+        <div class="card-body">Bookmark-shaped ribbon, bottom-left.</div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%= render layout: "showcase/example", locals: { title: "spinner - border/grow, sizes, colors, custom label", code: snippet(:content_14) } do %>
+  <span class="me-3"><%= tabler_ui.spinner %></span>
+  <span class="me-3"><%= tabler_ui.spinner type: :grow %></span>
+  <span class="me-3"><%= tabler_ui.spinner size: "sm", color: "blue" %></span>
+  <span class="me-3"><%= tabler_ui.spinner label: "Saving..." %></span>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "dimmer - active loading overlay", code: snippet(:content_15) } do %>
+  <%= tabler_ui.dimmer active: true do |slots| %>
+    <% slots.content do %>
+      <div class="p-4">Table rows would render here.</div>
+    <% end %>
+  <% end %>
+<% end %>
+
+<div class="row row-cards">
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "empty - title, subtitle, illustration, action", code: snippet(:content_16) } do %>
+      <%= tabler_ui.empty image: "search", title: "No results found",
+                          subtitle: "Try adjusting your search or filter." do |slots| %>
+        <% slots.action do %>
+          <%= tabler_ui.button text: "Clear filters", url: "#" %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="col-md-6">
+    <%= render layout: "showcase/example", locals: { title: "empty - header, icon instead of illustration, bordered", code: snippet(:content_17) } do %>
+      <%= tabler_ui.empty icon: "mood-empty", header: "404",
+                          title: "Page not found", bordered: true %>
+    <% end %>
+  </div>
+</div>
+
+<%= render layout: "showcase/example", locals: { title: "timeline - icons, colors, nested card content", code: snippet(:content_18) } do %>
+  <%= tabler_ui.timeline do |t| %>
+    <% t.item icon: "check", color: "green" do %>
+      <strong>Order placed</strong>
+      <div class="text-secondary">2 hours ago</div>
+    <% end %>
+    <% t.item icon: "truck", color: "blue" do %>
+      Shipped
+    <% end %>
+    <% t.item icon: "flag", color: "red" do %>
+      Flagged for review
+    <% end %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "steps - current progress, vertical, counter, color", code: snippet(:content_19) } do %>
+  <%= tabler_ui.steps(current: 2, counter: true, color: "azure") do |steps| %>
+    <% steps.item("Account", url: "#") %>
+    <% steps.item("Profile", url: "#") %>
+    <% steps.item("Confirm") %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "breadcrumb - style: :arrows, muted", code: snippet(:content_20) } do %>
+  <%= tabler_ui.breadcrumb(style: :arrows, muted: true) do |breadcrumb| %>
+    <% breadcrumb.item("Home", url: "#") %>
+    <% breadcrumb.item("Library", url: "#") %>
+    <% breadcrumb.item("Data") %>
+  <% end %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "pagination - computed mode (current:/total:/url:)", code: snippet(:content_21) } do %>
+  <% current_page = [[(params[:page] || 3).to_i, 1].max, 10].min %>
+  <%= tabler_ui.pagination current: current_page, total: 10,
+                           url: ->(n) { content_path(page: n) } %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "pagination - size: :sm, circle:, outline:", code: snippet(:content_22) } do %>
+  <%= tabler_ui.pagination current: 1, total: 5, url: ->(n) { "?page=#{n}" },
+                           size: :sm, circle: true, outline: true %>
+<% end %>
+
+<%= render layout: "showcase/example", locals: { title: "rating - custom choices, colored, clearable", code: snippet(:content_23) } do %>
+  <%= tabler_ui.rating %>
+  <%= tabler_ui.rating choices: [{ value: 1, label: "Bad" }, { value: 2, label: "Ok" }, { value: 3, label: "Great" }],
+                       max_stars: 3, color: "yellow", value: 2 %>
+<% end %>

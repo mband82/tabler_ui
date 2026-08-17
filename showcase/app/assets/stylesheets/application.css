@@ -1,0 +1,26 @@
+/*
+ * Showcase application stylesheet.
+ *
+ * Sprockets directive manifest -- tabler_ui.css (shipped by the gem) is
+ * itself a directive manifest with no CSS of its own, so it must be pulled
+ * in through `require`, not a stylesheet_link_tag pointed at Propshaft.
+ *
+ *= require tabler_ui
+ *= require_self
+ */
+
+.showcase-example {
+  margin-bottom: 1rem;
+}
+
+.showcase-example pre {
+  margin-bottom: 0;
+  font-size: 0.8125rem;
+}
+
+.showcase-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0.75rem 0.25rem 0;
+}

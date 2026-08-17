@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Tabler UI Showcase</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-param" content="<%= request_forgery_protection_token %>">
+    <meta name="csrf-token" content="<%= form_authenticity_token %>">
+
+    <%= stylesheet_link_tag "application" %>
+    <%= javascript_importmap_tags %>
+  </head>
+  <body>
+    <div class="page">
+      <%= tabler_ui.navbar(brand: link_to("Tabler UI Showcase", root_path)) do |navbar| %>
+        <% navbar.left do |nav| %>
+          <% nav.add "Home", url: root_path, active: current_page?(root_path) %>
+          <% nav.add "Layout", url: layout_path, active: current_page?(layout_path) %>
+          <% nav.add "Content", url: content_path, active: current_page?(content_path) %>
+          <% nav.add "Overlays", url: overlays_path, active: current_page?(overlays_path) %>
+          <% nav.add "Forms", url: forms_path, active: current_page?(forms_path) %>
+          <% nav.dropdown "More", align: :start do |dd| %>
+            <% dd.header "External" %>
+            <% dd.item "Tabler.io", url: "https://tabler.io", target: "_blank", icon: "external-link" %>
+            <% dd.divider %>
+            <% dd.item "GitHub", url: "https://github.com/webbastelbude/tabler_ui", target: "_blank", icon: "brand-github" %>
+          <% end %>
+        <% end %>
+        <% navbar.right do |nav| %>
+          <% nav.dark_mode_toggle %>
+        <% end %>
+      <% end %>
+
+      <div class="page-wrapper">
+        <div class="page-body">
+          <div class="container-xl">
+            <%= yield %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

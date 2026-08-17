@@ -1,0 +1,51 @@
+<%= tabler_ui.page_header title: "Tabler UI Showcase" do |s| %>
+  <% s.buttons do %>
+    <%= tabler_ui.badge text: "33 components", color: "primary" %>
+  <% end %>
+<% end %>
+
+<%= tabler_ui.card do |s| %>
+  <% s.body do %>
+    <p>
+      This is a dev-only reference app for the <code>tabler_ui</code> gem. Every component the
+      gem ships is rendered somewhere in this app, grouped by kind, with a short ERB snippet next
+      to each rendered example so the API is visible alongside the result.
+    </p>
+    <p class="mb-0">Pick a group from the navbar above, or jump straight in:</p>
+  <% end %>
+<% end %>
+
+<div class="row row-cards">
+  <div class="col-md-6 col-lg-3">
+    <%= tabler_ui.card do |s| %>
+      <% s.body do %>
+        <h3><%= link_to "Layout", layout_path %></h3>
+        <p class="text-secondary mb-0">navbar, page_header, card, table, datagrid, tabs, settings_page, accordion</p>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <%= tabler_ui.card do |s| %>
+      <% s.body do %>
+        <h3><%= link_to "Content", content_path %></h3>
+        <p class="text-secondary mb-0">badge, alert, avatar, icon, illustration, status, progress, stat_card, placeholder, ribbon, spinner, dimmer, empty, timeline, steps, breadcrumb, pagination, rating</p>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <%= tabler_ui.card do |s| %>
+      <% s.body do %>
+        <h3><%= link_to "Overlays", overlays_path %></h3>
+        <p class="text-secondary mb-0">modal, offcanvas, toast, dropdown, carousel</p>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <%= tabler_ui.card do |s| %>
+      <% s.body do %>
+        <h3><%= link_to "Forms", forms_path %></h3>
+        <p class="text-secondary mb-0">Every TablerUi::FormBuilder input type, via tabler_form_with</p>
+      <% end %>
+    <% end %>
+  </div>
+</div>
