@@ -53,10 +53,12 @@ RSpec.describe "TablerUi::Button", type: :component do
     expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("btn-sm")
   end
 
-  it "adds rounded-pill for shape: pill" do
+  it "adds btn-pill for shape: pill, not rounded-pill" do
     fragment = component_fragment(:button, text: "Save", shape: "pill")
+    classes = fragment.css(".btn").first["class"].split(/\s+/)
 
-    expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("rounded-pill")
+    expect(classes).to include("btn-pill")
+    expect(classes).not_to include("rounded-pill")
   end
 
   it "adds btn-square for shape: square" do
@@ -69,6 +71,82 @@ RSpec.describe "TablerUi::Button", type: :component do
     fragment = component_fragment(:button, icon: "star", icon_only: true)
 
     expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("btn-icon")
+  end
+
+  it "adds both btn-pill and btn-icon for shape: pill combined with icon_only: true" do
+    fragment = component_fragment(:button, icon: "star", icon_only: true, shape: "pill")
+    classes = fragment.css(".btn").first["class"].split(/\s+/)
+
+    expect(classes).to include("btn-pill", "btn-icon")
+  end
+
+  it "adds btn-loading for loading: true" do
+    fragment = component_fragment(:button, text: "Save", loading: true)
+
+    expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("btn-loading")
+  end
+
+  it "adds btn-floating for floating: true" do
+    fragment = component_fragment(:button, text: "Save", floating: true)
+
+    expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("btn-floating")
+  end
+
+  it "adds only the base btn-animate-icon class for animate_icon: true" do
+    fragment = component_fragment(:button, text: "Save", animate_icon: true)
+    classes = fragment.css(".btn").first["class"].split(/\s+/)
+
+    expect(classes).to include("btn-animate-icon")
+    expect(classes.grep(/^btn-animate-icon-/)).to be_empty
+  end
+
+  %w[rotate shake tada pulse move-start].each do |modifier|
+    it "adds btn-animate-icon and btn-animate-icon-#{modifier} for animate_icon: #{modifier.inspect}" do
+      fragment = component_fragment(:button, text: "Save", animate_icon: modifier)
+      classes = fragment.css(".btn").first["class"].split(/\s+/)
+
+      expect(classes).to include("btn-animate-icon", "btn-animate-icon-#{modifier}")
+    end
+  end
+
+  it "raises ArgumentError for an unknown animate_icon value" do
+    expect { component_fragment(:button, text: "Save", animate_icon: "spin") }
+      .to raise_error(ArgumentError, /spin/)
+  end
+
+  it "adds btn-ghost alongside btn-<color> for ghost: true" do
+    fragment = component_fragment(:button, text: "Save", color: "green", ghost: true)
+    classes = fragment.css(".btn").first["class"].split(/\s+/)
+
+    expect(classes).to include("btn-ghost", "btn-green")
+  end
+
+  it "raises ArgumentError when ghost: true is combined with outline: true" do
+    expect { component_fragment(:button, text: "Save", ghost: true, outline: true) }
+      .to raise_error(ArgumentError, /outline/)
+  end
+
+  it "accepts a brand color and emits btn-<brand>" do
+    fragment = component_fragment(:button, text: "Save", color: "github")
+
+    expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("btn-github")
+  end
+
+  it "accepts the muted color and emits btn-muted" do
+    fragment = component_fragment(:button, text: "Save", color: "muted")
+
+    expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("btn-muted")
+  end
+
+  it "accepts a brand color combined with outline: true and emits btn-outline-<brand>" do
+    fragment = component_fragment(:button, text: "Save", color: "github", outline: true)
+
+    expect(fragment.css(".btn").first["class"].split(/\s+/)).to include("btn-outline-github")
+  end
+
+  it "does not leak brand colors into the badge component's shared palette" do
+    expect { component_fragment(:badge, text: "Save", color: "github") }
+      .to raise_error(ArgumentError)
   end
 
   it "passes disabled through to the rendered element" do

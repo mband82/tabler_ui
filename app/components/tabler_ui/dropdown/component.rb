@@ -36,7 +36,22 @@ module TablerUi
       # item), not resolved attributes -- see #item_attributes.
       Item = Struct.new(:type, :title, :url, :method, :active, :disabled, :icon, :html, keyword_init: true)
 
-      attr_reader :label, :color, :align, :items
+      # Maps :direction values onto the wrapper class that replaces the plain
+      # "dropdown" class. These are alternatives, not additions -- Tabler
+      # declares dropdown/dropup/dropend/dropstart/dropup-center/dropdown-center
+      # as siblings in one shared `position: relative` rule, and Bootstrap's JS
+      # reads whichever one is present on the toggle's parentNode to compute
+      # Popper placement.
+      DIRECTIONS = {
+        "down" => "dropdown",
+        "up" => "dropup",
+        "end" => "dropend",
+        "start" => "dropstart",
+        "up-center" => "dropup-center",
+        "down-center" => "dropdown-center"
+      }.freeze
+
+      attr_reader :label, :color, :align, :items, :direction, :dark, :scrollable, :arrow, :align_breakpoint
 
       # @param options [Hash]
       # @option options [String] :label Button text
@@ -44,6 +59,16 @@ module TablerUi
       # @option options [Symbol, String] :align Menu alignment -- :start (default) or :end.
       #   The strings "start"/"end" are also accepted; anything else (including
       #   the old "right"/"left") raises ArgumentError.
+      # @option options [String] :direction Drop direction -- "down" (default), "up", "end",
+      #   "start", "up-center" or "down-center". Replaces the wrapper's base "dropdown"
+      #   class; anything else raises ArgumentError.
+      # @option options [Boolean] :dark Adds `dropdown-menu-dark` to the menu.
+      # @option options [Boolean] :scrollable Adds `dropdown-menu-scrollable` to the menu.
+      # @option options [Boolean] :arrow Adds `dropdown-menu-arrow` to the menu, alongside
+      #   any alignment class.
+      # @option options [String] :align_breakpoint Responsive breakpoint (sm/md/lg/xl/xxl)
+      #   -- combined with :align to add `dropdown-menu-<bp>-<align>` alongside the base
+      #   alignment class. Validated via TablerUi::Breakpoint.
       # @option options [Hash] :html         Rule 5 HTML hook for the outer wrapper (part :root)
       # @option options [Hash] :toggle_html  Rule 5 HTML hook for the toggle button (part :toggle)
       # @option options [Hash] :menu_html    Rule 5 HTML hook for the `.dropdown-menu` (part :menu)
@@ -51,6 +76,11 @@ module TablerUi
         @label = options[:label]
         @color = TablerUi::Color.validate!(options[:color], context: "dropdown") || "primary"
         @align = TablerUi::Align.validate!(options[:align], context: "dropdown")
+        @direction = validate_direction!(options[:direction])
+        @dark = options[:dark]
+        @scrollable = options[:scrollable]
+        @arrow = options[:arrow]
+        @align_breakpoint = TablerUi::Breakpoint.validate!(options[:align_breakpoint], context: "dropdown")
         @items = []
 
         initialize_html_options(options)
@@ -104,7 +134,7 @@ module TablerUi
 
       # @return [Hash] attributes for the outer wrapper (part :root)
       def root_attributes
-        html_for(:root, class: "dropdown")
+        html_for(:root, class: DIRECTIONS.fetch(direction))
       end
 
       # @return [Hash] attributes for the toggle button (part :toggle)
@@ -133,6 +163,10 @@ module TablerUi
       def menu_classes
         classes = ["dropdown-menu"]
         classes << "dropdown-menu-end" if align == :end
+        classes << "dropdown-menu-#{align_breakpoint}-#{align}" if align_breakpoint
+        classes << "dropdown-menu-dark" if dark
+        classes << "dropdown-menu-scrollable" if scrollable
+        classes << "dropdown-menu-arrow" if arrow
         classes.join(" ")
       end
 
@@ -141,6 +175,19 @@ module TablerUi
         classes << "active" if item.active
         classes << "disabled" if item.disabled
         classes.join(" ")
+      end
+
+      # Returns the direction as a String key into DIRECTIONS, or raises
+      # ArgumentError naming the offender and listing the valid values, in the
+      # style of TablerUi::Color.validate! / TablerUi::Align.validate!.
+      def validate_direction!(value)
+        return "down" if value.nil?
+
+        value = value.to_s
+        return value if DIRECTIONS.key?(value)
+
+        raise ArgumentError,
+              "unknown direction #{value.inspect} for dropdown — valid: #{DIRECTIONS.keys.join(', ')}"
       end
     end
   end

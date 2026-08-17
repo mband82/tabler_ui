@@ -163,7 +163,7 @@ RSpec.describe "TablerUi::Tabs", type: :component do
     classes = fragment.css("ul.nav").first["class"].split(/\s+/)
 
     expect(classes).to include("nav", "nav-tabs")
-    expect(classes).not_to include("nav-pills", "card-header-tabs", "nav-tabs-alt")
+    expect(classes).not_to include("nav-pills", "card-header-tabs", "nav-underline")
   end
 
   it "adds nav-pills for style: :pills" do
@@ -181,10 +181,82 @@ RSpec.describe "TablerUi::Tabs", type: :component do
     expect(classes).to include("nav-tabs", "card-header-tabs")
   end
 
-  it "adds nav-tabs nav-tabs-alt for style: :underline" do
+  it "adds nav-underline for style: :underline, replacing nav-tabs (regression)" do
     fragment = component_fragment(:tabs, "my-tabs", style: :underline)
     classes = fragment.css("ul.nav").first["class"].split(/\s+/)
 
-    expect(classes).to include("nav-tabs", "nav-tabs-alt")
+    expect(classes).to include("nav-underline")
+    expect(classes).not_to include("nav-tabs", "nav-tabs-alt")
+  end
+
+  it "adds nav-bordered for style: :bordered, not nav-tabs" do
+    fragment = component_fragment(:tabs, "my-tabs", style: :bordered)
+    classes = fragment.css("ul.nav").first["class"].split(/\s+/)
+
+    expect(classes).to include("nav-bordered")
+    expect(classes).not_to include("nav-tabs")
+  end
+
+  it "raises ArgumentError naming the component for an unknown style" do
+    expect { component_fragment(:tabs, "my-tabs", style: :bogus) }
+      .to raise_error(ArgumentError, /unknown tabs style/)
+  end
+
+  it "adds nav-fill for fill: true" do
+    fragment = component_fragment(:tabs, "my-tabs", fill: true)
+    classes = fragment.css("ul.nav").first["class"].split(/\s+/)
+
+    expect(classes).to include("nav-fill")
+  end
+
+  it "adds nav-justified for justified: true" do
+    fragment = component_fragment(:tabs, "my-tabs", justified: true)
+    classes = fragment.css("ul.nav").first["class"].split(/\s+/)
+
+    expect(classes).to include("nav-justified")
+  end
+
+  it "raises ArgumentError when fill: and justified: are both given" do
+    expect { component_fragment(:tabs, "my-tabs", fill: true, justified: true) }
+      .to raise_error(ArgumentError, /mutually exclusive/)
+  end
+
+  it "adds nav-segmented for style: :segmented, rendering .nav-link as a direct child of the ul" do
+    fragment = component_fragment(:tabs, "my-tabs", style: :segmented) do |tabs|
+      tabs.tab("First") { "First content" }
+      tabs.tab("Second") { "Second content" }
+    end
+
+    nav = fragment.css("ul.nav").first
+    classes = nav["class"].split(/\s+/)
+    expect(classes).to include("nav-segmented")
+
+    expect(nav.css("li")).to be_empty
+    expect(nav.children.select { |node| node.name == "a" }.size).to eq(2)
+  end
+
+  it "keeps data-bs-toggle=tab on each nav-link when style: :segmented" do
+    fragment = component_fragment(:tabs, "my-tabs", style: :segmented) do |tabs|
+      tabs.tab("First") { "First content" }
+      tabs.tab("Second") { "Second content" }
+    end
+
+    links = fragment.css(".nav-link")
+    expect(links.size).to eq(2)
+    links.each do |link|
+      expect(link["data-bs-toggle"]).to eq("tab")
+    end
+  end
+
+  it "adds nav-segmented-vertical for vertical: true with style: :segmented" do
+    fragment = component_fragment(:tabs, "my-tabs", style: :segmented, vertical: true)
+    classes = fragment.css("ul.nav").first["class"].split(/\s+/)
+
+    expect(classes).to include("nav-segmented", "nav-segmented-vertical")
+  end
+
+  it "raises ArgumentError when vertical: true is used with a style other than :segmented" do
+    expect { component_fragment(:tabs, "my-tabs", style: :tabs, vertical: true) }
+      .to raise_error(ArgumentError, /vertical/)
   end
 end

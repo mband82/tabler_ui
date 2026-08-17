@@ -24,18 +24,34 @@ module TablerUi
       include TablerUi::Base
 
       attr_reader :text, :color, :outline, :size, :shape, :icon_only, :url,
-                  :http_method, :target, :title, :disabled, :icon, :action
+                  :http_method, :target, :title, :disabled, :icon, :action,
+                  :loading, :floating, :animate_icon, :ghost
+
+      ANIMATE_ICON_MODIFIERS = %w[rotate shake tada pulse move-start].freeze
 
       # @param options [Hash]
       # @option options [String]  :text        Button label
       # @option options [String]  :color       Color variant -- validated against
-      #   TablerUi::Color (Tabler palette + Bootstrap semantic names). Defaults to "primary".
+      #   TablerUi::Color (Tabler palette + Bootstrap semantic names), plus the brand
+      #   and muted colours ("github", "x", "muted", ...), which only buttons accept.
+      #   Defaults to "primary".
       # @option options [Boolean] :outline     Outline variant, i.e. "btn-outline-<color>" (default: false)
       # @option options [String, Symbol] :size Button size, rendered as "btn-<size>"
-      # @option options [String]  :shape       "pill" (rounded-pill) or "square" (btn-square)
+      # @option options [String]  :shape       "pill" (btn-pill) or "square" (btn-square)
       # @option options [Boolean] :icon_only   Icon-only style, i.e. "btn-icon" (default: false)
       # @option options [Boolean] :action      Action button style -- transparent/compact/hover-highlight
       #   ("btn-action"), replacing the color/outline/shape/icon_only classes (default: false)
+      # @option options [Boolean] :loading     Loading style ("btn-loading"). The CSS only sets
+      #   `pointer-events: none` -- it does not disable the element, so pass `disabled: true` too
+      #   if the button must also be unfocusable/non-activatable (default: false)
+      # @option options [Boolean] :floating    Fixed-position floating style ("btn-floating") (default: false)
+      # @option options [Boolean, String] :animate_icon Animates the icon on hover/focus
+      #   ("btn-animate-icon"). `true` for the base slide animation, or one of
+      #   "rotate", "shake", "tada", "pulse", "move-start" for that modifier
+      #   ("btn-animate-icon-<x>"). Modifiers do not compose -- only one at a time.
+      # @option options [Boolean] :ghost       Ghost style, appends "btn-ghost" alongside
+      #   "btn-<color>" (default: false). Tabler defines no outline+ghost combination, so this
+      #   raises ArgumentError if combined with outline: true.
       # @option options [String]  :url         URL for the button (default: "#")
       # @option options [Symbol, String] :method HTTP method. :get (default) renders `link_to`;
       #   any other value renders `button_to`.
@@ -48,11 +64,17 @@ module TablerUi
       def initialize(options = {})
         @action = options[:action]
         @text = options.key?(:text) ? options[:text] : default_text
-        @color = TablerUi::Color.validate!(options[:color], context: "button") || "primary"
+        @color = TablerUi::Color.validate!(options[:color],
+                                            extra: TablerUi::Color::BRAND + TablerUi::Color::MUTED,
+                                            context: "button") || "primary"
         @outline = options[:outline]
         @size = options[:size]
         @shape = options[:shape]
         @icon_only = options[:icon_only]
+        @loading = options[:loading]
+        @floating = options[:floating]
+        @animate_icon = validate_animate_icon!(options[:animate_icon])
+        @ghost = options[:ghost]
         @url = options[:url].presence || "#"
         @http_method = options[:method] || :get
         @target = options[:target]
@@ -60,6 +82,9 @@ module TablerUi
         @disabled = options[:disabled]
         @data = options[:data]
         @icon = options[:icon]
+
+        raise ArgumentError, "ghost: true cannot be combined with outline: true -- " \
+                              "Tabler defines no outline+ghost combination" if @ghost && @outline
 
         initialize_html_options(options)
       end
@@ -105,7 +130,11 @@ module TablerUi
           "btn-#{outline_prefix}#{@color}",
           size_class,
           shape_class,
-          (@icon_only ? "btn-icon" : nil)
+          (@icon_only ? "btn-icon" : nil),
+          (@loading ? "btn-loading" : nil),
+          (@floating ? "btn-floating" : nil),
+          (@ghost ? "btn-ghost" : nil),
+          *animate_icon_classes
         ]
 
         classes.reject(&:blank?).join(" ")
@@ -127,9 +156,30 @@ module TablerUi
 
       def shape_class
         case @shape.to_s
-        when "pill" then "rounded-pill"
+        when "pill" then "btn-pill"
         when "square" then "btn-square"
         end
+      end
+
+      def animate_icon_classes
+        return [] unless @animate_icon
+
+        return ["btn-animate-icon"] if @animate_icon == true
+
+        ["btn-animate-icon", "btn-animate-icon-#{@animate_icon}"]
+      end
+
+      # Returns the validated animate_icon value (true, a modifier String, or nil),
+      # or raises ArgumentError naming the offender and the valid values.
+      def validate_animate_icon!(value)
+        return nil if value.nil? || value == false
+        return true if value == true
+
+        value = value.to_s
+        return value if ANIMATE_ICON_MODIFIERS.include?(value)
+
+        raise ArgumentError, "unknown animate_icon #{value.inspect} for button — " \
+                              "valid: true, #{ANIMATE_ICON_MODIFIERS.join(', ')}"
       end
     end
   end

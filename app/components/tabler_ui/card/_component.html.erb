@@ -1,4 +1,8 @@
 <%= tag.div(**card.root_attributes) do %>
+  <% if card.status? %>
+    <%= tag.div(**card.status_attributes) %>
+  <% end %>
+
   <% if (defined?(slots) && slots.present?(:header)) || card.title.present? %>
     <%= tag.div(**card.header_attributes) do %>
       <% if defined?(slots) && slots.present?(:header) %>

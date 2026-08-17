@@ -1,18 +1,23 @@
 <%= tag.div(**tabs.root_attributes) do %>
   <%= tag.ul("data-bs-toggle": "tabs", "data-controller": "tabler-ui--tab", role: "tablist", **tabs.nav_attributes) do %>
     <% tabs.tabs.each do |tab| %>
-      <li class="nav-item" role="presentation">
-        <%= tag.a(href: "##{tab.id}", "data-bs-toggle": "tab", "data-tabler-ui--tab-target": "toggle", role: "tab",
-                   "aria-selected": tab.active, **tabs.tab_attributes(tab)) do %>
-          <% if tab.icon.present? %>
-            <%= tabler_ui.icon(icon: tab.icon, html: { class: "me-1" }) %>
-          <% end %>
-          <%= tab.title %>
-          <% if tab.badge.present? %>
-            <span class="ms-1"><%= tabler_ui.badge(**tabs.badge_options_for(tab)) %></span>
-          <% end %>
+      <% link = tag.a(href: "##{tab.id}", "data-bs-toggle": "tab", "data-tabler-ui--tab-target": "toggle", role: "tab",
+                       "aria-selected": tab.active, **tabs.tab_attributes(tab)) do %>
+        <% if tab.icon.present? %>
+          <%= tabler_ui.icon(icon: tab.icon, html: { class: "me-1" }) %>
         <% end %>
-      </li>
+        <%= tab.title %>
+        <% if tab.badge.present? %>
+          <span class="ms-1"><%= tabler_ui.badge(**tabs.badge_options_for(tab)) %></span>
+        <% end %>
+      <% end %>
+
+      <% if tabs.segmented? %>
+        <%# .nav-segmented sizes .nav-link as a direct flex child -- no li wrapper %>
+        <%= link %>
+      <% else %>
+        <%= tag.li(link, class: "nav-item", role: "presentation") %>
+      <% end %>
     <% end %>
   <% end %>
 

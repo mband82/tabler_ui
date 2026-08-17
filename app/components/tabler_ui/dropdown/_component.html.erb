@@ -14,7 +14,7 @@
         <%
           item_content = capture do
             if item.icon.present?
-              concat tabler_ui.icon(icon: item.icon, html: { class: "me-1" })
+              concat tabler_ui.icon(icon: item.icon, html: { class: "dropdown-item-icon" })
             end
             concat item.title
           end

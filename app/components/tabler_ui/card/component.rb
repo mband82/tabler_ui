@@ -39,24 +39,33 @@ module TablerUi
     class Component
       include TablerUi::Base
 
-      attr_reader :title, :size, :status, :borderless, :stacked
+      # Valid values for `status_position:`. Each has a matching bare selector
+      # in tabler.css (.card-status-top / -start / -bottom) that expects a
+      # dedicated empty child div of `.card`, not classes on `.card` itself.
+      STATUS_POSITIONS = %w[top start bottom].freeze
+
+      attr_reader :title, :size, :status, :status_position, :borderless, :stacked
 
       # @param options [Hash]
       # @option options [String]  :title       Rendered as an `<h3 class="card-title">`
       #   inside the header when no `header` slot is given.
       # @option options [String, Symbol] :size Card size -- card-<size> (e.g. "sm", "lg")
-      # @option options [String]  :status      Colour for a `.card-status-top` strip --
-      #   validated against TablerUi::Color
+      # @option options [String]  :status      Colour for a status strip child div --
+      #   validated against TablerUi::Color. No strip is rendered without it.
+      # @option options [String]  :status_position Where the strip sits -- "top" (default),
+      #   "start" or "bottom". Has no effect without `status:`.
       # @option options [Boolean] :borderless  card-borderless (default: false)
       # @option options [Boolean] :stacked     card-stacked (default: false)
       # @option options [Hash]    :html        Rule 5 HTML hook for the outer `.card` (part :root)
       # @option options [Hash]    :header_html Rule 5 HTML hook for the `.card-header` (part :header)
       # @option options [Hash]    :body_html   Rule 5 HTML hook for the `.card-body` (part :body)
       # @option options [Hash]    :footer_html Rule 5 HTML hook for the `.card-footer` (part :footer)
+      # @option options [Hash]    :status_html Rule 5 HTML hook for the status strip (part :status)
       def initialize(options = {})
         @title = options[:title]
         @size = options[:size]
         @status = TablerUi::Color.validate!(options[:status], context: "card")
+        @status_position = validate_status_position(options[:status_position])
         @borderless = options[:borderless]
         @stacked = options[:stacked]
 
@@ -88,15 +97,33 @@ module TablerUi
         html_for(:footer, class: "card-footer")
       end
 
+      # @return [Hash] attributes for the status strip (part :status)
+      def status_attributes
+        html_for(:status, class: status_classes)
+      end
+
       private
 
       def root_classes
         classes = ["card"]
         classes << "card-#{@size}" if @size.present?
-        classes << "card-status-top" << "bg-#{@status}" if status?
         classes << "card-borderless" if @borderless
         classes << "card-stacked" if @stacked
         classes.join(" ")
+      end
+
+      def status_classes
+        "card-status-#{@status_position} bg-#{@status}"
+      end
+
+      def validate_status_position(value)
+        return "top" if value.nil?
+
+        position = value.to_s
+        return position if STATUS_POSITIONS.include?(position)
+
+        raise ArgumentError,
+              "unknown card status_position #{value.inspect} — valid: #{STATUS_POSITIONS.join(', ')}"
       end
     end
   end

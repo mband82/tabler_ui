@@ -41,21 +41,37 @@ module TablerUi
       # tab), not resolved attributes -- see #tab_attributes.
       Tab = Struct.new(:id, :title, :icon, :badge, :active, :content, :html, keyword_init: true)
 
-      attr_reader :id, :style, :tabs
+      STYLES = %i[tabs pills card underline bordered segmented].freeze
+
+      attr_reader :id, :style, :tabs, :fill, :justified, :vertical
 
       # @param id [String] Unique ID for the tabs container, used as the base
       #   for each tab pane's anchor id ("#{id}-tab-1", ...). Mandatory --
       #   Bootstrap's tab JS needs stable anchor targets.
       # @param options [Hash]
-      # @option options [Symbol, String] :style Tab style -- :tabs (default), :pills, :card, :underline
+      # @option options [Symbol, String] :style Tab style -- :tabs (default), :pills,
+      #   :card, :underline, :bordered, :segmented. Anything else raises ArgumentError
+      #   naming the component and the valid values.
+      # @option options [Boolean] :fill Adds `nav-fill` -- equal-width items that fill
+      #   the available space. Mutually exclusive with :justified.
+      # @option options [Boolean] :justified Adds `nav-justified` -- equal-width items
+      #   that fill the available space, each within its own equal column. Mutually
+      #   exclusive with :fill.
+      # @option options [Boolean] :vertical Adds `nav-segmented-vertical`. Only valid
+      #   together with style: :segmented -- raises ArgumentError otherwise.
       # @option options [Hash] :html         Rule 5 HTML hook for the outer wrapper (part :root)
       # @option options [Hash] :nav_html     Rule 5 HTML hook for the `ul.nav` (part :nav)
       # @option options [Hash] :content_html Rule 5 HTML hook for the `.tab-content` (part :content)
       def initialize(id, options = {})
         @id = id
-        @style = (options[:style] || :tabs).to_sym
+        @style = validate_style(options[:style])
+        @fill = options[:fill]
+        @justified = options[:justified]
+        @vertical = options[:vertical]
         @tabs = []
         @tab_counter = 0
+
+        validate_layout_options!
 
         initialize_html_options(options)
       end
@@ -101,6 +117,13 @@ module TablerUi
         @tabs.any?
       end
 
+      # @return [Boolean] whether style: :segmented is in effect. `.nav-segmented`
+      #   sizes its `.nav-link` children as *direct* flex children, so the template
+      #   drops the `li.nav-item` wrapper used by every other style when this is true.
+      def segmented?
+        style == :segmented
+      end
+
       # @return [Hash] attributes for the outer wrapper (part :root)
       def root_attributes
         html_for(:root, class: "tabs")
@@ -137,6 +160,24 @@ module TablerUi
 
       private
 
+      def validate_style(value)
+        style = (value || :tabs).to_sym
+        return style if STYLES.include?(style)
+
+        raise ArgumentError,
+              "unknown tabs style #{value.inspect} — valid: #{STYLES.join(', ')}"
+      end
+
+      def validate_layout_options!
+        if fill && justified
+          raise ArgumentError, "tabler_ui.tabs: fill: and justified: are mutually exclusive"
+        end
+
+        if vertical && style != :segmented
+          raise ArgumentError, "tabler_ui.tabs: vertical: is only valid together with style: :segmented"
+        end
+      end
+
       def tab_link_classes(tab)
         classes = ["nav-link"]
         classes << "active" if tab.active
@@ -152,10 +193,21 @@ module TablerUi
         when :card
           classes << "nav-tabs" << "card-header-tabs"
         when :underline
-          classes << "nav-tabs" << "nav-tabs-alt"
+          classes << "nav-underline"
+        when :bordered
+          # Tabler's own style. The name is a trap: "bordered" does not mean
+          # "boxed" -- it adds a full-width baseline divider across the whole
+          # bar, plus a 2px underline on the active link.
+          classes << "nav-bordered"
+        when :segmented
+          classes << "nav-segmented"
+          classes << "nav-segmented-vertical" if vertical
         else
           classes << "nav-tabs"
         end
+
+        classes << "nav-fill" if fill
+        classes << "nav-justified" if justified
 
         classes.join(" ")
       end

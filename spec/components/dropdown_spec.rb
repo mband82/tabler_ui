@@ -161,4 +161,100 @@ RSpec.describe "TablerUi::Dropdown", type: :component do
     expect(svg).not_to be_nil
     expect(svg["class"].to_s.split(/\s+/)).not_to include("icon-tabler-bug")
   end
+
+  it "renders item icon: with dropdown-item-icon, not the old me-1 utility class" do
+    fragment = component_fragment(:dropdown) do |dropdown|
+      dropdown.item("Edit", icon: "edit")
+    end
+
+    svg = fragment.css(".dropdown-item svg").first
+    classes = svg["class"].to_s.split(/\s+/)
+
+    expect(classes).to include("dropdown-item-icon")
+    expect(classes).not_to include("me-1")
+  end
+
+  it "dark: true adds dropdown-menu-dark to the menu" do
+    fragment = component_fragment(:dropdown, dark: true)
+
+    expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).to include("dropdown-menu-dark")
+  end
+
+  it "without dark:, the menu has no dropdown-menu-dark" do
+    fragment = component_fragment(:dropdown)
+
+    expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).not_to include("dropdown-menu-dark")
+  end
+
+  it "scrollable: true adds dropdown-menu-scrollable to the menu" do
+    fragment = component_fragment(:dropdown, scrollable: true)
+
+    expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).to include("dropdown-menu-scrollable")
+  end
+
+  it "arrow: true adds dropdown-menu-arrow to the menu" do
+    fragment = component_fragment(:dropdown, arrow: true)
+
+    expect(fragment.css(".dropdown-menu").first["class"].split(/\s+/)).to include("dropdown-menu-arrow")
+  end
+
+  it "arrow: true combined with align: :end emits both classes, side by side" do
+    fragment = component_fragment(:dropdown, arrow: true, align: :end)
+    classes = fragment.css(".dropdown-menu").first["class"].split(/\s+/)
+
+    expect(classes).to include("dropdown-menu-arrow")
+    expect(classes).to include("dropdown-menu-end")
+  end
+
+  it "direction: defaults to down, keeping the plain dropdown wrapper class" do
+    fragment = component_fragment(:dropdown)
+
+    expect(fragment.css(".dropdown").first["class"].split(/\s+/)).to include("dropdown")
+  end
+
+  {
+    "up" => "dropup",
+    "end" => "dropend",
+    "start" => "dropstart",
+    "up-center" => "dropup-center",
+    "down-center" => "dropdown-center"
+  }.each do |direction, wrapper_class|
+    it "direction: #{direction.inspect} emits #{wrapper_class} on the wrapper, replacing dropdown" do
+      fragment = component_fragment(:dropdown, direction: direction)
+      classes = fragment.css("div").first["class"].split(/\s+/)
+
+      expect(classes).to include(wrapper_class)
+      expect(classes).not_to include("dropdown")
+    end
+  end
+
+  it "raises ArgumentError naming the component on an unknown direction" do
+    expect { component_fragment(:dropdown, direction: "sideways") }
+      .to raise_error(ArgumentError, /unknown direction.*dropdown/)
+  end
+
+  it "align_breakpoint: 'lg' with align: :end emits both dropdown-menu-end and dropdown-menu-lg-end" do
+    fragment = component_fragment(:dropdown, align_breakpoint: "lg", align: :end)
+    classes = fragment.css(".dropdown-menu").first["class"].split(/\s+/)
+
+    expect(classes).to include("dropdown-menu-end")
+    expect(classes).to include("dropdown-menu-lg-end")
+  end
+
+  it "raises ArgumentError on an unknown align_breakpoint" do
+    expect { component_fragment(:dropdown, align_breakpoint: "not-a-breakpoint") }
+      .to raise_error(ArgumentError, /unknown breakpoint/)
+  end
+
+  it "default output is unchanged when none of the new options are passed" do
+    fragment = component_fragment(:dropdown, label: "Actions") do |dropdown|
+      dropdown.item("Edit", url: "/edit")
+    end
+
+    wrapper_classes = fragment.css(".dropdown").first["class"].split(/\s+/)
+    menu_classes = fragment.css(".dropdown-menu").first["class"].split(/\s+/)
+
+    expect(wrapper_classes).to eq(["dropdown"])
+    expect(menu_classes).to eq(["dropdown-menu"])
+  end
 end

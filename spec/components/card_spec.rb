@@ -122,11 +122,56 @@ RSpec.describe "TablerUi::Card", type: :component do
     expect(fragment.css(".card").first["class"].split(/\s+/)).to include("card-lg")
   end
 
-  it "adds a card-status-top strip with the color's bg class for status:" do
-    fragment = component_fragment(:card, status: "red")
-    classes = fragment.css(".card").first["class"].split(/\s+/)
+  # Regression: status: used to add "card-status-top"/"bg-<color>" to the
+  # .card root itself. tabler.css's .card-status-top is a bare selector
+  # (absolute, 2px tall) meant for a dedicated empty child div -- applied to
+  # .card directly it collapsed the whole card into a 2px sliver. The strip
+  # must be a separate child element, and .card must carry neither class.
+  it "renders the status strip as a separate empty child, not classes on .card" do
+    fragment = component_fragment(:card, status: "primary")
 
-    expect(classes).to include("card-status-top", "bg-red")
+    card_classes = fragment.css(".card").first["class"].split(/\s+/)
+    expect(card_classes).not_to include(a_string_matching(/\Acard-status-/))
+    expect(card_classes).not_to include("bg-primary")
+
+    strips = fragment.css(".card > .card-status-top")
+    expect(strips.size).to eq(1)
+    strip = strips.first
+    expect(strip["class"].split(/\s+/)).to contain_exactly("card-status-top", "bg-primary")
+    expect(strip.text.strip).to eq("")
+    expect(strip.children).to be_empty
+  end
+
+  it "renders no status strip at all when status: is omitted" do
+    fragment = component_fragment(:card)
+
+    expect(fragment.to_html).not_to include("card-status-")
+  end
+
+  it "defaults status_position: to top" do
+    fragment = component_fragment(:card, status: "blue")
+
+    expect(fragment.css(".card-status-top.bg-blue")).not_to be_empty
+  end
+
+  it "emits card-status-start for status_position: 'start'" do
+    fragment = component_fragment(:card, status: "blue", status_position: "start")
+
+    expect(fragment.css(".card-status-start.bg-blue")).not_to be_empty
+    expect(fragment.css(".card-status-top")).to be_empty
+  end
+
+  it "emits card-status-bottom for status_position: 'bottom'" do
+    fragment = component_fragment(:card, status: "blue", status_position: "bottom")
+
+    expect(fragment.css(".card-status-bottom.bg-blue")).not_to be_empty
+    expect(fragment.css(".card-status-top")).to be_empty
+  end
+
+  it "is a no-op when status_position: is given without status:" do
+    fragment = component_fragment(:card, status_position: "start")
+
+    expect(fragment.to_html).not_to include("card-status-")
   end
 
   it "raises ArgumentError naming card for an unknown status color" do
@@ -135,6 +180,16 @@ RSpec.describe "TablerUi::Card", type: :component do
     expect { component_fragment(:card, status: "not-a-real-color") }
       .to raise_error(ArgumentError, /card/)
   end
+
+  it "raises ArgumentError naming the offender and valid values for an unknown status_position" do
+    expect { component_fragment(:card, status: "primary", status_position: "left") }
+      .to raise_error(ArgumentError, /"left"/)
+    expect { component_fragment(:card, status: "primary", status_position: "left") }
+      .to raise_error(ArgumentError, /top, start, bottom/)
+  end
+
+  it_behaves_like "an element with an html hook", :card, { status: "primary" },
+    hook: :status_html, selector: ".card-status-top"
 
   it "adds card-borderless for borderless: true" do
     fragment = component_fragment(:card, borderless: true)
