@@ -130,45 +130,23 @@
     </div>
   </div>
 
-  <%= render layout: "showcase/example", locals: { title: "f.input :appointment_at / :salary -- plain text (see note)", code: snippet(:forms_19) } do %>
+  <%= render layout: "showcase/example", locals: { title: "f.input :appointment_at / :salary -- inferred types", code: snippet(:forms_19) } do %>
     <p class="text-secondary">
       <code>appointment_at</code> is a <code>:datetime</code> attribute and <code>salary</code> a
-      <code>:decimal</code> one, but <code>TablerUi::FormBuilder</code> only special-cases those
-      types (native <code>datetime-local</code>/<code>number step="any"</code> inputs) when
-      <code>object_type_for_method</code> can see the real column type via
-      <code>type_for_attribute</code>/<code>column_for_attribute</code> -- both ActiveRecord instance
-      methods. A plain <code>ActiveModel::Attributes</code> object only exposes
-      <code>type_for_attribute</code> at the class level, so <code>respond_to?</code> is false and
-      both fields render as plain text below, unlike a real ActiveRecord-backed form. There is also
-      no <code>as:</code> value that reaches those two branches directly (only <code>:date</code>
-      has <code>:date_picker</code>) -- see the showcase build report for details.
+      <code>:decimal</code> one. <code>TablerUi::FormBuilder</code> infers both from the model and
+      renders a native <code>datetime-local</code> field and a <code>number</code> field with
+      <code>step="any"</code> -- no <code>as:</code> needed. This works for plain
+      <code>ActiveModel::Attributes</code> objects as well as ActiveRecord ones, because
+      <code>object_type_for_method</code> falls back to the class-level
+      <code>attribute_types</code> that ActiveModel exposes.
     </p>
     <%= f.input :appointment_at %>
     <%= f.input :salary %>
   <% end %>
 
-  <%
-    input_group_error = nil
-    input_group_markup = capture do
-      f.input :salary, as: :input_group, prepend: "$", label: "Salary (as: :input_group)"
-    end
-  rescue ArgumentError => e
-    input_group_error = e.message
-  %>
-  <%= render layout: "showcase/example", locals: { title: "f.input as: :input_group -- gem finding, see note", code: snippet(:forms_20) } do %>
-    <% if input_group_error %>
-      <%= tabler_ui.alert color: "danger", title: "as: :input_group raises ArgumentError", text: input_group_error %>
-      <p class="text-secondary mb-0">
-        README.md documents <code>:input_group</code> as a valid <code>as:</code> value, but
-        <code>FormBuilder#input</code> dispatches to <code>"#{resolved_input_type}_input"</code> --
-        i.e. it looks for a method named <code>input_group_input</code>. The private method is
-        actually named <code>input_group</code>, with no <code>_input</code> suffix (unlike every
-        other private helper in the file), so this path can never be reached through the public
-        API. See the showcase build report for the exact fix.
-      </p>
-    <% else %>
-      <%= input_group_markup %>
-    <% end %>
+  <%= render layout: "showcase/example", locals: { title: "f.input as: :input_group", code: snippet(:forms_20) } do %>
+    <%= f.input :salary, as: :input_group, prepend: "$", label: "Salary (as: :input_group)" %>
+    <%= f.input :website, as: :input_group, append: ".com", label: "Website (as: :input_group)" %>
   <% end %>
 
   <div class="mt-3">

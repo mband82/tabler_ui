@@ -398,6 +398,7 @@ module ShowcaseHelper
     ERBSRC
     forms_20: <<~'ERBSRC',
       <%= f.input :salary, as: :input_group, prepend: "$", label: "Salary" %>
+      <%= f.input :website, as: :input_group, append: ".com", label: "Website" %>
     ERBSRC
   }.freeze
 
