@@ -18,106 +18,173 @@ module TablerUi
     #   <%= tabler_ui.placeholder type: :image, ratio: "21x9" %>
     #
     # @example Button placeholder
-    #   <%= tabler_ui.placeholder type: :button, width: 4, variant: "primary" %>
+    #   <%= tabler_ui.placeholder type: :button, width: 4, color: "primary" %>
     #
     # @example Card placeholder with glow animation
     #   <%= tabler_ui.placeholder type: :card, animation: :glow %>
+    #
+    # @example Rule 5 hooks -- the card's outer wrapper vs. its inner body
+    #   <%= tabler_ui.placeholder type: :card, html: { class: "mb-3" }, body_html: { class: "p-4" } %>
     class Component
-      attr_accessor :type, :width, :size, :animation, :ratio, :variant, :lines,
-                    :rounded, :custom_class, :show_image, :show_button
+      include TablerUi::Base
 
       SIZES = %w[xs sm lg xl].freeze
       ANIMATIONS = %i[glow wave].freeze
       TYPES = %i[text avatar image button card list].freeze
       RATIOS = %w[1x1 4x3 16x9 21x9].freeze
 
-      # Initialize placeholder component
+      attr_reader :type, :width, :size, :animation, :ratio, :color, :lines,
+                  :rounded, :show_image, :show_button
+
+      # @param options [Hash]
+      # @option options [Symbol]  :type        Placeholder type (:text, :avatar, :image, :button, :card, :list) (default: :text)
+      # @option options [Integer] :width       Column width for text/button placeholders (1-12)
+      # @option options [String]  :size        Size variant (xs, sm, lg, xl)
+      # @option options [Symbol]  :animation   Animation type (:glow, :wave)
+      # @option options [String]  :ratio       Aspect ratio for images (1x1, 4x3, 16x9, 21x9)
+      # @option options [String]  :color       Tabler color name, validated via TablerUi::Color and
+      #   rendered as "btn-<color>" on the :button type
+      # @option options [Array<Integer>] :lines Column widths for multiple text lines
+      # @option options [Boolean] :rounded     Whether the :avatar placeholder is rounded (default: true)
+      # @option options [Boolean] :show_image  Show the image block in the :card placeholder (default: true)
+      # @option options [Boolean] :show_button Show the button block in the :card placeholder (default: true)
+      # @option options [Hash]    :html        Rule 5 HTML hook for the active type's own root element
+      # @option options [Hash]    :body_html   Rule 5 HTML hook for the :card type's inner .card-body
+      def initialize(options = {})
+        @type = (options[:type] || :text).to_sym
+        @width = options[:width]
+        @size = options[:size]
+        @animation = options[:animation]&.to_sym
+        @ratio = options[:ratio]
+        @color = TablerUi::Color.validate!(options[:color], context: "placeholder")
+        @lines = options[:lines]
+        @rounded = options.fetch(:rounded, true)
+        @show_image = options.fetch(:show_image, true)
+        @show_button = options.fetch(:show_button, true)
+
+        initialize_html_options(options)
+      end
+
+      # --- rule 5 attribute hooks ---------------------------------------
       #
-      # @param type [Symbol] Placeholder type (:text, :avatar, :image, :button, :card, :list)
-      # @param width [Integer, nil] Column width for text placeholders (1-12)
-      # @param size [String, nil] Size variant (xs, sm, lg, xl)
-      # @param animation [Symbol, nil] Animation type (:glow, :wave)
-      # @param ratio [String, nil] Aspect ratio for images (1x1, 4x3, 16x9, 21x9)
-      # @param variant [String, nil] Button variant for button placeholders
-      # @param lines [Array<Integer>, nil] Array of column widths for multiple text lines
-      # @param rounded [Boolean] Whether avatar should be rounded (default: true)
-      # @param custom_class [String, nil] Additional CSS classes
-      # @param show_image [Boolean] Show image in card placeholder (default: true)
-      # @param show_button [Boolean] Show button in card placeholder (default: true)
-      def initialize(type: :text, width: nil, size: nil, animation: nil, ratio: nil,
-                     variant: nil, lines: nil, rounded: true, custom_class: nil,
-                     show_image: true, show_button: true)
-        @type = type.to_sym
-        @width = width
-        @size = size
-        @animation = animation&.to_sym
-        @ratio = ratio
-        @variant = variant
-        @lines = lines
-        @rounded = rounded
-        @custom_class = custom_class
-        @show_image = show_image
-        @show_button = show_button
+      # One method per root/part the template renders. Each is the single
+      # place that calls html_for for its element, which is how the old
+      # per-type "append custom_class by hand" duplication was collapsed --
+      # see #placeholder_classes / #wrapper_classes / #avatar_classes /
+      # #button_classes below, none of which touch the caller's html: hook
+      # any more.
+
+      # @return [Hash] attributes for the :text type's root wrapper <div>.
+      #   Always a wrapper (even without an animation) so :text has a stable
+      #   element to hang the html: hook on.
+      def text_wrapper_attributes
+        html_for(:root, class: wrapper_classes)
       end
 
-      # Returns placeholder CSS classes for text/inline placeholders
-      # @return [String] Combined CSS classes
-      def placeholder_classes
+      # @return [Hash] attributes for the :avatar type's root <div>.
+      def avatar_attributes
+        html_for(:root, class: avatar_classes)
+      end
+
+      # @return [Hash] attributes for the :image type's root <div>.
+      def image_attributes
+        html_for(:root, class: "ratio #{ratio_class} placeholder")
+      end
+
+      # @return [Hash] attributes for the :button type's root <a>.
+      def button_attributes
+        html_for(:root, href: "#", tabindex: "-1", "aria-hidden": "true", class: button_classes)
+      end
+
+      # @return [Hash] attributes for the :card type's root <div>.
+      def card_attributes
+        html_for(:root, class: [card_classes, wrapper_classes].reject(&:blank?).join(" "))
+      end
+
+      # @return [Hash] attributes for the :card type's inner .card-body <div>
+      #   -- a genuinely distinct structural part from the card's own wrapper.
+      def card_body_attributes
+        html_for(:body, class: "card-body")
+      end
+
+      # @return [Hash] attributes for the :list type's root <div>.
+      def list_attributes
+        html_for(:root, class: wrapper_classes)
+      end
+
+      # @return [Hash] attributes for the fallback root element rendered for
+      #   any +type+ outside TYPES.
+      def default_attributes
+        html_for(:root, class: placeholder_classes)
+      end
+
+      # --- helpers used directly by the template --------------------------
+
+      # @return [String] classes for a single text placeholder line. Repeated
+      #   sibling lines aren't a distinct named part (there's no fixed count
+      #   of them), so they're not individually hookable -- only the :text
+      #   wrapper is.
+      def text_line_classes(line_width)
         classes = ["placeholder"]
-        classes << "placeholder-#{size}" if size && SIZES.include?(size.to_s)
-        classes << "col-#{width}" if width
-        classes << custom_class if custom_class
+        classes << (size && SIZES.include?(size.to_s) ? "placeholder-#{size}" : "placeholder-xs")
+        classes << "col-#{line_width}"
         classes.join(" ")
       end
 
-      # Returns wrapper CSS classes with animation
-      # @return [String] Combined CSS classes
-      def wrapper_classes
-        classes = []
-        classes << "placeholder-#{animation}" if animation && ANIMATIONS.include?(animation)
-        classes << custom_class if custom_class && type == :card
-        classes.join(" ")
-      end
-
-      # Returns avatar CSS classes
-      # @return [String] Combined CSS classes
-      def avatar_classes
-        classes = ["avatar", "placeholder"]
-        classes << "avatar-rounded" if rounded
-        classes << "avatar-#{size}" if size
-        classes << custom_class if custom_class
-        classes.join(" ")
-      end
-
-      # Returns button CSS classes
-      # @return [String] Combined CSS classes
-      def button_classes
-        classes = ["btn", "disabled", "placeholder"]
-        classes << "btn-#{variant}" if variant
-        classes << "col-#{width}" if width
-        classes << custom_class if custom_class
-        classes.join(" ")
-      end
-
-      # Returns image ratio class
-      # @return [String] Ratio class
+      # @return [String] image ratio class.
       def ratio_class
         return "ratio-#{ratio}" if ratio && RATIOS.include?(ratio)
         "ratio-21x9"
       end
 
-      # Check if animation should be applied
-      # @return [Boolean]
+      # @return [Boolean] whether an animation modifier is active.
       def has_animation?
         !animation.nil? && ANIMATIONS.include?(animation)
       end
 
-      # Get lines array for multiple text lines
-      # @return [Array<Integer>]
+      # @return [Array<Integer>] column widths for multiple text lines.
       def text_lines
         return lines if lines.is_a?(Array)
         return [width || 9] if width
         [9]
+      end
+
+      private
+
+      # --- plain CSS class strings ----------------------------------------
+      #
+      # These no longer know anything about the caller's html: hook -- that
+      # duplication (each one used to re-append custom_class by hand) is
+      # gone. They just compute the component's own base classes; the
+      # *_attributes methods above are what merge them through html_for.
+
+      def placeholder_classes
+        classes = ["placeholder"]
+        classes << "placeholder-#{size}" if size && SIZES.include?(size.to_s)
+        classes << "col-#{width}" if width
+        classes.join(" ")
+      end
+
+      def wrapper_classes
+        has_animation? ? "placeholder-#{animation}" : ""
+      end
+
+      def avatar_classes
+        classes = ["avatar", "placeholder"]
+        classes << "avatar-rounded" if rounded
+        classes << "avatar-#{size}" if size
+        classes.join(" ")
+      end
+
+      def button_classes
+        classes = ["btn", "disabled", "placeholder"]
+        classes << "btn-#{color}" if color
+        classes << "col-#{width}" if width
+        classes.join(" ")
+      end
+
+      def card_classes
+        "card"
       end
     end
   end

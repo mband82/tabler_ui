@@ -1,24 +1,15 @@
 <%# Tabler UI Badge Component %>
-<% if badge.link? %>
-  <a href="<%= badge.url %>" class="<%= badge.badge_classes %>">
-    <% if badge.has_icon? %>
-      <%= tabler_ui.icon(icon: badge.icon).html_safe %>
-    <% end %>
-    <% if badge.content.present? %>
-      <%= badge.content.html_safe %>
-    <% elsif badge.has_text? %>
-      <%= badge.text %>
-    <% end %>
-  </a>
-<% else %>
-  <span class="<%= badge.badge_classes %>">
-    <% if badge.has_icon? %>
-      <%= tabler_ui.icon(icon: badge.icon).html_safe %>
-    <% end %>
-    <% if badge.content.present? %>
-      <%= badge.content.html_safe %>
-    <% elsif badge.has_text? %>
-      <%= badge.text %>
-    <% end %>
-  </span>
+<% badge_tag = badge.link? ? :a : :span %>
+<%= tag.public_send(badge_tag, **badge.root_attributes) do %>
+  <% if badge.has_icon? %>
+    <%= tabler_ui.icon(icon: badge.icon).html_safe %>
+  <% end %>
+  <% if badge.content.present? %>
+    <%# badge.content is only ever trusted verbatim when it already arrived as
+        an ActiveSupport::SafeBuffer -- a plain String falls through to <%=,
+        which escapes it like any other interpolated value. %>
+    <%= badge.content %>
+  <% elsif badge.has_text? %>
+    <%= badge.text %>
+  <% end %>
 <% end %>

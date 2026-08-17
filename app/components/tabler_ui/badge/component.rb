@@ -14,11 +14,14 @@ module TablerUi
     # @example Pill badge
     #   <%= tabler_ui.badge text: "4", color: "red", pill: true %>
     #
-    # @example Notification dot
+    # @example Notification dot (no mandatory argument at all)
     #   <%= tabler_ui.badge color: "red", notification: true %>
     #
     # @example Blinking notification
     #   <%= tabler_ui.badge color: "red", notification: true, blink: true %>
+    #
+    # @example Outline variant
+    #   <%= tabler_ui.badge text: "Draft", color: "secondary", outline: true %>
     #
     # @example With icon
     #   <%= tabler_ui.badge text: "Star", color: "yellow", icon: "star" %>
@@ -29,63 +32,50 @@ module TablerUi
     # @example With size
     #   <%= tabler_ui.badge text: "Small", color: "green", size: :sm %>
     #   <%= tabler_ui.badge text: "Large", color: "green", size: :lg %>
+    #
+    # @example Rule 5 hook on the root <a>/<span>
+    #   <%= tabler_ui.badge text: "New", html: { class: "me-2", data: { testid: "new-badge" } } %>
     class Component
-      COLORS = %w[
-        blue azure indigo purple pink red orange yellow lime green teal cyan
-        primary secondary success danger warning info
-      ].freeze
+      include TablerUi::Base
 
       SIZES = %w[sm lg].freeze
 
       attr_reader :text, :color, :light, :pill, :notification, :blink,
-                  :icon, :url, :size, :custom_class, :content
+                  :outline, :icon, :url, :size, :content
 
       attr_writer :content
 
-      # Initialize badge component
-      #
-      # @param text [String, nil] Badge text
-      # @param color [String] Color variant (blue, azure, indigo, purple, pink, red, orange, yellow, lime, green, teal, cyan)
-      # @param light [Boolean] Use light/subtle variant (default: false)
-      # @param pill [Boolean] Rounded pill shape (default: false)
-      # @param notification [Boolean] Empty notification dot (default: false)
-      # @param blink [Boolean] Blinking animation for notification dots (default: false)
-      # @param icon [String, nil] Tabler icon name
-      # @param url [String, nil] URL to make badge a link
-      # @param size [String, Symbol, nil] Badge size (:sm or :lg)
-      # @param custom_class [String, nil] Additional CSS classes
-      def initialize(text: nil, color: nil, light: false, pill: false, notification: false,
-                     blink: false, icon: nil, url: nil, size: nil, custom_class: nil)
-        @text = text
-        @color = validate_color(color)
-        @light = light
-        @pill = pill
-        @notification = notification
-        @blink = blink
-        @icon = icon
-        @url = url
-        @size = validate_size(size)
-        @custom_class = custom_class
-      end
+      # @param options [Hash]
+      # @option options [String]  :text         Badge text
+      # @option options [String]  :color        Color variant -- validated against
+      #   TablerUi::Color (Tabler palette + Bootstrap semantic names)
+      # @option options [Boolean] :light        Use light/subtle variant (default: false)
+      # @option options [Boolean] :pill         Rounded pill shape (default: false)
+      # @option options [Boolean] :notification Empty notification dot (default: false)
+      # @option options [Boolean] :blink        Blinking animation for notification dots (default: false)
+      # @option options [Boolean] :outline      Outline variant, i.e. "badge-outline" (default: false)
+      # @option options [String]  :icon         Tabler icon name
+      # @option options [String]  :url          URL to make the badge a link (renders <a> instead of <span>)
+      # @option options [String, Symbol] :size  Badge size (:sm or :lg)
+      # @option options [String, ActiveSupport::SafeBuffer] :content
+      #   Block/caller-supplied body content. A plain String is escaped like
+      #   any other <%= %> output; only a value that already arrived as an
+      #   ActiveSupport::SafeBuffer is trusted verbatim.
+      # @option options [Hash]    :html         Rule 5 HTML hook for the root <a>/<span> (part :root)
+      def initialize(options = {})
+        @text = options[:text]
+        @color = TablerUi::Color.validate!(options[:color], context: "badge")
+        @light = options[:light]
+        @pill = options[:pill]
+        @notification = options[:notification]
+        @blink = options[:blink]
+        @outline = options[:outline]
+        @icon = options[:icon]
+        @url = options[:url]
+        @size = validate_size(options[:size])
+        @content = options[:content]
 
-      # CSS classes for the badge element
-      # @return [String] Combined CSS classes
-      def badge_classes
-        classes = ["badge"]
-
-        if @color
-          suffix = @light ? "-lt" : ""
-          classes << "bg-#{@color}#{suffix}"
-          classes << "text-#{@color}#{suffix}-fg"
-        end
-
-        classes << "badge-pill" if @pill
-        classes << "badge-notification" if @notification
-        classes << "badge-blink" if @blink
-        classes << "badge-#{@size}" if @size
-        classes << @custom_class if @custom_class
-
-        classes.join(" ")
+        initialize_html_options(options)
       end
 
       # Whether to render as a link
@@ -106,21 +96,40 @@ module TablerUi
         @text.present?
       end
 
-      # HTML tag to render
-      # @return [String] "a" or "span"
-      def tag_name
-        link? ? "a" : "span"
+      # @return [Hash] attributes for the root <a>/<span> (part :root), merged
+      #   with whatever the caller supplied via html:.
+      def root_attributes
+        defaults = { class: badge_classes }
+        defaults[:href] = @url if link?
+
+        html_for(:root, defaults)
       end
 
       private
 
-      def validate_color(color)
-        return nil if color.nil?
-        COLORS.include?(color.to_s) ? color.to_s : nil
+      # CSS classes for the badge element
+      # @return [String] Combined CSS classes
+      def badge_classes
+        classes = ["badge"]
+
+        if @color
+          suffix = @light ? "-lt" : ""
+          classes << "bg-#{@color}#{suffix}"
+          classes << "text-#{@color}#{suffix}-fg"
+        end
+
+        classes << "badge-pill" if @pill
+        classes << "badge-notification" if @notification
+        classes << "badge-blink" if @blink
+        classes << "badge-outline" if @outline
+        classes << "badge-#{@size}" if @size
+
+        classes.join(" ")
       end
 
       def validate_size(size)
         return nil if size.nil?
+
         s = size.to_s
         SIZES.include?(s) ? s : nil
       end

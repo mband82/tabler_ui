@@ -1,19 +1,19 @@
 <% if status.indicator? %>
   <%# Status Indicator (3 circles) %>
-  <span class="<%= status.status_classes %>">
+  <%= tag.span(**status.root_attributes) do %>
     <span class="status-indicator-circle"></span>
     <span class="status-indicator-circle"></span>
     <span class="status-indicator-circle"></span>
-  </span>
+  <% end %>
 <% elsif status.standalone? %>
   <%# Standalone Status Dot %>
-  <span class="<%= status.status_classes %>"></span>
+  <%= tag.span(**status.root_attributes) %>
 <% else %>
   <%# Regular Status (with optional dot) %>
-  <span class="<%= status.status_classes %>">
+  <%= tag.span(**status.root_attributes) do %>
     <% if status.with_dot? %>
-      <span class="<%= status.dot_classes %>"></span>
+      <%= tag.span(**status.dot_attributes) %>
     <% end %>
     <%= status.text if status.has_text? %>
-  </span>
+  <% end %>
 <% end %>

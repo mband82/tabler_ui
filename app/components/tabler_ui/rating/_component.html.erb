@@ -1,10 +1,6 @@
-<%# Build options array with labels and values %>
-<% options_array = rating.options.map { |opt| [opt[:label], opt[:value]] } %>
+<%# Build choices array with labels and values %>
+<% choices_array = rating.choices.map { |opt| [opt[:label], opt[:value]] } %>
 <%= select_tag rating.name,
-    options_for_select(options_array, rating.value),
-    id: rating.id,
-    class: rating.select_classes,
-    required: rating.required,
-    disabled: rating.disabled,
-    data: rating.controller_attributes
+    options_for_select(choices_array, rating.value),
+    **rating.root_attributes
 %>

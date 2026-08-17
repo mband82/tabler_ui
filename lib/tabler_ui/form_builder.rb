@@ -491,11 +491,11 @@ module TablerUi
             required: options[:required],
             disabled: options[:disabled],
             size: options[:size],
-            variant: options[:variant],
+            color: options[:color],
             tooltip: options[:tooltip],
             clearable: options[:clearable],
             max_stars: options[:max_stars],
-            options: options[:options]
+            choices: options[:choices]
           )
         ]
       end

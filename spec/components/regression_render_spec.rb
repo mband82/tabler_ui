@@ -74,16 +74,7 @@ RSpec.describe "TablerUi component regression render", type: :component do
     expect(fragment.to_html).not_to be_empty
   end
 
-  # Pre-existing bug in app/components/tabler_ui/rating/component.rb#initialize:
-  # `@options = options || default_options` runs before `@max_stars = max_stars`
-  # is assigned, so #default_options (which reads `max_stars`) sees @max_stars
-  # as nil and blows up on `max_stars - 1` with a NoMethodError. This means
-  # `tabler_ui.rating` cannot render at all with its own defaults (the only
-  # way to dodge it is to pass `options:` explicitly, which skips
-  # #default_options entirely -- that would hide the bug rather than
-  # document it, so this is left pending instead). Scheduled to be fixed in
-  # a later batch.
-  pending "renders rating (pre-existing bug: default_options reads max_stars before it's assigned)" do
+  it "renders rating" do
     fragment = component_fragment(:rating)
 
     expect(fragment.css("select")).not_to be_empty

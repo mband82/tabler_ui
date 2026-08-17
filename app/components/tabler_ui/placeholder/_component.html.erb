@@ -1,52 +1,47 @@
 <%# Tabler UI Placeholder Component %>
 <% case placeholder.type %>
 <% when :text %>
-  <%# Single or multiple text placeholder lines %>
-  <% if placeholder.has_animation? %>
-    <div class="<%= placeholder.wrapper_classes %>">
-      <% placeholder.text_lines.each do |line_width| %>
-        <div class="placeholder <%= placeholder.size ? "placeholder-#{placeholder.size}" : "placeholder-xs" %> col-<%= line_width %>"></div>
-      <% end %>
-    </div>
-  <% else %>
+  <%# Single or multiple text placeholder lines, always inside a wrapper so
+      the html: hook has a stable root regardless of whether animation is on %>
+  <%= tag.div(**placeholder.text_wrapper_attributes) do %>
     <% placeholder.text_lines.each do |line_width| %>
-      <div class="placeholder <%= placeholder.size ? "placeholder-#{placeholder.size}" : "placeholder-xs" %> col-<%= line_width %>"></div>
+      <%= tag.div class: placeholder.text_line_classes(line_width) %>
     <% end %>
   <% end %>
 
 <% when :avatar %>
   <%# Avatar placeholder %>
-  <div class="<%= placeholder.avatar_classes %>"></div>
+  <%= tag.div(**placeholder.avatar_attributes) %>
 
 <% when :image %>
   <%# Image placeholder with aspect ratio %>
-  <div class="ratio <%= placeholder.ratio_class %> placeholder"></div>
+  <%= tag.div(**placeholder.image_attributes) %>
 
 <% when :button %>
   <%# Button placeholder %>
-  <a href="#" tabindex="-1" class="<%= placeholder.button_classes %>" aria-hidden="true"></a>
+  <%= tag.a(**placeholder.button_attributes) %>
 
 <% when :card %>
   <%# Full card placeholder skeleton %>
-  <div class="card <%= placeholder.has_animation? ? placeholder.wrapper_classes : '' %>">
+  <%= tag.div(**placeholder.card_attributes) do %>
     <% if placeholder.show_image %>
-      <div class="ratio ratio-21x9 card-img-top placeholder"></div>
+      <%= tag.div class: "ratio ratio-21x9 card-img-top placeholder" %>
     <% end %>
-    <div class="card-body">
-      <div class="placeholder col-9 mb-3"></div>
-      <div class="placeholder placeholder-xs col-10"></div>
-      <div class="placeholder placeholder-xs col-11"></div>
+    <%= tag.div(**placeholder.card_body_attributes) do %>
+      <%= tag.div class: "placeholder col-9 mb-3" %>
+      <%= tag.div class: "placeholder placeholder-xs col-10" %>
+      <%= tag.div class: "placeholder placeholder-xs col-11" %>
       <% if placeholder.show_button %>
-        <div class="mt-3">
-          <a href="#" tabindex="-1" class="btn btn-primary disabled placeholder col-4" aria-hidden="true"></a>
-        </div>
+        <%= tag.div class: "mt-3" do %>
+          <%= tag.a "", href: "#", tabindex: "-1", class: "btn btn-primary disabled placeholder col-4", "aria-hidden": "true" %>
+        <% end %>
       <% end %>
-    </div>
-  </div>
+    <% end %>
+  <% end %>
 
 <% when :list %>
   <%# List item placeholder with avatar %>
-  <div class="<%= placeholder.has_animation? ? placeholder.wrapper_classes : '' %>">
+  <%= tag.div(**placeholder.list_attributes) do %>
     <div class="row align-items-center">
       <div class="col-auto">
         <div class="avatar avatar-rounded placeholder"></div>
@@ -60,9 +55,9 @@
         <div class="placeholder placeholder-xs col-10"></div>
       </div>
     </div>
-  </div>
+  <% end %>
 
 <% else %>
-  <%# Default: simple placeholder span %>
-  <span class="<%= placeholder.placeholder_classes %>"></span>
+  <%# Default: simple placeholder span for a type outside TYPES %>
+  <%= tag.span(**placeholder.default_attributes) %>
 <% end %>
