@@ -22,6 +22,7 @@ import FilterController from "controllers/tabler_ui/filter_controller"
 import ModalController from "controllers/tabler_ui/modal_controller"
 import OffcanvasController from "controllers/tabler_ui/offcanvas_controller"
 import ToastController from "controllers/tabler_ui/toast_controller"
+import CarouselController from "controllers/tabler_ui/carousel_controller"
 import RatingController from "controllers/tabler_ui/rating_controller"
 import TabController from "controllers/tabler_ui/tab_controller"
 import ToggleButtonController from "controllers/tabler_ui/toggle_button_controller"
@@ -38,6 +39,7 @@ if (window.Stimulus) {
   app.register("tabler-ui--modal", ModalController)
   app.register("tabler-ui--offcanvas", OffcanvasController)
   app.register("tabler-ui--toast", ToastController)
+  app.register("tabler-ui--carousel", CarouselController)
   app.register("tabler-ui--rating", RatingController)
   app.register("tabler-ui--tab", TabController)
   app.register("tabler-ui--toggle-button", ToggleButtonController)

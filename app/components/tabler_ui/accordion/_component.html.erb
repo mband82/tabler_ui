@@ -1,0 +1,24 @@
+<%= tag.div(**accordion.root_attributes) do %>
+  <% accordion.items.each do |item| %>
+    <div class="accordion-item">
+      <%= tag.h2(id: item.header_id, **accordion.item_header_attributes(item)) do %>
+        <%= tag.button(type: "button", "data-bs-toggle": "collapse", "data-bs-target": "##{item.id}",
+                        "aria-expanded": item.open, "aria-controls": item.id,
+                        **accordion.item_attributes(item)) do %>
+          <% if item.icon.present? %>
+            <%= tabler_ui.icon(icon: item.icon, html: { class: "accordion-button-icon" }) %>
+          <% end %>
+          <%= item.title %>
+          <%= tabler_ui.icon(icon: accordion.toggle_icon, html: { class: accordion.toggle_icon_classes }) %>
+        <% end %>
+      <% end %>
+
+      <%= tag.div(id: item.id, class: accordion.collapse_classes(item), "aria-labelledby": item.header_id,
+                   "data-bs-parent": accordion.parent_selector, "data-controller": "tabler-ui--collapse") do %>
+        <%= tag.div(**accordion.item_body_attributes(item)) do %>
+          <%= capture(&item.content) if item.content %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

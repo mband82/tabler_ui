@@ -5,6 +5,12 @@ en:
     illustration:
       not_found: "not found"
       unknown: "unknown"
+    carousel:
+      label: "Carousel"
+      previous: "Previous"
+      next: "Next"
+      slide: "Slide %{number}"
+      slide_of: "Slide %{number} of %{total}"
     breadcrumb:
       aria_label: "breadcrumb"
     dark_mode_toggle:

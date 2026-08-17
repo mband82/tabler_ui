@@ -31,6 +31,7 @@ module TablerUi
         controllers/tabler_ui/modal_controller.js
         controllers/tabler_ui/offcanvas_controller.js
         controllers/tabler_ui/toast_controller.js
+        controllers/tabler_ui/carousel_controller.js
         controllers/tabler_ui/rating_controller.js
         controllers/tabler_ui/tab_controller.js
         controllers/tabler_ui/toggle_button_controller.js

@@ -1,0 +1,40 @@
+<%= tag.div(**carousel.root_attributes) do %>
+  <% if carousel.indicators? %>
+    <%= tag.div(**carousel.indicators_attributes) do %>
+      <% carousel.items.each do |item| %>
+        <%= tag.button(type: "button",
+                        class: ("active" if item.active),
+                        style: carousel.indicator_style(item),
+                        "aria-current": (item.active ? "true" : nil),
+                        "aria-label": carousel.indicator_label(item.index),
+                        data: { bs_target: "##{carousel.id}", bs_slide_to: item.index }) %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= tag.div(**carousel.inner_attributes) do %>
+    <% carousel.items.each do |item| %>
+      <%= tag.div(**carousel.item_attributes(item)) do %>
+        <% if item.content %>
+          <%= capture(&item.content) %>
+        <% elsif item.image.present? %>
+          <%= tag.img(src: item.image, class: "d-block w-100", alt: item.caption.to_s) %>
+        <% end %>
+        <% if item.caption.present? %>
+          <%= tag.div(item.caption, **carousel.caption_attributes(item)) %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if carousel.controls? %>
+    <%= tag.button(type: "button", **carousel.prev_attributes) do %>
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+      <span class="visually-hidden"><%= carousel.previous_label %></span>
+    <% end %>
+    <%= tag.button(type: "button", **carousel.next_attributes) do %>
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+      <span class="visually-hidden"><%= carousel.next_label %></span>
+    <% end %>
+  <% end %>
+<% end %>

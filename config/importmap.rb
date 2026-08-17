@@ -26,6 +26,7 @@ pin 'controllers/tabler_ui/filter_controller', to: 'controllers/tabler_ui/filter
 pin 'controllers/tabler_ui/modal_controller', to: 'controllers/tabler_ui/modal_controller.js'
 pin 'controllers/tabler_ui/offcanvas_controller', to: 'controllers/tabler_ui/offcanvas_controller.js'
 pin 'controllers/tabler_ui/toast_controller', to: 'controllers/tabler_ui/toast_controller.js'
+pin 'controllers/tabler_ui/carousel_controller', to: 'controllers/tabler_ui/carousel_controller.js'
 pin 'controllers/tabler_ui/rating_controller', to: 'controllers/tabler_ui/rating_controller.js'
 pin 'controllers/tabler_ui/tab_controller', to: 'controllers/tabler_ui/tab_controller.js'
 pin 'controllers/tabler_ui/toggle_button_controller', to: 'controllers/tabler_ui/toggle_button_controller.js'
