@@ -608,16 +608,7 @@ module TablerUi
     end
 
     def merge_input_options(options, user_options)
-      return options if user_options.nil?
-
-      # Merge classes properly
-      if options[:class] && user_options[:class]
-        merged_options = options.merge(user_options)
-        merged_options[:class] = "#{options[:class]} #{user_options[:class]}"
-        merged_options
-      else
-        options.merge(user_options)
-      end
+      TablerUi::HtmlOptions.merge_html(options, user_options)
     end
   end
 end

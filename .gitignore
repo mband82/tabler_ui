@@ -5,4 +5,7 @@
 /doc/
 /pkg/
 /spec/reports/
+/spec/internal/log/
 /tmp/
+.rspec_status
+.claude/
