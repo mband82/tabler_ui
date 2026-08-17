@@ -3,34 +3,36 @@ import {Controller} from "@hotwired/stimulus"
 import "vanillajs-datepicker";
 
 export default class extends Controller {
+    static values = {
+        min: { type: String, default: null },
+        max: { type: String, default: null },
+        format: { type: String, default: "yyyy-mm-dd" }
+    }
+
     connect() {
-        const minDate = this.element.dataset.min || null
-        const maxDate = this.element.dataset.max || null
-        const dateFormat = this.element.dataset.format || 'yyyy-mm-dd' // Default format
+        // vanillajs-datepicker is pinned to a CDN -- guard against it
+        // failing to load rather than throwing.
+        if (typeof Datepicker === "undefined") return
 
-        if (this.element.tagName === "INPUT") {
-            const datepicker = new Datepicker(this.element,
-                {
-                    buttonClass: 'btn',
-                    autohide: true,
-                    format: dateFormat, // Format from data attribute of input field
-                    minDate: minDate ? new Date(minDate) : null, // minDate from input field
-                    maxDate: maxDate ? new Date(maxDate) : null, // maxDate from input field
-                    weekNumbers: 1,
-                    weekStart: 1
-                });
+        const options = {
+            buttonClass: 'btn',
+            autohide: true,
+            format: this.formatValue,
+            minDate: this.minValue ? new Date(this.minValue) : null,
+            maxDate: this.maxValue ? new Date(this.maxValue) : null,
+            weekNumbers: 1,
+            weekStart: 1
+        }
 
-        } else {
-            const datepicker = new DateRangePicker(this.element,
-                {
-                    buttonClass: 'btn',
-                    format: dateFormat, // Format from data attribute of input field
-                    minDate: minDate ? new Date(minDate) : null, // minDate from input field
-                    maxDate: maxDate ? new Date(maxDate) : null, // maxDate from input field
-                    weekNumbers: 1,
-                    weekStart: 1,
-                    autohide: true
-                });
+        this.picker = this.element.tagName === "INPUT"
+            ? new Datepicker(this.element, options)
+            : new DateRangePicker(this.element, options)
+    }
+
+    disconnect() {
+        if (this.picker) {
+            this.picker.destroy()
+            this.picker = null
         }
     }
 }

@@ -75,15 +75,13 @@ module TablerUi
 
       # @return [Hash] the data-* attributes the tabler-ui--rating Stimulus
       #   controller (see rating_controller.js `static values`) expects.
-      #   Ruby-side this is `color:`, but the data attribute name stays
-      #   `-variant-value` since that's the controller's declared value name.
       def controller_attributes
         {
           controller: "tabler-ui--rating",
           "tabler-ui--rating-id-value" => id,
           "tabler-ui--rating-tooltip-value" => tooltip,
           "tabler-ui--rating-clearable-value" => clearable,
-          "tabler-ui--rating-variant-value" => color,
+          "tabler-ui--rating-color-value" => color,
           "tabler-ui--rating-size-value" => size
         }
       end

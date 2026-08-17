@@ -11,6 +11,8 @@ export default class extends Controller {
   }
 
   toggle() {
+    if (!this.hasInputTarget) return
+
     const checked = this.inputTarget.value === "1"
     this.inputTarget.value = checked ? "0" : "1"
     this.inputTarget.dispatchEvent(new Event("change", { bubbles: true }))
@@ -18,6 +20,8 @@ export default class extends Controller {
   }
 
   updateAppearance() {
+    if (!this.hasInputTarget || !this.hasButtonTarget) return
+
     const checked = this.inputTarget.value === "1"
     const btn = this.buttonTarget
     const color = this.colorValue

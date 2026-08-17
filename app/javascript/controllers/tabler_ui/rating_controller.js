@@ -8,7 +8,7 @@ export default class extends Controller {
     id: String,
     tooltip: { type: Boolean, default: true },
     clearable: { type: Boolean, default: true },
-    variant: String,
+    color: String,
     size: String
   }
 
@@ -33,8 +33,8 @@ export default class extends Controller {
       stars: this.getStarsFunction()
     }
 
-    if (this.variantValue) {
-      options.variant = this.variantValue
+    if (this.colorValue) {
+      options.variant = this.colorValue
     }
 
     if (this.sizeValue) {
@@ -54,8 +54,8 @@ export default class extends Controller {
         iconClass += " icon-2"
       }
 
-      if (this.variantValue) {
-        iconClass += ` text-${this.variantValue}`
+      if (this.colorValue) {
+        iconClass += ` text-${this.colorValue}`
       }
 
       el.innerHTML = this.getStarSvg(iconClass)

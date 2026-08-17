@@ -6,15 +6,12 @@
       <%= navbar.brand %>
     <% end %>
 
-    <%# TODO(rule 6): data-bs-toggle="collapse" drives Bootstrap's Collapse
-        class directly. Left as-is per instructions -- wrap this in a shared
-        tabler-ui--navbar Stimulus controller once that lands. %>
     <%= tag.button(type: "button", "data-bs-toggle": "collapse", **navbar.toggler_attributes) do %>
       <span class="navbar-toggler-icon"></span>
     <% end %>
 
     <%# Collapsible Navigation Container %>
-    <%= tag.div(**navbar.menu_attributes) do %>
+    <%= tag.div("data-controller": "tabler-ui--collapse", **navbar.menu_attributes) do %>
       <ul class="navbar-nav">
         <% navbar.items_left.each do |item| %>
           <%= render "tabler_ui/navbar/nav_item", navbar: navbar, item: item %>

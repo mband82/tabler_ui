@@ -12,19 +12,27 @@ import "tabler_ui/tabler"
 import "star-rating.js"
 
 // Auto-register Stimulus controllers
+import AlertController from "controllers/tabler_ui/alert_controller"
+import ChartController from "controllers/tabler_ui/chart_controller"
+import CollapseController from "controllers/tabler_ui/collapse_controller"
 import DarkModeController from "controllers/tabler_ui/dark_mode_controller"
 import DatepickerController from "controllers/tabler_ui/datepicker_controller"
-import DropdownController from "controllers/tabler_ui/dropdown_controller"
+import DropdownMenuController from "controllers/tabler_ui/dropdown_menu_controller"
 import FilterController from "controllers/tabler_ui/filter_controller"
 import RatingController from "controllers/tabler_ui/rating_controller"
+import TabController from "controllers/tabler_ui/tab_controller"
 import ToggleButtonController from "controllers/tabler_ui/toggle_button_controller"
 
 if (window.Stimulus) {
   const app = window.Stimulus
+  app.register("tabler-ui--alert", AlertController)
+  app.register("tabler-ui--chart", ChartController)
+  app.register("tabler-ui--collapse", CollapseController)
   app.register("tabler-ui--dark-mode", DarkModeController)
   app.register("tabler-ui--datepicker", DatepickerController)
-  app.register("tabler-ui--dropdown", DropdownController)
+  app.register("tabler-ui--dropdown-menu", DropdownMenuController)
   app.register("tabler-ui--filter", FilterController)
   app.register("tabler-ui--rating", RatingController)
+  app.register("tabler-ui--tab", TabController)
   app.register("tabler-ui--toggle-button", ToggleButtonController)
 }

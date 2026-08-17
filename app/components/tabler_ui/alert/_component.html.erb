@@ -1,8 +1,7 @@
 <%# Tabler UI Alert Component %>
-<%= tag.div(**alert.root_attributes) do %>
+<%= tag.div(**alert.root_attributes,
+              **(alert.dismissible ? { "data-controller": "tabler-ui--alert" } : {})) do %>
   <% if alert.dismissible %>
-    <%# TODO(rule 6): this drives Bootstrap's alert dismiss directly via data-bs-dismiss;
-        wrap it with a tabler-ui--alert Stimulus controller once that lands. %>
     <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
   <% end %>
 

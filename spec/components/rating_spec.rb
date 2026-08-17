@@ -64,17 +64,17 @@ RSpec.describe "TablerUi::Rating", type: :component do
       expect { component_fragment(:rating, color: "not-a-color") }.to raise_error(ArgumentError, /not-a-color/)
     end
 
-    it "sets the Stimulus variant-value data attribute from color:" do
+    it "sets the Stimulus color-value data attribute from color:" do
       fragment = component_fragment(:rating, color: "red")
 
-      expect(fragment.css("select").first["data-tabler-ui--rating-variant-value"]).to eq("red")
+      expect(fragment.css("select").first["data-tabler-ui--rating-color-value"]).to eq("red")
     end
   end
 
   it "no longer reads variant: -- it's ignored, not an error" do
     fragment = component_fragment(:rating, variant: "red")
 
-    expect(fragment.css("select").first["data-tabler-ui--rating-variant-value"]).to be_nil
+    expect(fragment.css("select").first["data-tabler-ui--rating-color-value"]).to be_nil
   end
 
   it "carries all the Stimulus data attributes rating_controller.js expects" do
@@ -86,7 +86,7 @@ RSpec.describe "TablerUi::Rating", type: :component do
     expect(select["data-tabler-ui--rating-id-value"]).to eq("my-rating")
     expect(select["data-tabler-ui--rating-tooltip-value"]).to eq("false")
     expect(select["data-tabler-ui--rating-clearable-value"]).to eq("false")
-    expect(select["data-tabler-ui--rating-variant-value"]).to eq("green")
+    expect(select["data-tabler-ui--rating-color-value"]).to eq("green")
     expect(select["data-tabler-ui--rating-size-value"]).to eq("sm")
   end
 

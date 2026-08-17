@@ -22,12 +22,16 @@ module TablerUi
         apexcharts.css apexcharts.js
         tabler_ui/addons/*.css
         tabler_ui/flags/**/*.svg
+        controllers/tabler_ui/alert_controller.js
         controllers/tabler_ui/chart_controller.js
+        controllers/tabler_ui/collapse_controller.js
         controllers/tabler_ui/dark_mode_controller.js
         controllers/tabler_ui/datepicker_controller.js
-        controllers/tabler_ui/dropdown_controller.js
+        controllers/tabler_ui/dropdown_menu_controller.js
         controllers/tabler_ui/filter_controller.js
         controllers/tabler_ui/rating_controller.js
+        controllers/tabler_ui/tab_controller.js
+        controllers/tabler_ui/toggle_button_controller.js
       ]
     end
 

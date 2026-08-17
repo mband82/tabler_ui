@@ -1,26 +1,27 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static values = { debounce: Number }
+  static values = { debounce: { type: Number, default: 200 } }
 
   connect() {
-    console.log("✅ FilterController connected", this.element)
     this._debouncedSubmit = this._debounce(
       () => this.element.requestSubmit(),
-      this.debounceValue || 200
+      this.debounceValue
     )
   }
 
+  disconnect() {
+    clearTimeout(this._timeout)
+  }
+
   submit() {
-    console.log("🔔 submit triggered")
     this._debouncedSubmit()
   }
 
   _debounce(fn, wait) {
-    let t
     return (...args) => {
-      clearTimeout(t)
-      t = setTimeout(() => fn.apply(this, args), wait)
+      clearTimeout(this._timeout)
+      this._timeout = setTimeout(() => fn.apply(this, args), wait)
     }
   }
 }

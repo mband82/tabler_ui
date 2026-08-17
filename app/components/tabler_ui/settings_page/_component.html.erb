@@ -4,13 +4,10 @@
     <%# Sidebar Navigation %>
     <%= tag.div(**settings_page.sidebar_attributes) do %>
       <h4 class="subheader"><%= settings_page.title %></h4>
-      <div class="list-group list-group-transparent">
+      <div class="list-group list-group-transparent" data-controller="tabler-ui--tab">
         <% settings_page.items.each do |item| %>
-          <%# TODO(rule 6): data-bs-toggle="list" drives Bootstrap's Tab class
-              directly. Left as-is per instructions -- once tabs is converted to
-              Stimulus, wrap this in a shared tabler-ui--tab controller, since
-              Bootstrap's Tab class backs both data-bs-toggle="tab" and "list". %>
-          <%= tag.a(href: "##{item.id}", "data-bs-toggle": "list", **settings_page.item_attributes(item)) do %>
+          <%= tag.a(href: "##{item.id}", "data-bs-toggle": "list", "data-tabler-ui--tab-target": "toggle",
+                     **settings_page.item_attributes(item)) do %>
             <% if item.icon.present? %>
               <%= tabler_ui.icon(icon: item.icon, html: { class: "me-2" }) %>
             <% end %>

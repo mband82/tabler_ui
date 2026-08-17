@@ -14,9 +14,11 @@ module TablerUi
 
       object_type = object_type_for_method(method)
 
+      # :date, :integer, :decimal, :float, :datetime and :time all render
+      # through string_input -> string_field, which does the finer-grained
+      # dispatch on the real column type (see string_field below).
       input_type = case object_type
-                   when :date then :string
-                   when :integer then :string
+                   when :date, :integer, :decimal, :float, :datetime, :time then :string
                    else object_type
                    end
 
@@ -26,7 +28,22 @@ module TablerUi
                               :select
                             end
 
-      send("#{override_input_type || input_type}_input", method, options)
+      resolved_input_type = override_input_type || input_type
+      input_method = "#{resolved_input_type}_input"
+
+      # A column type we don't recognize (and that wasn't given an explicit
+      # `as:`) would otherwise hit `send` with a method name nothing defines,
+      # raising a bare NoMethodError. Fail with a message that names the
+      # field and the type so the next developer knows what to add.
+      unless respond_to?(input_method, true)
+        raise ArgumentError,
+              "TablerUi::FormBuilder#input doesn't know how to render #{method.inspect} " \
+              "(column type #{object_type.inspect}, resolved input type #{resolved_input_type.inspect}). " \
+              "Pass `as:` to render it explicitly (e.g. `as: :string`), or add a `##{input_method}` " \
+              'method to TablerUi::FormBuilder.'
+      end
+
+      send(input_method, method, options)
     end
 
     # Naked input field without wrapper or label
@@ -374,6 +391,23 @@ module TablerUi
                    merge_input_options(options,
                                        { data: { controller: 'tabler-ui--datepicker' }, "autocomplete": 'off' }))
       when :integer then number_field(method, options)
+      when :decimal, :float
+        # step: "any" rather than a fixed increment: a :decimal column's
+        # scale isn't reliably available here (no guaranteed DB connection),
+        # and a fixed step (e.g. "0.01") would make the browser reject
+        # otherwise-valid values with more precision. A caller that wants a
+        # specific step can still set input_html: { step: ... }, which wins
+        # over this default (merge_input_options puts the default first).
+        number_field(method, merge_input_options({ step: 'any' }, options))
+      when :datetime
+        # Native datetime-local input rather than routing through the
+        # tabler-ui--datepicker Stimulus controller: that controller wraps
+        # vanillajs-datepicker, a date-only picker with no time support, and
+        # extending it is out of scope here (touches app/, owned by another
+        # agent right now). This needs no JS at all.
+        datetime_local_field(method, options)
+      when :time
+        time_field(method, options)
       when :string
         case method.to_s
         when /password/ then password_field(method, options)
@@ -383,6 +417,12 @@ module TablerUi
         else
           text_field(method, options)
         end
+      else
+        # Any other/unhandled type still needs a widget when reached from
+        # here (e.g. via #input_field, which has no equivalent of #input's
+        # clear-error guard). A plain text field is the safest fallback --
+        # better than silently rendering nothing.
+        text_field(method, options)
       end
     end
 

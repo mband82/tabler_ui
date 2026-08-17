@@ -20,10 +20,8 @@
   <% if visible_items.any? { |sub| sub.type != :divider } %>
     <% dropdown_active = visible_items.any? { |sub| sub.type == :item && item_active.call(sub) } %>
     <%= tag.li(**navbar.item_attributes(item, active: dropdown_active)) do %>
-      <%# TODO(rule 6): data-bs-toggle="dropdown" drives Bootstrap's Dropdown
-          class directly. Left as-is per instructions -- wrap this in a
-          shared tabler-ui--dropdown Stimulus controller once that lands. %>
-      <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" role="button" aria-expanded="false">
+      <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-controller="tabler-ui--dropdown-menu"
+         role="button" aria-expanded="false">
         <%= item.title %>
       </a>
       <div class="dropdown-menu<%= ' dropdown-menu-end' if item.align == :end %>">

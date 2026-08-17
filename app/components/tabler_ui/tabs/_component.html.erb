@@ -1,12 +1,9 @@
 <%# Tabler UI Tabs Component %>
 <%= tag.div(**tabs.root_attributes) do %>
-  <%# TODO(rule 6): data-bs-toggle="tabs"/"tab" drive Bootstrap's Tab class
-      directly. Left as-is per instructions -- wrap this in a shared
-      tabler-ui--tab Stimulus controller once that lands. %>
-  <%= tag.ul("data-bs-toggle": "tabs", role: "tablist", **tabs.nav_attributes) do %>
+  <%= tag.ul("data-bs-toggle": "tabs", "data-controller": "tabler-ui--tab", role: "tablist", **tabs.nav_attributes) do %>
     <% tabs.tabs.each do |tab| %>
       <li class="nav-item" role="presentation">
-        <%= tag.a(href: "##{tab.id}", "data-bs-toggle": "tab", role: "tab",
+        <%= tag.a(href: "##{tab.id}", "data-bs-toggle": "tab", "data-tabler-ui--tab-target": "toggle", role: "tab",
                    "aria-selected": tab.active, **tabs.tab_attributes(tab)) do %>
           <% if tab.icon.present? %>
             <%= tabler_ui.icon(icon: tab.icon, html: { class: "me-1" }) %>

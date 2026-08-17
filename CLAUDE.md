@@ -200,7 +200,7 @@ lib/tabler_ui/
 app/components/tabler_ui/
   <name>/component.rb + _component.html.erb    class-backed components
   _<name>.html.erb                             bare-partial components
-app/javascript/controllers/tabler_ui/          7 Stimulus controllers
+app/javascript/controllers/tabler_ui/          10 Stimulus controllers
 app/assets/                                    Tabler CSS/JS, ApexCharts, ~5700 icons, ~200 illustrations
 config/importmap.rb                            pins shipped to the host app
 ```
@@ -257,12 +257,14 @@ Current bare partials: `_button`, `_card` (slots: header/body/footer), `_page_he
 
 - Stimulus IDs are namespaced `tabler-ui--<feature>`, e.g. `data-controller="tabler-ui--datepicker"`.
 - `app/assets/javascripts/tabler_ui.js` self-registers controllers against `window.Stimulus`
-  (set by the host app). Adding a controller means touching **three** places: the file,
+  (set by the host app). Adding a controller means touching **four** places: the file,
   the import + `app.register` block in `tabler_ui.js`, the pin in `config/importmap.rb`,
   and the precompile list in `engine.rb`.
-- Known drift: `chart_controller` is pinned and precompiled but never registered in
-  `tabler_ui.js`; `toggle_button_controller` is registered and pinned but missing from
-  the `engine.rb` precompile list.
+- Bootstrap's own JS (bundled inside `tabler_ui/tabler.js`, exposed as `window.tabler.bootstrap`)
+  keeps doing the interactive work for tabs/lists, collapse and dropdowns; `tab_controller`,
+  `collapse_controller`, `dropdown_menu_controller` and `alert_controller` are thin lifecycle
+  wrappers (instantiate in `connect()`, dispose in `disconnect()`) driven by the `data-bs-*`
+  attributes already in the markup.
 - External deps: `vanillajs-datepicker` (CDN pin), `star-rating.js` and `apexcharts` (bundled).
 
 ## Gotchas

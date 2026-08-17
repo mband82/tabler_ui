@@ -1,10 +1,7 @@
 <%# Tabler UI Dropdown Component %>
 <%= tag.div(**dropdown.root_attributes) do %>
-  <%# TODO(rule 6): data-bs-toggle="dropdown" drives Bootstrap's Dropdown class
-      directly. Left as-is per instructions -- wrap this in a shared
-      tabler-ui--dropdown-menu Stimulus controller once that lands. %>
-  <%= tag.button(type: "button", "data-bs-toggle": "dropdown", "aria-expanded": "false",
-                 **dropdown.toggle_attributes) do %>
+  <%= tag.button(type: "button", "data-bs-toggle": "dropdown", "data-controller": "tabler-ui--dropdown-menu",
+                 "aria-expanded": "false", **dropdown.toggle_attributes) do %>
     <%= dropdown.label %>
   <% end %>
   <%= tag.div(**dropdown.menu_attributes) do %>
