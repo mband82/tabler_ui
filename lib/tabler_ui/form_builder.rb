@@ -198,6 +198,16 @@ module TablerUi
                  @object.type_for_attribute(method.to_s).try(:type)
                elsif @object.respond_to?(:column_for_attribute) && @object.has_attribute?(method)
                  @object.column_for_attribute(method).try(:type)
+               elsif @object.class.respond_to?(:attribute_types) && @object.class.attribute_types.key?(method.to_s)
+                 # ActiveModel::Attributes exposes `type_for_attribute` and
+                 # `attribute_types` on the *class*, not the instance, and
+                 # defines no `has_attribute?` at all -- unlike ActiveRecord,
+                 # whose equivalents are instance methods (checked above).
+                 # `attribute_types` is a Hash keyed by attribute name that
+                 # returns a generic ActiveModel::Type::Value (not nil) for
+                 # unknown keys, so presence must be checked with `key?`
+                 # rather than by testing the returned type for nil.
+                 @object.class.attribute_types[method.to_s].try(:type)
                end
 
       result || :string
@@ -595,7 +605,7 @@ module TablerUi
       end
     end
 
-    def input_group(method, options = {})
+    def input_group_input(method, options = {})
       prepend = options[:prepend]
       append = options[:append]
       prepend_button = options[:prepend_button]

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails_helper"
+require "active_model"
 
 # There is no ActiveRecord in this harness (see spec/rails_helper.rb), so
 # FormBuilder#object_type_for_method's data source is faked with a plain
@@ -74,6 +75,25 @@ class FakeModel
   def respond_to_missing?(name, include_private = false)
     @attributes.key?(name.to_s.chomp("=").to_sym) || super
   end
+end
+
+# A real ActiveModel::Model + ActiveModel::Attributes object, used to prove
+# that #object_type_for_method's automatic type dispatch also works for
+# non-ActiveRecord models. Rails' ActiveModel::Attributes module defines
+# `type_for_attribute`/`attribute_types` on the *class*, not the instance,
+# and defines no `has_attribute?` at all -- unlike ActiveRecord's equivalents,
+# which are instance methods. FakeModel above hand-rolls exactly that
+# instance-level ActiveRecord-shaped surface, so it can't exercise this path;
+# only Rails' own module, included for real, demonstrates how it actually
+# exposes types.
+class ActiveModelAttributesFakeModel
+  include ActiveModel::Model
+  include ActiveModel::Attributes
+
+  attribute :quantity, :integer
+  attribute :price, :decimal
+  attribute :starts_at, :datetime
+  attribute :born_on, :date
 end
 
 RSpec.describe TablerUi::FormBuilder do
@@ -231,6 +251,69 @@ RSpec.describe TablerUi::FormBuilder do
         expect(error.message).to include("balance")
         expect(error.message).to include("money")
       end
+    end
+  end
+
+  describe "#input dispatch on ActiveModel::Attributes (non-ActiveRecord) objects" do
+    it "renders a number field for an :integer attribute instead of falling back to text (regression)" do
+      model = ActiveModelAttributesFakeModel.new(quantity: 5)
+      form = build_form(model)
+
+      field = fragment_for(form.input(:quantity)).css('input[name="model[quantity]"]').first
+
+      expect(field["type"]).to eq("number")
+    end
+
+    it "renders a number field with step=any for a :decimal attribute instead of falling back to text (regression)" do
+      model = ActiveModelAttributesFakeModel.new(price: "19.99")
+      form = build_form(model)
+
+      field = fragment_for(form.input(:price)).css('input[name="model[price]"]').first
+
+      expect(field["type"]).to eq("number")
+      expect(field["step"]).to eq("any")
+    end
+
+    it "renders a datetime-local field for a :datetime attribute instead of falling back to text (regression)" do
+      model = ActiveModelAttributesFakeModel.new(starts_at: nil)
+      form = build_form(model)
+
+      field = fragment_for(form.input(:starts_at)).css('input[name="model[starts_at]"]').first
+
+      expect(field["type"]).to eq("datetime-local")
+    end
+
+    it "routes a :date attribute through the tabler-ui--datepicker controller instead of falling back to text (regression)" do
+      model = ActiveModelAttributesFakeModel.new(born_on: nil)
+      form = build_form(model)
+
+      field = fragment_for(form.input(:born_on)).css('input[name="model[born_on]"]').first
+
+      expect(field["type"]).to eq("text")
+      expect(field["data-controller"]).to eq("tabler-ui--datepicker")
+    end
+  end
+
+  describe "as: :input_group" do
+    it "renders an input group instead of raising (regression)" do
+      model = FakeModel.new({ amount: "10" }, types: { amount: :string })
+      form = build_form(model)
+
+      expect { form.input(:amount, as: :input_group) }.not_to raise_error
+
+      fragment = fragment_for(form.input(:amount, as: :input_group))
+      expect(fragment.css("div.input-group")).not_to be_empty
+      expect(fragment.css('input[name="model[amount]"]')).not_to be_empty
+    end
+
+    it "renders prepend and append text" do
+      model = FakeModel.new({ amount: "10" }, types: { amount: :string })
+      form = build_form(model)
+
+      fragment = fragment_for(form.input(:amount, as: :input_group, prepend: "$", append: ".00"))
+      texts = fragment.css("div.input-group .input-group-text").map(&:text)
+
+      expect(texts).to eq(%w[$ .00])
     end
   end
 
