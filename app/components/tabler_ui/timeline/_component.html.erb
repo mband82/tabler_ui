@@ -1,0 +1,14 @@
+<%= tag.ul(**timeline.root_attributes) do %>
+  <% timeline.items.each do |item| %>
+    <%= tag.li(**timeline.item_attributes(item)) do %>
+      <%= tag.div(**timeline.icon_attributes(item)) do %>
+        <%= tabler_ui.icon(icon: item.icon, color: item.color) if timeline.icon?(item) %>
+      <% end %>
+      <%= tag.div(**timeline.card_attributes(item)) do %>
+        <% if item.content %>
+          <%= capture(&item.content) %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -5,9 +5,13 @@ en:
     illustration:
       not_found: "not found"
       unknown: "unknown"
+    breadcrumb:
+      aria_label: "breadcrumb"
     dark_mode_toggle:
       title: "Switch theme"
     dimmer:
       loader_label: "Loading..."
     spinner:
       label: "Loading..."
+    steps:
+      label: "Steps"

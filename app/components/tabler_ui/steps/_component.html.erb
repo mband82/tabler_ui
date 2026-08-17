@@ -1,0 +1,9 @@
+<%= tag.ul(**steps.root_attributes) do %>
+  <% steps.items.each do |item| %>
+    <% if item.url.present? %>
+      <%= link_to item.title, item.url, **steps.item_attributes(item) %>
+    <% else %>
+      <%= tag.li(item.title, **steps.item_attributes(item)) %>
+    <% end %>
+  <% end %>
+<% end %>

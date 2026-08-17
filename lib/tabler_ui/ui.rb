@@ -106,6 +106,12 @@ module TablerUi
     def render_block(component_class, component, partial_path, name, &block)
       if component_class&.builder_style?
         @view.capture(component, &block)
+        # Builder components only know their full item list once the block has
+        # run, so anything that validates across items (steps' current: index)
+        # can't check in initialize. Give them a hook here, before rendering --
+        # raising inside the template instead would get wrapped in
+        # ActionView::Template::Error, burying the real message in #cause.
+        component.validate! if component.respond_to?(:validate!)
         render_component(partial_path, name, component, nil)
       else
         # Slot style: the default for components, and the only option for
