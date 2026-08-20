@@ -21,15 +21,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<turbo-frame>` around the table itself and points the filter form at it from outside, so the
   debounced search input is never re-rendered mid-typing; `pagination` only targets the frame.
   Opt-in and markup-only — the gem takes no `turbo-rails` dependency.
-- New HTML hooks: `sort_html:`, `filter_html:`, `filter_form_html:`, `filter_reset_html:` and
-  `frame_html:` on `table`, and `link_html:` on `pagination`. The last two close rule 5 gaps on
-  elements that previously had no hook at all.
+- `table` takes a `footer` slot, rendering a `.card-footer` inside the card. It sits inside the
+  turbo-frame, so a pager or a row count placed there re-renders with the table instead of going
+  stale. This is the opposite of the filter toolbar, which stays outside the frame so the search
+  input survives typing.
+- A `:search`/`:text` filter field takes `button:`, rendering the input in an input group with an
+  attached submit button.
+- `filter:` takes `min_chars:`, below which the auto-submitting form submits with the search value
+  blanked — so the table returns to unfiltered results, the URL follows, and a hint appears under
+  the field. Clearing the field always submits, so a user cannot get stuck filtered. It applies
+  only to an auto-submitting form on a framed table, and is silently inert otherwise.
+- New HTML hooks: `sort_html:`, `filter_html:`, `filter_form_html:`, `filter_reset_html:`,
+  `filter_button_html:`, `filter_hint_html:`, `frame_html:` and `footer_html:` on `table`, and
+  `link_html:` on `pagination`. `link_html:` and `filter_reset_html:` close rule 5 gaps on elements
+  that previously had no hook at all.
+
+### Changed
+
+- `filter: { auto: }` now defaults to true only for a `:get` form on a table that has a `frame:`,
+  and false otherwise. Auto-submitting without a frame meant every debounced submit was a full
+  navigation, so the search field lost focus and the page jumped to the top mid-typing. An explicit
+  `auto: true` still opts in, for hosts driving the form themselves.
 
 ### Fixed
 
 - `navbar.css` was in the engine's precompile list but missing from the stylesheet manifest, so it
   was compiled and served but never actually loaded. Its alignment fixes now apply, which makes nav
   items reach the full navbar height and puts Tabler's active indicator on the bottom edge.
+- `pagination` emitted `page-prev`/`page-next` on every prev/next item. Tabler gives those classes
+  `flex: 0 0 50%` for its article-style pager, where the two are the only items, so combining them
+  with page numbers overflowed the container and pushed Next outside it. They are now emitted only
+  for a pure prev/next pager.
 
 ## [0.5.0] - 2026-08-17
 
