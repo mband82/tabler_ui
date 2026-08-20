@@ -28,7 +28,7 @@ module TablerUi
     class Component
       include TablerUi::Base
 
-      SIZES = %w[xs sm lg xl].freeze
+      SIZES = %w[xs sm lg].freeze
       ANIMATIONS = %i[glow wave].freeze
       TYPES = %i[text avatar image button card list].freeze
       RATIOS = %w[1x1 4x3 16x9 21x9].freeze
@@ -39,7 +39,10 @@ module TablerUi
       # @param options [Hash]
       # @option options [Symbol]  :type        Placeholder type (:text, :avatar, :image, :button, :card, :list) (default: :text)
       # @option options [Integer] :width       Column width for text/button placeholders (1-12)
-      # @option options [String]  :size        Size variant (xs, sm, lg, xl)
+      # @option options [String]  :size        Size variant (xs, sm, lg) for the :text/fallback
+      #   placeholder. An unrecognized value raises ArgumentError -- Tabler defines no
+      #   .placeholder-xl, so that value used to be silently dropped. Not validated against
+      #   this set for the :avatar type, which has its own, larger .avatar-* size scale.
       # @option options [Symbol]  :animation   Animation type (:glow, :wave)
       # @option options [String]  :ratio       Aspect ratio for images (1x1, 4x3, 16x9, 21x9)
       # @option options [String]  :color       Tabler color name, validated via TablerUi::Color and
@@ -61,6 +64,8 @@ module TablerUi
         @rounded = options.fetch(:rounded, true)
         @show_image = options.fetch(:show_image, true)
         @show_button = options.fetch(:show_button, true)
+
+        validate_size!
 
         initialize_html_options(options)
       end
@@ -124,7 +129,7 @@ module TablerUi
       #   wrapper is.
       def text_line_classes(line_width)
         classes = ["placeholder"]
-        classes << (size && SIZES.include?(size.to_s) ? "placeholder-#{size}" : "placeholder-xs")
+        classes << (size ? "placeholder-#{size}" : "placeholder-xs")
         classes << "col-#{line_width}"
         classes.join(" ")
       end
@@ -157,9 +162,25 @@ module TablerUi
 
       def placeholder_classes
         classes = ["placeholder"]
-        classes << "placeholder-#{size}" if size && SIZES.include?(size.to_s)
+        classes << "placeholder-#{size}" if size
         classes << "col-#{width}" if width
         classes.join(" ")
+      end
+
+      # Validated eagerly, like :color, so an unrecognized value raises before
+      # rendering rather than being silently dropped by the SIZES gate that
+      # used to live in #text_line_classes / #placeholder_classes. Skipped for
+      # :avatar, which has its own, larger .avatar-* size scale (xxs..2xl) --
+      # see #avatar_classes, which reads +size+ straight through unvalidated.
+      #
+      # @raise [ArgumentError] if +size+ is present, the type isn't :avatar,
+      #   and the value isn't one of SIZES.
+      def validate_size!
+        return if size.nil? || type == :avatar
+        return if SIZES.include?(size.to_s)
+
+        raise ArgumentError,
+              "unknown placeholder size #{size.inspect} -- valid: #{SIZES.join(', ')}"
       end
 
       def wrapper_classes

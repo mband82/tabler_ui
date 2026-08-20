@@ -117,10 +117,29 @@ RSpec.describe "TablerUi::Placeholder", type: :component do
     expect(fragment.css("div.col-6")).not_to be_empty
   end
 
-  it "applies size: as placeholder-<size> on the text placeholder" do
-    fragment = component_fragment(:placeholder, type: :text, size: "lg")
+  TablerUi::Placeholder::Component::SIZES.each do |size|
+    it "applies size: #{size.inspect} as placeholder-#{size} on the text placeholder" do
+      fragment = component_fragment(:placeholder, type: :text, size: size)
 
-    expect(fragment.css("div.placeholder-lg")).not_to be_empty
+      expect(fragment.css("div.placeholder-#{size}")).not_to be_empty
+    end
+  end
+
+  it "raises ArgumentError for size: \"xl\" -- Tabler defines no .placeholder-xl, " \
+     "so it used to silently do nothing" do
+    expect { component_fragment(:placeholder, type: :text, size: "xl") }
+      .to raise_error(ArgumentError, /unknown placeholder size "xl"/)
+  end
+
+  it "raises ArgumentError for size: \"xl\" on the fallback type too" do
+    expect { component_fragment(:placeholder, type: :bogus, size: "xl") }
+      .to raise_error(ArgumentError, /unknown placeholder size "xl"/)
+  end
+
+  it "does not validate size: against SIZES for the :avatar type -- .avatar-xl is real Tabler CSS" do
+    fragment = component_fragment(:placeholder, type: :avatar, size: "xl")
+
+    expect(fragment.css("div.avatar-xl")).not_to be_empty
   end
 
   it "applies size: as avatar-<size> on the avatar placeholder" do

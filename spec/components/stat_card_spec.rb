@@ -22,6 +22,9 @@ RSpec.describe "TablerUi::StatCard", type: :component do
   it_behaves_like "an element with an html hook", :stat_card, { url: "/details" },
     hook: :link_html, selector: "a.btn"
 
+  it_behaves_like "an element with an html hook", :stat_card, { icon: "shopping-cart" },
+    hook: :icon_html, selector: "span.avatar"
+
   it "appends a caller class to the root card's own class, not replacing it" do
     fragment = component_fragment(:stat_card, html: { class: "hook-extra-class" })
     classes = fragment.css("div.card").first["class"].split(/\s+/)
@@ -98,17 +101,35 @@ RSpec.describe "TablerUi::StatCard", type: :component do
 
   it "renders the named icon via the dispatcher, not the error-fallback bug icon" do
     fragment = component_fragment(:stat_card, icon: "shopping-cart")
-    svg = fragment.css(".icon-box svg").first
+    svg = fragment.css("span.avatar svg").first
 
     expect(svg).not_to be_nil
     expect(svg["class"]).to include("icon-tabler-shopping-cart")
     expect(svg["class"]).not_to include("icon-tabler-bug")
   end
 
-  it "renders no icon box when icon: is omitted" do
+  it "renders no icon badge when icon: is omitted" do
     fragment = component_fragment(:stat_card)
 
-    expect(fragment.css(".icon-box")).to be_empty
+    expect(fragment.css("span.avatar")).to be_empty
+  end
+
+  it "renders the icon badge with the avatar class, not the icon-box class that " \
+     "matched no CSS and left the badge with no size or centring (the reported bug)" do
+    fragment = component_fragment(:stat_card, icon: "shopping-cart")
+    badge = fragment.css("span.avatar").first
+
+    expect(badge).not_to be_nil
+    classes = badge["class"].split(/\s+/)
+    expect(classes).not_to include("icon-box")
+  end
+
+  it "keeps the icon badge's background colour class alongside the avatar class" do
+    fragment = component_fragment(:stat_card, icon: "shopping-cart", color: "green")
+    badge = fragment.css("span.avatar").first
+    classes = badge["class"].split(/\s+/)
+
+    expect(classes).to include("avatar", "bg-green-lt")
   end
 
   it "renders a Details link when url: is given" do

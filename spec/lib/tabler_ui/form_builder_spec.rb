@@ -96,6 +96,18 @@ class ActiveModelAttributesFakeModel
   attribute :born_on, :date
 end
 
+# A minimal collection item for #imagecheck_input: value_method and text_method
+# both default to :to_s, image_method defaults to :image_url.
+ImageOption = Struct.new(:id, :image) do
+  def to_s
+    id.to_s
+  end
+
+  def image_url
+    image
+  end
+end
+
 RSpec.describe TablerUi::FormBuilder do
   # A real ActionView::Base view context, built the same way
   # spec/support/component_helper.rb does it, since FormBuilder's input
@@ -314,6 +326,101 @@ RSpec.describe TablerUi::FormBuilder do
       texts = fragment.css("div.input-group .input-group-text").map(&:text)
 
       expect(texts).to eq(%w[$ .00])
+    end
+  end
+
+  describe "as: :imagecheck" do
+    def imagecheck_collection
+      [ImageOption.new("classic", "/images/classic.png"), ImageOption.new("modern", "/images/modern.png")]
+    end
+
+    it "puts form-imagecheck on each item's label, not the invented form-imagecheck-item class that " \
+       "matched no CSS (regression: items lost their pointer cursor and hover state)" do
+      model = FakeModel.new({ style: "modern" }, types: { style: :string })
+      form = build_form(model)
+
+      fragment = fragment_for(form.input(:style, as: :imagecheck, collection: imagecheck_collection))
+
+      labels = fragment.css("label.form-imagecheck")
+      expect(labels.size).to eq(imagecheck_collection.size)
+      expect(fragment.css(".form-imagecheck-item")).to be_empty
+    end
+
+    it "nests input, figure, image and caption the way Tabler's descendant/sibling selectors require" do
+      model = FakeModel.new({ style: "modern" }, types: { style: :string })
+      form = build_form(model)
+
+      fragment = fragment_for(
+        form.input(:style, as: :imagecheck, collection: imagecheck_collection, show_text: true)
+      )
+
+      # .form-imagecheck-input:focus/:checked ~ .form-imagecheck-figure requires the input to be a
+      # sibling of the figure (and precede it), both direct children of the item label.
+      expect(fragment.css("label.form-imagecheck > input.form-imagecheck-input")).not_to be_empty
+      expect(
+        fragment.css("label.form-imagecheck > input.form-imagecheck-input + figure.form-imagecheck-figure")
+      ).not_to be_empty
+
+      # .form-imagecheck-image rules (:first-child/:last-child) and the hover/checked rules that
+      # reach ".form-imagecheck-figure .form-imagecheck-image" require the image inside the figure.
+      expect(fragment.css("figure.form-imagecheck-figure > img.form-imagecheck-image")).not_to be_empty
+
+      # .form-imagecheck-input:checked ~ .form-imagecheck-figure .form-imagecheck-caption requires the
+      # caption to be a descendant of the figure, not a sibling of it.
+      expect(fragment.css("figure.form-imagecheck-figure > span.form-imagecheck-caption")).not_to be_empty
+      expect(fragment.css("label.form-imagecheck > span.form-imagecheck-caption")).to be_empty
+    end
+
+    it "keeps the checked-state selector working: the checked input's following figure sibling still " \
+       "contains the caption (regression: the caption used to sit outside the figure, so " \
+       ".form-imagecheck-input:checked ~ .form-imagecheck-figure .form-imagecheck-caption never matched)" do
+      model = FakeModel.new({ style: "modern" }, types: { style: :string })
+      form = build_form(model)
+
+      fragment = fragment_for(
+        form.input(:style, as: :imagecheck, collection: imagecheck_collection, show_text: true)
+      )
+
+      checked_input = fragment.css("input.form-imagecheck-input[checked]").first
+      expect(checked_input).not_to be_nil
+
+      expect(
+        fragment.css(
+          "input.form-imagecheck-input[checked] ~ figure.form-imagecheck-figure > span.form-imagecheck-caption"
+        )
+      ).not_to be_empty
+    end
+
+    it "still renders one radio_button per collection item, with the model's current value checked" do
+      model = FakeModel.new({ style: "modern" }, types: { style: :string })
+      form = build_form(model)
+
+      fragment = fragment_for(form.input(:style, as: :imagecheck, collection: imagecheck_collection))
+
+      inputs = fragment.css('input[name="model[style]"]')
+      expect(inputs.map { |i| i["value"] }).to contain_exactly("classic", "modern")
+      expect(inputs.find { |i| i["value"] == "modern" }["checked"]).to eq("checked")
+      expect(inputs.find { |i| i["value"] == "classic" }["checked"]).to be_nil
+    end
+
+    it "renders check_box inputs for multiple: true" do
+      model = FakeModel.new({ style: "modern" }, types: { style: :string })
+      form = build_form(model)
+
+      fragment = fragment_for(
+        form.input(:style, as: :imagecheck, collection: imagecheck_collection, multiple: true)
+      )
+
+      expect(fragment.css('input[type="checkbox"][name="model[style][]"]')).not_to be_empty
+    end
+
+    it "only renders the caption when show_text is truthy" do
+      model = FakeModel.new({ style: "modern" }, types: { style: :string })
+      form = build_form(model)
+
+      fragment = fragment_for(form.input(:style, as: :imagecheck, collection: imagecheck_collection))
+
+      expect(fragment.css(".form-imagecheck-caption")).to be_empty
     end
   end
 

@@ -594,13 +594,13 @@ module TablerUi
       form_group(method, options) do
         safe_join [
           (label_with_description(method, options) unless options[:label] == false),
-          tag.div(class: 'form-imagecheck') do
+          tag.div do
             collection.map do |item|
               value = item.respond_to?(value_method) ? item.send(value_method) : item
               image = item.respond_to?(image_method) ? item.send(image_method) : item
               text = item.respond_to?(text_method) ? item.send(text_method) : item.to_s
 
-              tag.label(class: 'form-imagecheck-item') do
+              tag.label(class: 'form-imagecheck') do
                 safe_join [
                   if multiple
                     check_box(method, { class: 'form-imagecheck-input', multiple: true }, value, nil)
@@ -608,10 +608,12 @@ module TablerUi
                     radio_button(method, value, class: 'form-imagecheck-input')
                   end,
                   tag.figure(class: 'form-imagecheck-figure') do
-                    tag.img(src: image, alt: text, class: 'form-imagecheck-image')
-                  end,
-                  (tag.span(text, class: 'form-imagecheck-caption') if options[:show_text])
-                ].compact
+                    safe_join [
+                      tag.img(src: image, alt: text, class: 'form-imagecheck-image'),
+                      (tag.span(text, class: 'form-imagecheck-caption') if options[:show_text])
+                    ].compact
+                  end
+                ]
               end
             end.join.html_safe
           end

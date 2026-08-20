@@ -11,7 +11,7 @@
     <% end %>
     <%= tag.div class: "d-flex align-items-center pt-2" do %>
       <% if stat_card.icon? %>
-        <%= tag.span class: "icon-box bg-#{stat_card.icon_color}-lt me-3" do %>
+        <%= tag.span(**stat_card.icon_attributes) do %>
           <%= tabler_ui.icon(icon: stat_card.icon, color: stat_card.icon_color) %>
         <% end %>
       <% end %>

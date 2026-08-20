@@ -19,10 +19,11 @@ module TablerUi
     #   <%= tabler_ui.stat_card label: "Revenue", value: "$9,600", icon: "currency-dollar", color: "green" %>
     #
     # @example Rule 5 hooks
-    #   <%= tabler_ui.stat_card label: "Sales", value: "456",
+    #   <%= tabler_ui.stat_card label: "Sales", value: "456", icon: "shopping-cart",
     #                          html: { class: "mb-3" },
     #                          body_html: { data: { testid: "sales-card" } },
     #                          value_html: { class: "fw-bold" },
+    #                          icon_html: { class: "avatar-rounded" },
     #                          link_html: { class: "ms-2" } %>
     class Component
       include TablerUi::Base
@@ -42,6 +43,8 @@ module TablerUi
       # @option options [Hash]             :html        Rule 5 HTML hook for the outer <div class="card"> (part :root)
       # @option options [Hash]             :body_html   Rule 5 HTML hook for the <div class="card-body"> (part :body)
       # @option options [Hash]             :value_html  Rule 5 HTML hook for the value element (part :value)
+      # @option options [Hash]             :icon_html   Rule 5 HTML hook for the icon badge (part :icon),
+      #   only rendered when icon: is present
       # @option options [Hash]             :link_html   Rule 5 HTML hook for the Details link (part :link),
       #   only rendered when url: is present
       def initialize(options = {})
@@ -125,6 +128,13 @@ module TablerUi
       #   with whatever the caller supplied via value_html:.
       def value_attributes
         html_for(:value, class: "h1 mb-0")
+      end
+
+      # @return [Hash] attributes for the icon badge (part :icon), merged
+      #   with whatever the caller supplied via icon_html:. Only relevant
+      #   when icon? is true.
+      def icon_attributes
+        html_for(:icon, class: "avatar bg-#{icon_color}-lt me-3")
       end
 
       # @return [Hash] attributes for the Details link (part :link), merged
