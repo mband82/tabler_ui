@@ -36,8 +36,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `link_html:` on `pagination`. `link_html:` and `filter_reset_html:` close rule 5 gaps on elements
   that previously had no hook at all.
 
+- `button` takes `confirm:` (emits `data-turbo-confirm`) and `turbo:`. With `turbo: true` a non-GET
+  action renders as `<a data-turbo-method="delete">` instead of going through `button_to`, so no
+  `<form>` is emitted — which means the button is valid inside another form. Both are inert without
+  Turbo loaded, and `turbo:` defaults to false, so existing output is unchanged.
+- HTML hooks on links that previously had none at all: `link_html:` on `breadcrumb` and `navbar`
+  (component-wide and per item), `link_html:` and `dismiss_html:` on `alert`, `close_html:` on
+  `toast`, and `dropdown_toggle_html:` plus a per-sub-item `link_html:` on `navbar`. Before this,
+  those elements accepted no caller attributes whatsoever — not `class`, not `data`, not `aria`.
+
 ### Changed
 
+- `alert`'s dismiss control now uses a translated `aria-label` (`tabler_ui.alert.close`) instead of
+  a hardcoded lowercase `"close"`, matching `modal` and `toast`. Rendered output changes.
 - `filter: { auto: }` now defaults to true only for a `:get` form on a table that has a `frame:`,
   and false otherwise. Auto-submitting without a frame meant every debounced submit was a full
   navigation, so the search field lost focus and the page jumped to the top mid-typing. An explicit
@@ -48,6 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `navbar.css` was in the engine's precompile list but missing from the stylesheet manifest, so it
   was compiled and served but never actually loaded. Its alignment fixes now apply, which makes nav
   items reach the full navbar height and puts Tabler's active indicator on the bottom edge.
+- `rating` generated its id with `SecureRandom`, so the markup changed on every render and could not
+  be cached. It now derives from `name:`; pass `id:` to disambiguate two ratings sharing a name.
 - `pagination` emitted `page-prev`/`page-next` on every prev/next item. Tabler gives those classes
   `flex: 0 0 50%` for its article-style pager, where the two are the only items, so combining them
   with page numbers overflowed the container and pushed Next outside it. They are now emitted only
