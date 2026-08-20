@@ -205,7 +205,7 @@
 <% table_demo_pagination_url = ->(page) {
   layout_path(**{ sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir], q: params[:q], status: params[:status], page: page }.compact_blank)
 } %>
-<%= render layout: "showcase/example", locals: { title: "table - frame: (Turbo Frame: sorting, filtering and paging without a page reload)", code: snippet(:layout_28) } do %>
+<%= render layout: "showcase/example", locals: { title: "table - frame: (Turbo Frame: sorting, filtering and paging without a page reload; search button: \"Search\"; filter min_chars: 3)", code: snippet(:layout_28) } do %>
   <%= tabler_ui.table columns: table_demo_columns, data: @table_demo_rows, hover: true,
                       sort: @table_demo_sort,
                       sort_url: table_demo_sort_url,
@@ -214,8 +214,9 @@
                       filter: {
                         url: layout_path,
                         hidden: { sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir] },
+                        min_chars: 3,
                         fields: [
-                          { name: "q", value: params[:q] },
+                          { name: "q", value: params[:q], button: "Search" },
                           { name: "status", type: :select, label: "Status", value: params[:status],
                             include_blank: true, options: %w[active away inactive] }
                         ],
@@ -223,6 +224,28 @@
                       } %>
   <%= tabler_ui.pagination current: @table_demo_page, total: @table_demo_total_pages,
                             url: table_demo_pagination_url, frame: "table-demo" %>
+<% end %>
+
+<% inert_min_chars_columns = [
+  { label: "Name", value: ->(row) { row[:name] } },
+  { label: "Status", value: ->(row) { row[:status].capitalize } }
+] %>
+<% inert_min_chars_rows = [
+  { name: "Ada Lovelace", status: "active" },
+  { name: "Grace Hopper", status: "active" },
+  { name: "Alan Turing", status: "away" }
+] %>
+<% inert_min_chars_q = params[:inert_q].to_s %>
+<% inert_min_chars_filtered_rows = inert_min_chars_q.present? ? inert_min_chars_rows.select { |row| row[:name].downcase.include?(inert_min_chars_q.downcase) } : inert_min_chars_rows %>
+<%= render layout: "showcase/example", locals: { title: "table - filter min_chars: 3 without frame: (no-op by design: 1 character filters immediately, no hint is shown)", code: snippet(:layout_29) } do %>
+  <%= tabler_ui.table columns: inert_min_chars_columns, data: inert_min_chars_filtered_rows, hover: true,
+                      filter: {
+                        url: layout_path,
+                        min_chars: 3,
+                        fields: [
+                          { name: "inert_q", value: inert_min_chars_q }
+                        ]
+                      } %>
 <% end %>
 
 <%= render layout: "showcase/example", locals: { title: "datagrid", code: snippet(:layout_6) } do %>

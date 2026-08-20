@@ -15,6 +15,7 @@ en:
       search_placeholder: "Search"
       apply: "Apply"
       reset: "Reset"
+      min_chars_hint: "Enter at least %{count} characters to search."
     carousel:
       label: "Carousel"
       previous: "Previous"

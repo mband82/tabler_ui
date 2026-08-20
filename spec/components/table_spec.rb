@@ -649,6 +649,160 @@ RSpec.describe "TablerUi::Table", type: :component do
         expect(fragment.css("input").first["id"]).to eq("custom-id")
       end
     end
+
+    describe "button:" do
+      it "wraps the input in .input-group with an attached button.btn[type=submit] carrying the label" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q", button: "Go" }] })
+        group = fragment.css(".input-group").first
+
+        expect(group).not_to be_nil
+
+        input = group.css("input").first
+        button = group.css("button").first
+
+        expect(input).not_to be_nil
+        expect(button["type"]).to eq("submit")
+        expect(button["class"].to_s.split(/\s+/)).to include("btn")
+        expect(button.text).to eq("Go")
+      end
+
+      it "without button:, renders no .input-group wrapper at all" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }] })
+
+        expect(fragment.css(".input-group")).to be_empty
+      end
+
+      it "raises ArgumentError for button: on a :select field" do
+        expect {
+          component_fragment(
+            :table, filter: { fields: [{ name: "status", type: :select, options: %w[active inactive], button: "Go" }] }
+          )
+        }.to raise_error(ArgumentError, /button/)
+      end
+
+      it "raises ArgumentError for button: on a :date field" do
+        expect {
+          component_fragment(:table, filter: { fields: [{ name: "from", type: :date, button: "Go" }] })
+        }.to raise_error(ArgumentError, /button/)
+      end
+
+      it "works alongside auto: true -- the button submits immediately, no separate Apply button renders" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q", button: "Go" }], auto: true })
+        form = fragment.css("form").first
+
+        expect(form["data-controller"]).to eq("tabler-ui--filter")
+        expect(fragment.css(".input-group button.btn").first.text).to eq("Go")
+        expect(fragment.css("button.btn.btn-primary")).to be_empty
+      end
+
+      it "works alongside auto: false -- the field button and a separate Apply button both render" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q", button: "Go" }], auto: false })
+
+        expect(fragment.css(".input-group button.btn").first.text).to eq("Go")
+        expect(fragment.css("button.btn.btn-primary").first.text).to eq(I18n.t("tabler_ui.table.apply"))
+      end
+
+      it_behaves_like "an element with an html hook", :table,
+        { filter: { fields: [{ name: "q", button: "Go" }] } },
+        hook: :filter_button_html, selector: "button.btn"
+    end
+
+    describe "min_chars:" do
+      it "INERT: with a frame but auto: false, output is byte-identical to the same call without min_chars:" do
+        base = { filter: { fields: [{ name: "q" }], auto: false }, frame: "tbl" }
+        with_min_chars = { filter: { fields: [{ name: "q" }], auto: false, min_chars: 3 }, frame: "tbl" }
+
+        expect(render_component(:table, **with_min_chars)).to eq(render_component(:table, **base))
+      end
+
+      it "INERT: with auto-submit but no frame:, output is byte-identical to the same call without min_chars:" do
+        base = { filter: { fields: [{ name: "q" }] } }
+        with_min_chars = { filter: { fields: [{ name: "q" }], min_chars: 3 } }
+
+        expect(render_component(:table, **with_min_chars)).to eq(render_component(:table, **base))
+      end
+
+      it "ACTIVE (auto + frame): the form carries data-tabler-ui--filter-min-chars-value" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], min_chars: 3 }, frame: "tbl")
+
+        expect(fragment.css("form").first["data-tabler-ui--filter-min-chars-value"]).to eq("3")
+      end
+
+      it "ACTIVE: the search input carries data-tabler-ui--filter-target=\"input\"" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], min_chars: 3 }, frame: "tbl")
+
+        expect(fragment.css("input.form-control").first["data-tabler-ui--filter-target"]).to eq("input")
+      end
+
+      it "ACTIVE: renders the translated hint as the input's next sibling for a plain field" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], min_chars: 3 }, frame: "tbl")
+        hint = fragment.css("input.form-control + div.invalid-feedback").first
+
+        expect(hint).not_to be_nil
+        expect(hint.text).to eq("Enter at least 3 characters to search.")
+        expect(hint["data-tabler-ui--filter-target"]).to eq("hint")
+      end
+
+      it "ACTIVE + button:: the hint is the .input-group's last child, after the button" do
+        fragment = component_fragment(
+          :table, filter: { fields: [{ name: "q", button: "Go" }], min_chars: 3 }, frame: "tbl"
+        )
+
+        expect(fragment.css(".input-group > input + button + div.invalid-feedback")).not_to be_empty
+      end
+
+      it "min_chars_hint: overrides the hint text" do
+        fragment = component_fragment(
+          :table, filter: { fields: [{ name: "q" }], min_chars: 3, min_chars_hint: "Type more, please" },
+                  frame: "tbl"
+        )
+
+        expect(fragment.css("div.invalid-feedback").first.text).to eq("Type more, please")
+      end
+
+      it "raises ArgumentError for min_chars: 0" do
+        expect {
+          component_fragment(:table, filter: { fields: [{ name: "q" }], min_chars: 0 })
+        }.to raise_error(ArgumentError, /min_chars/)
+      end
+
+      it "raises ArgumentError for a negative min_chars:" do
+        expect {
+          component_fragment(:table, filter: { fields: [{ name: "q" }], min_chars: -1 })
+        }.to raise_error(ArgumentError, /min_chars/)
+      end
+
+      it "raises ArgumentError for a non-Integer min_chars:" do
+        expect {
+          component_fragment(:table, filter: { fields: [{ name: "q" }], min_chars: "3" })
+        }.to raise_error(ArgumentError, /min_chars/)
+      end
+
+      it "raises ArgumentError when fields: has no :search/:text field for min_chars: to attach to" do
+        expect {
+          component_fragment(
+            :table, filter: { fields: [{ name: "status", type: :select, options: %w[active inactive] }], min_chars: 3 }
+          )
+        }.to raise_error(ArgumentError, /search|text/)
+      end
+
+      it_behaves_like "an element with an html hook", :table,
+        { filter: { fields: [{ name: "q" }], min_chars: 3 }, frame: "tbl" },
+        hook: :filter_hint_html, selector: "div.invalid-feedback"
+
+      it "REGRESSION: min_chars:, frame: and an auto-submitting filter: together keep the Stimulus " \
+         "data-controller/data-action, data-turbo-frame, AND the min-chars value all on the form " \
+         "(extends the frame:/filter: composition regression above)" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], min_chars: 3 }, frame: "tbl")
+        form = fragment.css("form").first
+
+        expect(form["data-controller"]).to eq("tabler-ui--filter")
+        expect(form["data-action"]).to include("input->tabler-ui--filter#submit")
+        expect(form["data-action"]).to include("change->tabler-ui--filter#submit")
+        expect(form["data-turbo-frame"]).to eq("tbl")
+        expect(form["data-tabler-ui--filter-min-chars-value"]).to eq("3")
+      end
+    end
   end
 
   describe "filter slot:" do

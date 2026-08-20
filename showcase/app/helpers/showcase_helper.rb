@@ -207,8 +207,9 @@ module ShowcaseHelper
                            filter: {
                              url: layout_path,
                              hidden: { sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir] },
+                             min_chars: 3,  # active: form auto-submits and the table has frame: above
                              fields: [
-                               { name: "q", value: params[:q] },
+                               { name: "q", value: params[:q], button: "Search" },
                                { name: "status", type: :select, label: "Status", value: params[:status],
                                  include_blank: true, options: %w[active away inactive] }
                              ],
@@ -218,6 +219,25 @@ module ShowcaseHelper
                                 url: ->(page) { layout_path(sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir],
                                                              q: params[:q], status: params[:status], page: page) },
                                 frame: "table-demo" %>
+    ERBSRC
+    layout_29: <<~'ERBSRC',
+      columns = [
+        { label: "Name", value: ->(row) { row[:name] } },
+        { label: "Status", value: ->(row) { row[:status].capitalize } }
+      ]
+
+      # No frame: on this table -- min_chars: 3 is accepted but is a silent
+      # no-op (see the table component's "Filtering" docs): typing even a
+      # single character submits and filters immediately, no hint appears.
+
+      <%= tabler_ui.table columns: columns, data: filtered_rows, hover: true,
+                           filter: {
+                             url: layout_path,
+                             min_chars: 3,
+                             fields: [
+                               { name: "inert_q", value: params[:inert_q] }
+                             ]
+                           } %>
     ERBSRC
     layout_25: <<~'ERBSRC',
       <%= tabler_ui.tabs("demo-tabs") do |tabs| %>

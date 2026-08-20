@@ -164,6 +164,12 @@ module TablerUi
       # @option options [Hash] :filter_reset_html Rule 5 HTML hook for the
       #   filter toolbar's Reset link (part :filter_reset), only rendered
       #   when `filter: { reset: }` is given.
+      # @option options [Hash] :filter_button_html Rule 5 HTML hook for a
+      #   filter field's attached search button (part :filter_button), only
+      #   rendered for a field carrying `button:` -- see "Filtering" below.
+      # @option options [Hash] :filter_hint_html Rule 5 HTML hook for the
+      #   `min_chars:` hint element (part :filter_hint), only rendered when
+      #   `filter: { min_chars: }` is given -- see "Filtering" below.
       # @option options [Hash] :frame_html Rule 5 HTML hook for the
       #   `<turbo-frame>` element (part :frame), only rendered when `frame:`
       #   is given.
@@ -227,6 +233,42 @@ module TablerUi
       # * `:submit` -- Apply button label (default: a translated "Apply"),
       #   only rendered when `auto:` is false.
       # * `:debounce` -- milliseconds, forwarded to the Stimulus controller.
+      # * `:min_chars` -- a positive Integer (anything else raises
+      #   ArgumentError). Applies to the FIRST `:search`/`:text` field in
+      #   `fields:` -- absent such a field, ArgumentError ("needs a search or
+      #   text field to apply to"). These two checks are the only ones that
+      #   raise -- `min_chars:` is otherwise always *accepted*.
+      #
+      #   Whether it actually does anything is a separate, silent question
+      #   (see #filter_min_chars_active?): it only takes effect when the
+      #   form BOTH auto-submits (`auto:` resolves to true) AND the table
+      #   has a `frame:`. Missing either, `min_chars:` is a no-op -- the
+      #   rendered output is byte-identical to the same call without it: no
+      #   `data-tabler-ui--filter-min-chars-value` on the form, no
+      #   `data-tabler-ui--filter-target="input"` on the field, no hint
+      #   element at all. This is deliberate, not a bug to "fix": without a
+      #   frame, a below-threshold submit is a full page reload, and the
+      #   server echoes back the blanked search value -- wiping the user's
+      #   typed text out of the input. The feature only behaves well when
+      #   the form's response swaps in over Turbo instead of replacing the
+      #   whole page, so outside that setup it does nothing rather than
+      #   half-working.
+      #
+      #   When active, the tabler-ui--filter Stimulus controller still
+      #   submits the form below the threshold (so the URL/query params
+      #   stay in sync) but blanks the field's own value first, so the
+      #   table falls back to unfiltered results instead of filtering on a
+      #   too-short fragment; the hint text appears and the field is marked
+      #   `is-invalid` while below the threshold. Clearing the field
+      #   entirely (0 characters) always submits normally -- a user can
+      #   never get stuck in a filtered state with no way back out. See
+      #   app/javascript/controllers/tabler_ui/filter_controller.js for the
+      #   submit-time logic; this component only emits the
+      #   `data-tabler-ui--filter-min-chars-value` and
+      #   `data-tabler-ui--filter-target="input"`/`"hint"` markup it reads.
+      # * `:min_chars_hint` -- overrides the hint text shown below the
+      #   `min_chars:` field (default: a translated "Enter at least %{count}
+      #   characters to search.").
       #
       # Field hashes: `:name` is mandatory (raises ArgumentError when
       # missing/blank). `:type` is one of :search (default), :text, :select,
@@ -244,6 +286,12 @@ module TablerUi
       # output stays cache-stable across identical requests; pass `:id`
       # explicitly when the same field `name:` appears in more than one
       # filtered table on the same page, to avoid duplicate DOM ids.
+      # `:button` -- a String label (search/text fields only; ArgumentError
+      # on :select/:date, since there is nothing sensible for the button to
+      # attach to). Wraps the input in a Bootstrap input group with a
+      # `type="submit"` button glued to its trailing edge -- works whether
+      # or not the form auto-submits; with `auto: true` it simply submits
+      # immediately rather than waiting for the debounce.
       #
       # ## Turbo Frames
       #
@@ -457,6 +505,17 @@ module TablerUi
         !@filter.nil?
       end
 
+      # @return [Boolean] whether filter: { min_chars: } actually takes
+      #   effect on this render. min_chars: is accepted and validated at
+      #   construction time regardless (see #validate_min_chars!), but only
+      #   changes the rendered output when the form both auto-submits AND
+      #   the table has a frame: -- otherwise it is a silent no-op (no
+      #   Stimulus value on the form, no target on the field, no hint
+      #   element at all). See the class docs' "Filtering" section for why.
+      def filter_min_chars_active?
+        !!(@filter && @filter[:min_chars] && @filter[:auto] && frame?)
+      end
+
       # @return [Hash] attributes for the filter toolbar's outer element
       #   (part :filter), merged with whatever the caller supplied via
       #   filter_html:.
@@ -517,7 +576,8 @@ module TablerUi
       # @param field [Hash] a normalized filter field (:type in
       #   :search/:text/:date)
       # @return [Hash] attributes for the field's `<input>`, merged with the
-      #   field's own html:.
+      #   field's own html:. Carries the tabler-ui--filter Stimulus "input"
+      #   target when this is the field filter: { min_chars: } applies to.
       def filter_field_input_attributes(field)
         base = {
           type: field[:type].to_s,
@@ -527,8 +587,45 @@ module TablerUi
           value: field[:value]
         }
         base[:placeholder] = field[:placeholder] if field[:placeholder].present?
+        base[:data] = { "tabler-ui--filter-target": "input" } if field[:min_chars_target] && filter_min_chars_active?
 
         TablerUi::HtmlOptions.merge_html(base, field[:html])
+      end
+
+      # @param field [Hash] a normalized filter field carrying button: (see
+      #   #build_filter_field)
+      # @return [Hash] attributes for the field's attached search button
+      #   (part :filter_button): class, type="submit". Merged with whatever
+      #   the caller supplied via filter_button_html:.
+      def filter_field_button_attributes(field)
+        html_for(:filter_button, class: "btn", type: "submit")
+      end
+
+      # @param field [Hash] a normalized filter field
+      # @return [Boolean] whether this field renders the filter: {
+      #   min_chars: } hint -- true only for the single field min_chars:
+      #   applies to (see #mark_min_chars_target!), AND only when
+      #   min_chars: is actually active (see #filter_min_chars_active?).
+      def filter_field_hint?(field)
+        !!field[:min_chars_target] && filter_min_chars_active?
+      end
+
+      # @return [String] the filter: { min_chars: } hint text -- the
+      #   caller's own min_chars_hint:, or a translated default
+      #   interpolating the threshold
+      def filter_min_chars_hint
+        @filter[:min_chars_hint] || I18n.t("tabler_ui.table.min_chars_hint", count: @filter[:min_chars])
+      end
+
+      # @param field [Hash] a normalized filter field (unused directly --
+      #   kept for symmetry with the other filter_field_*_attributes
+      #   methods, and so a future per-field hint can vary this)
+      # @return [Hash] attributes for the filter: { min_chars: } hint
+      #   element (part :filter_hint): class="invalid-feedback", the
+      #   tabler-ui--filter Stimulus "hint" target. Merged with whatever the
+      #   caller supplied via filter_hint_html:.
+      def filter_field_hint_attributes(field)
+        html_for(:filter_hint, class: "invalid-feedback", data: { "tabler-ui--filter-target": "hint" })
       end
 
       # @param field [Hash] a normalized filter field (:type :select)
@@ -717,6 +814,9 @@ module TablerUi
 
         method = validate_filter_method!(filter_options[:method])
         auto = filter_options.key?(:auto) ? !!filter_options[:auto] : method == :get
+        fields = (filter_options[:fields] || []).map { |field| build_filter_field(field) }
+        min_chars = validate_min_chars!(filter_options[:min_chars], fields: fields)
+        mark_min_chars_target!(fields, min_chars)
 
         {
           url: filter_options[:url],
@@ -726,8 +826,49 @@ module TablerUi
           reset: filter_options[:reset],
           submit: filter_options[:submit],
           debounce: filter_options[:debounce],
-          fields: (filter_options[:fields] || []).map { |field| build_filter_field(field) }
+          min_chars: min_chars,
+          min_chars_hint: filter_options[:min_chars_hint],
+          fields: fields
         }
+      end
+
+      # @param value [Integer, nil] the raw filter: { min_chars: } option
+      # @param fields [Array<Hash>] the already-normalized filter fields --
+      #   used to check a :search/:text field exists for min_chars: to apply to
+      # @return [Integer, nil] value, validated, or nil when not given
+      #
+      # Deliberately does NOT check auto:/frame: here -- whether min_chars:
+      # actually takes effect is a rendering-time question (see
+      # #filter_min_chars_active?), not a construction-time error. Only a
+      # structurally broken call (not a positive Integer, or no
+      # :search/:text field to attach to) raises.
+      def validate_min_chars!(value, fields:)
+        return nil if value.nil?
+
+        unless value.is_a?(Integer) && value.positive?
+          raise ArgumentError, "table filter min_chars: must be a positive Integer, got #{value.inspect}"
+        end
+
+        unless fields.any? { |field| GROWING_FILTER_FIELD_TYPES.include?(field[:type]) }
+          raise ArgumentError,
+                "table filter min_chars: needs a search or text field to apply to, but fields: has none"
+        end
+
+        value
+      end
+
+      # Marks the first :search/:text field in +fields+ as the min_chars:
+      # target (mutates it in place) -- that field is the one that gets the
+      # tabler-ui--filter Stimulus "input" target and the trailing hint
+      # element. No-op when min_chars is nil (min_chars: not given).
+      #
+      # @param fields [Array<Hash>] the already-normalized filter fields
+      # @param min_chars [Integer, nil] the validated min_chars: value
+      def mark_min_chars_target!(fields, min_chars)
+        return unless min_chars
+
+        target = fields.find { |field| GROWING_FILTER_FIELD_TYPES.include?(field[:type]) }
+        target[:min_chars_target] = true
       end
 
       def validate_filter_method!(value)
@@ -748,6 +889,7 @@ module TablerUi
           action: "input->tabler-ui--filter#submit change->tabler-ui--filter#submit"
         }
         data["tabler-ui--filter-debounce-value"] = @filter[:debounce] if @filter[:debounce]
+        data["tabler-ui--filter-min-chars-value"] = @filter[:min_chars] if filter_min_chars_active?
 
         { data: data }
       end
@@ -762,14 +904,20 @@ module TablerUi
       # @param field [Hash] a raw field hash from filter: { fields: [...] }
       # @return [Hash] the normalized field, with :type validated/defaulted,
       #   a deterministic :id for label binding (the field's own :id, when
-      #   present, wins outright), :placeholder defaulted (search only), and
-      #   (select fields only) :select_choices built from
-      #   :options/:include_blank
+      #   present, wins outright), :placeholder defaulted (search only),
+      #   :button validated (search/text only), and (select fields only)
+      #   :select_choices built from :options/:include_blank
       def build_filter_field(field)
         name = field[:name]
         raise ArgumentError, "table filter field is missing name: -- #{field.inspect}" if name.blank?
 
         type = validate_filter_field_type!(field[:type])
+        button = field[:button]
+        if button.present? && !GROWING_FILTER_FIELD_TYPES.include?(type)
+          raise ArgumentError,
+                "table filter field button: is only valid for :search/:text fields, not #{type.inspect} " \
+                "-- there is nothing sensible for the button to attach to"
+        end
 
         normalized = {
           name: name,
@@ -779,7 +927,8 @@ module TablerUi
           value: field[:value],
           placeholder: filter_field_placeholder(field, type),
           col: field[:col],
-          html: field[:html]
+          html: field[:html],
+          button: button
         }
         normalized[:select_choices] = build_select_choices(field[:options], field[:include_blank]) if type == :select
 

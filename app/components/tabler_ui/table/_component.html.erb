@@ -46,8 +46,19 @@
               <% if field[:type] == :select %>
                 <%= select_tag field[:name], options_for_select(field[:select_choices], field[:value]),
                                 **table.filter_field_select_attributes(field) %>
+              <% elsif field[:button].present? %>
+                <%= tag.div(class: "input-group") do %>
+                  <%= tag.input(**table.filter_field_input_attributes(field)) %>
+                  <%= tag.button(field[:button], **table.filter_field_button_attributes(field)) %>
+                  <% if table.filter_field_hint?(field) %>
+                    <%= tag.div(table.filter_min_chars_hint, **table.filter_field_hint_attributes(field)) %>
+                  <% end %>
+                <% end %>
               <% else %>
                 <%= tag.input(**table.filter_field_input_attributes(field)) %>
+                <% if table.filter_field_hint?(field) %>
+                  <%= tag.div(table.filter_min_chars_hint, **table.filter_field_hint_attributes(field)) %>
+                <% end %>
               <% end %>
             <% end %>
           <% end %>
