@@ -3,7 +3,13 @@
     <%= tag.thead(**table.thead_attributes) do %>
       <%= tag.tr do %>
         <% table.columns.each do |col| %>
-          <%= tag.th(col[:label], **table.cell_attributes(col)) %>
+          <% if table.sortable?(col) %>
+            <%= tag.th(**table.header_cell_attributes(col)) do %>
+              <%= tag.a(col[:label], **table.sort_attributes(col)) %>
+            <% end %>
+          <% else %>
+            <%= tag.th(col[:label], **table.cell_attributes(col)) %>
+          <% end %>
         <% end %>
       <% end %>
     <% end %>
@@ -19,10 +25,55 @@
   <% end %>
 <% end %>
 
+<% if table.filter? %>
+  <% has_filter_slot = defined?(slots) && slots.present?(:filter) %>
+  <% table.guard_filter_slot!(has_filter_slot) %>
+  <% filter_markup = capture do %>
+    <%= tag.div(**table.filter_attributes) do %>
+      <%= tag.form(**table.filter_form_attributes) do %>
+        <% table.filter_hidden_fields.each do |name, value| %>
+          <%= tag.input(type: "hidden", name: name, value: value) %>
+        <% end %>
+
+        <% if has_filter_slot %>
+          <%= slots.filter %>
+        <% else %>
+          <% table.filter_fields.each do |field| %>
+            <%= tag.div(class: table.filter_field_wrapper_class(field)) do %>
+              <% if field[:label].present? %>
+                <%= tag.label(field[:label], for: field[:id], class: "form-label") %>
+              <% end %>
+              <% if field[:type] == :select %>
+                <%= select_tag field[:name], options_for_select(field[:select_choices], field[:value]),
+                                **table.filter_field_select_attributes(field) %>
+              <% else %>
+                <%= tag.input(**table.filter_field_input_attributes(field)) %>
+              <% end %>
+            <% end %>
+          <% end %>
+        <% end %>
+
+        <% if table.filter_show_buttons? %>
+          <%= tag.div(class: "col-12 col-md-auto") do %>
+            <% if table.filter_show_submit? %>
+              <%= tag.button(table.filter_submit_label, type: "submit", class: "btn btn-primary") %>
+            <% end %>
+            <% if table.filter_show_reset? %>
+              <%= tag.a(table.filter_reset_label, href: table.filter_reset_url, class: "btn btn-link") %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
 <% if table.card? %>
   <%= tag.div(**table.root_attributes) do %>
+    <%= filter_markup if table.filter? %>
     <%= tag.div(table_markup, **table.responsive_attributes) %>
   <% end %>
 <% else %>
+  <%= filter_markup if table.filter? %>
   <%= tag.div(table_markup, **table.root_attributes) %>
 <% end %>

@@ -188,6 +188,29 @@ module ShowcaseHelper
     layout_24: <<~'ERBSRC',
       <%= tabler_ui.table columns: mobile_columns, data: mobile_rows, mobile: true %>
     ERBSRC
+    layout_28: <<~'ERBSRC',
+      columns = [
+        { label: "Name", sort: "name", value: ->(row) { row[:name] } },
+        { label: "Status", sort: "status", value: ->(row) { ... } },
+        { label: "Created", sort: "created_at", value: ->(row) { row[:created_at].strftime("%b %-d, %Y") } },
+        { label: "Actions", value: ->(row) { link_to "View", "#" } }  # not sortable
+      ]
+
+      <%= tabler_ui.table columns: columns, data: @table_demo_rows, hover: true,
+                           sort: @table_demo_sort,
+                           sort_url: ->(key, dir) { layout_path(sort: dir && key, dir: dir, q: params[:q], status: params[:status]) },
+                           sort_reset: true,
+                           filter: {
+                             url: layout_path,
+                             hidden: { sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir] },
+                             fields: [
+                               { name: "q", value: params[:q] },
+                               { name: "status", type: :select, label: "Status", value: params[:status],
+                                 include_blank: true, options: %w[active away inactive] }
+                             ],
+                             reset: layout_path(sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir])
+                           } %>
+    ERBSRC
     layout_25: <<~'ERBSRC',
       <%= tabler_ui.tabs("demo-tabs") do |tabs| %>
         <% tabs.tab("One") { "First" } %>

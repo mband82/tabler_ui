@@ -10,6 +10,11 @@ en:
       prev: "Previous"
       next: "Next"
       gap: "…"
+    table:
+      filter_label: "Filters"
+      search_placeholder: "Search"
+      apply: "Apply"
+      reset: "Reset"
     carousel:
       label: "Carousel"
       previous: "Previous"

@@ -5,7 +5,10 @@ class ShowcaseController < ActionController::Base
 
   def index; end
 
-  def layout; end
+  def layout
+    @table_demo_sort = table_demo_sort
+    @table_demo_rows = table_demo_rows
+  end
 
   def content; end
 
@@ -39,6 +42,57 @@ class ShowcaseController < ActionController::Base
   end
 
   private
+
+  # Sortable/filterable table demo data (layout page, "table - sorting and
+  # filtering" example). A plain hardcoded array, no ORM -- per the table
+  # component's class docs, sorting/filtering are entirely this controller's
+  # job; the component only renders links and a form against whatever state
+  # it's handed.
+  TABLE_DEMO_ROWS = [
+    { name: "Ada Lovelace", status: "active", created_at: Date.new(2026, 1, 12) },
+    { name: "Grace Hopper", status: "active", created_at: Date.new(2025, 11, 3) },
+    { name: "Alan Turing", status: "away", created_at: Date.new(2026, 2, 20) },
+    { name: "Katherine Johnson", status: "active", created_at: Date.new(2025, 8, 30) },
+    { name: "Margaret Hamilton", status: "inactive", created_at: Date.new(2026, 3, 5) },
+    { name: "Radia Perlman", status: "away", created_at: Date.new(2025, 12, 18) },
+    { name: "Barbara Liskov", status: "active", created_at: Date.new(2026, 4, 1) }
+  ].freeze
+
+  # Whitelist of the columns the demo actually lets a caller sort by -- a
+  # column that isn't in this list (or a junk params[:sort]) is treated as
+  # "no sort" rather than passed through to Array#sort_by/blowing up.
+  TABLE_DEMO_SORT_KEYS = %w[name status created_at].freeze
+
+  # @return [Hash] { key:, dir: } built from params, both whitelisted: key
+  # is nil unless it names an actual sortable column, dir collapses to
+  # "asc" unless it's exactly "desc". Reused for the row sort itself, the
+  # component's sort:, and every sort_url:/hidden: link built in the view,
+  # so a junk ?sort=/?dir= in the URL can never reach the table component
+  # (which raises ArgumentError on an unrecognised dir:) or Array#sort_by.
+  def table_demo_sort
+    key = params[:sort] if TABLE_DEMO_SORT_KEYS.include?(params[:sort])
+    { key: key, dir: params[:dir] == "desc" ? "desc" : "asc" }
+  end
+
+  def table_demo_rows
+    sort_table_demo_rows(filter_table_demo_rows(TABLE_DEMO_ROWS))
+  end
+
+  def filter_table_demo_rows(rows)
+    if params[:q].present?
+      term = params[:q].downcase
+      rows = rows.select { |row| row[:name].downcase.include?(term) }
+    end
+    rows = rows.select { |row| row[:status] == params[:status] } if params[:status].present?
+    rows
+  end
+
+  def sort_table_demo_rows(rows)
+    return rows unless @table_demo_sort[:key]
+
+    sorted = rows.sort_by { |row| row[@table_demo_sort[:key].to_sym] }
+    @table_demo_sort[:dir] == "desc" ? sorted.reverse : sorted
+  end
 
   # A plain ActiveModel double -- no database, per the brief.
   #
