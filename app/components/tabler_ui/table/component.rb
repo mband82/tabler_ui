@@ -62,6 +62,16 @@ module TablerUi
     #       <%= tag.input(type: "search", name: "q", value: params[:q], class: "form-control") %>
     #     <% end %>
     #   <% end %>
+    #
+    # @example Turbo Frame -- String shorthand, sorting/filtering stay in-frame
+    #   <%= tabler_ui.table columns: columns, data: rows,
+    #                       sort: { key: params[:sort], dir: params[:dir] },
+    #                       sort_url: ->(key, dir) { users_path(sort: key, dir: dir) },
+    #                       frame: "users-table" %>
+    #
+    # @example Turbo Frame -- Hash form, lazily loaded, no history entries
+    #   <%= tabler_ui.table columns: columns, data: [],
+    #                       frame: { id: "users-table", src: users_path, loading: :lazy, advance: false } %>
     class Component
       include TablerUi::Base
 
@@ -77,6 +87,9 @@ module TablerUi
 
       # Valid values for `sort: { dir: }`.
       SORT_DIRS = %i[asc desc].freeze
+
+      # Valid values for `frame: { loading: }`.
+      FRAME_LOADING_VALUES = %i[lazy eager].freeze
 
       attr_reader :columns, :data
 
@@ -123,6 +136,10 @@ module TablerUi
       # @option options [Hash] :filter Turns on the filter/search toolbar --
       #   see "Filtering" below. Absent (the default) renders nothing extra
       #   at all; the rest of the table's output is unaffected.
+      # @option options [String, Hash] :frame Opt-in Turbo Frame support --
+      #   see "Turbo Frames" below. A String is shorthand for `{ id: the
+      #   String }`. Absent (the default) renders no `<turbo-frame>` at all;
+      #   the rest of the table's output is unaffected.
       # @option options [Hash]    :html       Rule 5 HTML hook for the outermost
       #   element -- the `.card` wrapper, or the `.table-responsive` div when
       #   `card: false` (part :root)
@@ -144,6 +161,12 @@ module TablerUi
       #   `filter:` is given.
       # @option options [Hash] :filter_form_html Rule 5 HTML hook for the
       #   filter toolbar's `<form>` (part :filter_form).
+      # @option options [Hash] :filter_reset_html Rule 5 HTML hook for the
+      #   filter toolbar's Reset link (part :filter_reset), only rendered
+      #   when `filter: { reset: }` is given.
+      # @option options [Hash] :frame_html Rule 5 HTML hook for the
+      #   `<turbo-frame>` element (part :frame), only rendered when `frame:`
+      #   is given.
       #
       # ## Sorting
       #
@@ -221,6 +244,42 @@ module TablerUi
       # output stays cache-stable across identical requests; pass `:id`
       # explicitly when the same field `name:` appears in more than one
       # filtered table on the same page, to avoid duplicate DOM ids.
+      #
+      # ## Turbo Frames
+      #
+      # `frame:` wraps just the `.table-responsive` div (the `<table>` and
+      # its scroll wrapper) in a `<turbo-frame>`, so sorting and filtering
+      # navigate inside that frame instead of reloading the whole page. This
+      # gem takes no turbo-rails dependency -- the `<turbo-frame>` tag is
+      # plain markup, inert without Turbo's JS loaded in the host app, and
+      # nothing else in this component ever checks whether `frame:` was
+      # given except to decide what to render.
+      #
+      # * `:id` -- the frame's HTML id. Mandatory; a blank/missing value
+      #   raises ArgumentError, since there would be nothing for the filter
+      #   form/Reset link to target.
+      # * `:advance` -- when true (the default), the frame carries
+      #   `data-turbo-action="advance"`, so a sort/filter navigation updates
+      #   the URL bar and the back button works. false omits the attribute
+      #   entirely (Turbo's own default -- a frame navigation, but no
+      #   history entry).
+      # * `:src` -- optional; emitted as the frame's `src` attribute.
+      # * `:loading` -- optional, `:lazy` or `:eager` (string forms
+      #   accepted too; anything else raises ArgumentError). Combined with
+      #   `src:`, gives a lazily-loaded table -- the frame ships empty and
+      #   Turbo fetches `src:` once it scrolls into view.
+      #
+      # The frame deliberately wraps only the table, never the `.card` /
+      # filter toolbar around it. The filter form auto-submits on a debounce
+      # (see "Filtering" above); if the frame wrapped the card, a
+      # replacement response landing mid-typing would replace the search
+      # input itself and destroy its focus and caret position. So instead
+      # the filter form and Reset link stay outside the frame and target it
+      # explicitly via `data-turbo-frame="<id>"` (see #filter_form_attributes
+      # and #filter_reset_attributes). Sortable column headers need no such
+      # attribute -- their `<a>` links already live *inside* the frame, so
+      # Turbo intercepts and scopes the navigation to it automatically; do
+      # not add a redundant `data-turbo-frame` to #sort_attributes.
       def initialize(options = {})
         @columns = options[:columns] || []
         @data = options[:data] || []
@@ -241,6 +300,7 @@ module TablerUi
         guard_sort_url!
 
         @filter = build_filter(options[:filter])
+        @frame = build_frame(options[:frame])
 
         initialize_html_options(options)
       end
@@ -407,8 +467,9 @@ module TablerUi
       # @return [Hash] attributes for the filter toolbar's <form> (part
       #   :filter_form): method, action (when url: was given), a translated
       #   aria-label, and -- when the form is auto-submitting -- the
-      #   tabler-ui--filter Stimulus wiring. Merged with whatever the caller
-      #   supplied via filter_form_html:.
+      #   tabler-ui--filter Stimulus wiring, plus -- when frame: is given --
+      #   data-turbo-frame targeting the frame. Merged with whatever the
+      #   caller supplied via filter_form_html:.
       def filter_form_attributes
         defaults = {
           class: "row g-2 align-items-end",
@@ -416,7 +477,15 @@ module TablerUi
           aria: { label: I18n.t("tabler_ui.table.filter_label") }
         }
         defaults[:action] = @filter[:url] if @filter[:url].present?
-        defaults.merge!(filter_auto_data_attributes) if @filter[:auto]
+
+        # Both filter_auto_data_attributes and frame: contribute keys under
+        # :data. A plain Hash#merge! here would let whichever applied second
+        # replace :data outright and silently drop the other's keys --
+        # TablerUi::HtmlOptions.merge_html deep-merges :data one level
+        # instead, so the Stimulus controller/action keys and turbo_frame
+        # targeting coexist.
+        defaults = TablerUi::HtmlOptions.merge_html(defaults, filter_auto_data_attributes) if @filter[:auto]
+        defaults = TablerUi::HtmlOptions.merge_html(defaults, data: { turbo_frame: @frame[:id] }) if frame?
 
         html_for(:filter_form, defaults)
       end
@@ -503,6 +572,17 @@ module TablerUi
         @filter && @filter[:reset]
       end
 
+      # @return [Hash] attributes for the Reset link (part :filter_reset):
+      #   class, href, plus -- when frame: is given -- data-turbo-frame
+      #   targeting the frame (mirroring #filter_form_attributes). Merged
+      #   with whatever the caller supplied via filter_reset_html:.
+      def filter_reset_attributes
+        defaults = { class: "btn btn-link", href: filter_reset_url }
+        defaults[:data] = { turbo_frame: @frame[:id] } if frame?
+
+        html_for(:filter_reset, defaults)
+      end
+
       # Guards the mutual exclusion between the declarative fields: and the
       # filter slot escape hatch -- mirrors pagination's computed-vs-builder
       # guard (#guard_against_computed! there). Called from the partial once
@@ -516,6 +596,26 @@ module TablerUi
         raise ArgumentError,
               "table filter: was given both fields: and a filter slot -- pick one: fields: for " \
               "the generated form, or slots.filter { ... } to supply the form contents yourself"
+      end
+
+      # --- Turbo Frames ------------------------------------------------------
+
+      # @return [Boolean] whether frame: was given at all
+      def frame?
+        !@frame.nil?
+      end
+
+      # @return [Hash] attributes for the `<turbo-frame>` element (part
+      #   :frame): id, data-turbo-action="advance" when advance: is true
+      #   (the default), src:/loading: when given. Merged with whatever the
+      #   caller supplied via frame_html:.
+      def frame_attributes
+        defaults = { id: @frame[:id] }
+        defaults[:data] = { turbo_action: "advance" } if @frame[:advance]
+        defaults[:src] = @frame[:src] if @frame[:src].present?
+        defaults[:loading] = @frame[:loading].to_s if @frame[:loading]
+
+        html_for(:frame, defaults)
       end
 
       private
@@ -724,6 +824,38 @@ module TablerUi
 
         blank_label = include_blank == true ? "" : include_blank.to_s
         [[blank_label, ""]] + choices
+      end
+
+      # --- Turbo Frames ------------------------------------------------------
+
+      # @param frame_options [String, Hash, nil] the raw frame: option -- a
+      #   String is shorthand for `{ id: the String }`
+      # @return [Hash, nil] the normalized frame state used by #frame_attributes
+      #   and every frame-aware filter_* method, or nil when frame: was not given
+      def build_frame(frame_options)
+        return nil if frame_options.nil?
+
+        frame_options = { id: frame_options } if frame_options.is_a?(String)
+
+        id = frame_options[:id]
+        raise ArgumentError, "table frame: is missing id: -- #{frame_options.inspect}" if id.blank?
+
+        {
+          id: id,
+          advance: frame_options.fetch(:advance, true),
+          src: frame_options[:src],
+          loading: validate_frame_loading!(frame_options[:loading])
+        }
+      end
+
+      def validate_frame_loading!(value)
+        return nil if value.nil?
+
+        loading = value.to_sym
+        return loading if FRAME_LOADING_VALUES.include?(loading)
+
+        raise ArgumentError,
+              "unknown table frame loading #{value.inspect} -- valid: #{FRAME_LOADING_VALUES.join(', ')}"
       end
     end
   end

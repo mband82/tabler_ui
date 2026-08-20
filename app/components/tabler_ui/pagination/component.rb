@@ -42,6 +42,14 @@ module TablerUi
     #     <% p.item 2, url: "/2", html: ->(item) { { class: "text-danger" } if item.page == 2 } %>
     #   <% end %>
     #
+    # @example frame: -- target a Turbo Frame that a framed table lives in
+    #   <%= tabler_ui.pagination current: 3, total: 10, url: ->(n) { posts_path(page: n) },
+    #                            frame: "posts-table" %>
+    #
+    # @example link_html: -- Rule 5 hook on the `<a>`/`<span>` element itself
+    #   <%= tabler_ui.pagination current: 3, total: 10, url: ->(n) { posts_path(page: n) },
+    #                            link_html: { class: "fw-bold" } %>
+    #
     # ## Computed mode
     #
     # `current:` (1-based) and `total:` (page count) together turn on computed
@@ -91,11 +99,43 @@ module TablerUi
     # exactly one page is worse than just showing that page); two or more
     # hidden pages collapse to one `:gap` marker.
     #
+    # ## Turbo Frames
+    #
+    # `table` also has a `frame:` option (same key, different job -- do not
+    # conflate the two). There, `frame:` makes the component *emit* a
+    # `<turbo-frame id="...">` wrapping the table. Here, `frame:` makes every
+    # link this component renders *target* a frame by id, via
+    # `data-turbo-frame="<id>"` -- pagination never emits a `<turbo-frame>`
+    # of its own.
+    #
+    # That split matches how the two components are normally laid out on the
+    # page: pagination controls typically sit *below* a framed table, i.e.
+    # outside the frame they page through. If pagination also emitted a
+    # frame, the caller would have two nested/adjacent frames to keep in
+    # sync for no benefit -- one frame (owned by `table`) is enough, and
+    # pagination just needs to point at it by id:
+    #
+    #   <%= tabler_ui.table columns: columns, data: rows, frame: "users-table" %>
+    #   <%= tabler_ui.pagination current: page, total: total,
+    #                            url: ->(n) { users_path(page: n) },
+    #                            frame: "users-table" %>
+    #
+    # Only `id:` is accepted -- `advance:`/`src:`/`loading:` are
+    # frame-*emitting* concerns and belong to `table`'s `frame:` alone; if a
+    # caller passes them here they are silently ignored rather than raising,
+    # since a matching `table frame:` hash is a plausible (if unnecessary)
+    # thing to copy-paste into both calls.
+    #
+    # The gem takes no `turbo-rails` dependency -- `data-turbo-frame` is
+    # inert markup without Turbo loaded in the host app, exactly like every
+    # other `data-*` attribute this gem emits.
+    #
     # ## CSS surface
     #
     #   ul.pagination[.pagination-sm|.pagination-lg][.pagination-circle][.pagination-outline]
     #     li.page-item[.active][.disabled][.page-prev|.page-next]
     #       a.page-link (linkable items) or span.page-link (gaps, disabled prev/next)
+    #       -- both built by #link_attributes (part :link, hook link_html:)
     #
     # ## Accessibility
     #
@@ -120,7 +160,7 @@ module TablerUi
       # default -- see #item_text).
       Item = Struct.new(:kind, :page, :label, :url, :active, :disabled, :html, keyword_init: true)
 
-      attr_reader :items, :size, :circle, :outline, :window
+      attr_reader :items, :size, :circle, :outline, :window, :frame
 
       # @param options [Hash]
       # @option options [Integer] :current 1-based current page. Switches on
@@ -139,6 +179,13 @@ module TablerUi
       #   the prev control (falls back to a translated default). A per-call
       #   `label:` passed to #prev overrides this.
       # @option options [String] :next_label Same as :prev_label, for #next.
+      # @option options [String, Hash] :frame Opt-in Turbo Frame *targeting*
+      #   -- see "Turbo Frames" above. A String is shorthand for `{ id: the
+      #   String }`. `id:` is mandatory (raises ArgumentError when blank);
+      #   `advance:`/`src:`/`loading:` are ignored if given -- those belong
+      #   to `table`'s `frame:` alone. Absent (the default) renders no
+      #   `data-turbo-frame` attribute at all; the rest of the component's
+      #   output is unaffected.
       # @option options [Hash] :html Rule 5 HTML hook for the `<ul class="pagination">` (part :root)
       # @option options [Hash, #call] :item_html Rule 5 HTML hook applied to
       #   every `<li class="page-item">` (part :item) -- a plain Hash, or a
@@ -146,6 +193,10 @@ module TablerUi
       #   for parts a component itself generates in bulk. Merged underneath
       #   any per-item `html:` given to #item/#prev/#next directly -- see
       #   #item_attributes.
+      # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to
+      #   every `<a class="page-link">`/`<span class="page-link">` (part
+      #   :link) -- a plain Hash, or a callable taking the item, same
+      #   contract as :item_html. See #link_attributes.
       def initialize(options = {})
         @computed = options.key?(:total) || options.key?(:current)
         @size = validate_size!(options[:size])
@@ -154,6 +205,7 @@ module TablerUi
         @window = options.fetch(:window, 2)
         @prev_label = options[:prev_label]
         @next_label = options[:next_label]
+        @frame = build_frame(options[:frame])
         @items = []
 
         initialize_html_options(options)
@@ -274,6 +326,29 @@ module TablerUi
       #   explicitly disabled.
       def linkable?(item)
         item.url.present? && !item.disabled
+      end
+
+      # @param item [Item] the item being rendered
+      # @return [Hash] attributes for this item's `<a>` (#linkable? item) or
+      #   `<span>` (gap, disabled prev/next) element (part :link) -- one
+      #   method covers both tags since they are the same visual element,
+      #   just without an `href` (and hence without a real destination) when
+      #   there's nothing to link to. Always carries "page-link"; gains
+      #   `href:` when #linkable?(item), and `data-turbo-frame` when the
+      #   component-level `frame:` option was given (see "Turbo Frames"
+      #   above) -- but only on the real links. A gap or a disabled prev/next
+      #   renders as a `<span>` with no `href` and never navigates anywhere,
+      #   so a `data-turbo-frame` there would be inert markup repeated on
+      #   every page of every paginated list.
+      def link_attributes(item)
+        defaults = { class: "page-link" }
+
+        if linkable?(item)
+          defaults[:href] = item.url
+          defaults[:data] = { turbo_frame: frame[:id] } if frame
+        end
+
+        html_for(:link, defaults, item)
       end
 
       # @param item [Item] the item being rendered
@@ -408,6 +483,25 @@ module TablerUi
         end
 
         pages
+      end
+
+      # @param value [String, Hash, nil] the raw :frame option
+      # @return [Hash, nil] `{ id: }` normalized, or nil when :frame was not
+      #   given at all. A String is shorthand for `{ id: the String }`.
+      #   `advance:`/`src:`/`loading:` are silently ignored if present --
+      #   see the class docs' "Turbo Frames" section for why.
+      def build_frame(value)
+        return nil if value.nil?
+
+        frame = value.is_a?(String) ? { id: value } : value
+        id = frame[:id]
+
+        if id.blank?
+          raise ArgumentError,
+                "pagination frame: needs an id: to target -- got #{value.inspect}"
+        end
+
+        { id: id }
       end
 
       def validate_size!(value)

@@ -3,9 +3,9 @@
     <% pagination.items.each do |item| %>
       <%= tag.li(**pagination.item_attributes(item)) do %>
         <% if pagination.linkable?(item) %>
-          <%= link_to pagination.item_text(item), item.url, class: "page-link" %>
+          <%= tag.a(pagination.item_text(item), **pagination.link_attributes(item)) %>
         <% else %>
-          <%= tag.span(pagination.item_text(item), class: "page-link") %>
+          <%= tag.span(pagination.item_text(item), **pagination.link_attributes(item)) %>
         <% end %>
       <% end %>
     <% end %>

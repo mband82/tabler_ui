@@ -59,7 +59,7 @@
               <%= tag.button(table.filter_submit_label, type: "submit", class: "btn btn-primary") %>
             <% end %>
             <% if table.filter_show_reset? %>
-              <%= tag.a(table.filter_reset_label, href: table.filter_reset_url, class: "btn btn-link") %>
+              <%= tag.a(table.filter_reset_label, **table.filter_reset_attributes) %>
             <% end %>
           <% end %>
         <% end %>
@@ -71,9 +71,13 @@
 <% if table.card? %>
   <%= tag.div(**table.root_attributes) do %>
     <%= filter_markup if table.filter? %>
-    <%= tag.div(table_markup, **table.responsive_attributes) %>
+    <% responsive_markup = tag.div(table_markup, **table.responsive_attributes) %>
+    <%# frame: wraps only .table-responsive, never the .card -- see the %>
+    <%# component's "Turbo Frames" class docs for why %>
+    <%= table.frame? ? tag.turbo_frame(responsive_markup, **table.frame_attributes) : responsive_markup %>
   <% end %>
 <% else %>
   <%= filter_markup if table.filter? %>
-  <%= tag.div(table_markup, **table.root_attributes) %>
+  <% root_markup = tag.div(table_markup, **table.root_attributes) %>
+  <%= table.frame? ? tag.turbo_frame(root_markup, **table.frame_attributes) : root_markup %>
 <% end %>

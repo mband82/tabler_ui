@@ -17,6 +17,7 @@ module TablerUi
         tabler_ui/tabler-theme.js
         tabler_ui/datepicker.css
         tabler_ui/navbar.css
+        tabler_ui/turbo.css
         star-rating.css star-rating.js
         apexcharts.css apexcharts.js
         tabler_ui/addons/*.css

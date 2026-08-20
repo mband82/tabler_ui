@@ -24,3 +24,16 @@
   gap: 0.5rem;
   margin: 0.25rem 0.75rem 0.25rem 0;
 }
+
+/*
+ * Showcase-only busy-state recipe for the table `frame:` demo -- the gem
+ * itself deliberately ships no loading styling (see turbo.css), only a real
+ * <turbo-frame>, which Turbo marks with a `busy` attribute for the duration
+ * of an in-frame navigation. This host-side recipe dims the frame's content
+ * while `busy` is present, so a sort/filter/page request is visibly "in
+ * flight" rather than silently swapping.
+ */
+turbo-frame[busy] {
+  opacity: 0.55;
+  transition: opacity 0.15s ease-in-out;
+}

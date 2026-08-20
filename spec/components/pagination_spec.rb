@@ -366,4 +366,75 @@ RSpec.describe "TablerUi::Pagination", type: :component do
       expect(disabled_prev.css("span.page-link")).not_to be_empty
     end
   end
+
+  describe "frame:" do
+    it "DEGRADATION: with no frame:, renders no turbo-frame element and no turbo attribute anywhere" do
+      fragment = component_fragment(:pagination, current: 5, total: 10, url: ->(n) { "/p/#{n}" })
+
+      expect(fragment.css("turbo-frame")).to be_empty
+      expect(fragment.to_html).not_to match(/turbo/i)
+    end
+
+    it "String shorthand and the equivalent Hash form produce identical markup" do
+      string_form = component_fragment(:pagination, current: 5, total: 10, url: ->(n) { "/p/#{n}" }, frame: "tbl")
+      hash_form = component_fragment(:pagination, current: 5, total: 10, url: ->(n) { "/p/#{n}" },
+                                                   frame: { id: "tbl" })
+
+      expect(string_form.to_html).to eq(hash_form.to_html)
+    end
+
+    it "every linkable a.page-link carries data-turbo-frame" do
+      fragment = component_fragment(:pagination, current: 5, total: 10, url: ->(n) { "/p/#{n}" }, frame: "tbl")
+
+      links = fragment.css("a.page-link")
+      expect(links).not_to be_empty
+      links.each { |link| expect(link["data-turbo-frame"]).to eq("tbl") }
+    end
+
+    it "gap and disabled prev/next render as span.page-link and do not carry data-turbo-frame" do
+      fragment = component_fragment(:pagination, current: 1, total: 10, url: ->(n) { "/p/#{n}" }, frame: "tbl")
+
+      spans = fragment.css("span.page-link")
+      expect(spans).not_to be_empty
+      spans.each { |span| expect(span.attribute("data-turbo-frame")).to be_nil }
+    end
+
+    it "never emits a <turbo-frame> element itself -- it only targets one" do
+      fragment = component_fragment(:pagination, current: 5, total: 10, url: ->(n) { "/p/#{n}" }, frame: "tbl")
+
+      expect(fragment.css("turbo-frame")).to be_empty
+    end
+
+    it "silently ignores advance:/src:/loading: in a shared frame: hash instead of raising, so a " \
+       "table's frame: hash can be passed straight through to pagination" do
+      shared_frame = { id: "tbl", advance: false, src: "/x", loading: :lazy }
+
+      expect {
+        component_fragment(:pagination, current: 1, total: 3, url: ->(n) { "/p/#{n}" }, frame: shared_frame)
+      }.not_to raise_error
+    end
+
+    it "raises ArgumentError for a blank frame: { id: }" do
+      expect {
+        component_fragment(:pagination, current: 1, total: 3, url: ->(n) { "/p/#{n}" }, frame: { id: "" })
+      }.to raise_error(ArgumentError, /id/)
+    end
+
+    it_behaves_like "an element with an html hook", :pagination,
+                     { current: 1, total: 5, url: ->(n) { "/p/#{n}" } },
+                     hook: :link_html, selector: "a.page-link"
+
+    it "applies link_html: as a callable per item, so links can differ" do
+      fragment = component_fragment(
+        :pagination, current: 1, total: 3, url: ->(n) { "/p/#{n}" },
+                     link_html: ->(item) { item.page == 1 ? { class: "hook-a" } : { class: "hook-b" } }
+      )
+
+      page1 = fragment.css("a.page-link").find { |link| link.text.strip == "1" }
+      page2 = fragment.css("a.page-link").find { |link| link.text.strip == "2" }
+
+      expect(page1["class"].split(/\s+/)).to include("hook-a")
+      expect(page2["class"].split(/\s+/)).to include("hook-b")
+    end
+  end
 end

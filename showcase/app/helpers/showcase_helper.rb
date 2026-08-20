@@ -196,10 +196,14 @@ module ShowcaseHelper
         { label: "Actions", value: ->(row) { link_to "View", "#" } }  # not sortable
       ]
 
+      # @table_demo_rows is already filtered, sorted and paginated by the
+      # controller -- see ShowcaseController's table_demo_* private methods.
+
       <%= tabler_ui.table columns: columns, data: @table_demo_rows, hover: true,
                            sort: @table_demo_sort,
                            sort_url: ->(key, dir) { layout_path(sort: dir && key, dir: dir, q: params[:q], status: params[:status]) },
                            sort_reset: true,
+                           frame: "table-demo",
                            filter: {
                              url: layout_path,
                              hidden: { sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir] },
@@ -210,6 +214,10 @@ module ShowcaseHelper
                              ],
                              reset: layout_path(sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir])
                            } %>
+      <%= tabler_ui.pagination current: @table_demo_page, total: @table_demo_total_pages,
+                                url: ->(page) { layout_path(sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir],
+                                                             q: params[:q], status: params[:status], page: page) },
+                                frame: "table-demo" %>
     ERBSRC
     layout_25: <<~'ERBSRC',
       <%= tabler_ui.tabs("demo-tabs") do |tabs| %>

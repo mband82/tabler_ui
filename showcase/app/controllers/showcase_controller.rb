@@ -7,6 +7,8 @@ class ShowcaseController < ActionController::Base
 
   def layout
     @table_demo_sort = table_demo_sort
+    @table_demo_page = table_demo_page
+    @table_demo_total_pages = table_demo_total_pages
     @table_demo_rows = table_demo_rows
   end
 
@@ -63,6 +65,10 @@ class ShowcaseController < ActionController::Base
   # "no sort" rather than passed through to Array#sort_by/blowing up.
   TABLE_DEMO_SORT_KEYS = %w[name status created_at].freeze
 
+  # Rows per page for the frame:/pagination demo -- deliberately small (the
+  # fixture has 7 rows) so the demo actually spans multiple pages.
+  TABLE_DEMO_PER_PAGE = 3
+
   # @return [Hash] { key:, dir: } built from params, both whitelisted: key
   # is nil unless it names an actual sortable column, dir collapses to
   # "asc" unless it's exactly "desc". Reused for the row sort itself, the
@@ -74,8 +80,42 @@ class ShowcaseController < ActionController::Base
     { key: key, dir: params[:dir] == "desc" ? "desc" : "asc" }
   end
 
+  # @return [Array<Hash>] the current page's rows -- filtered, then sorted,
+  # then sliced. Paging never touches the filter/sort itself, exactly like
+  # sorting never touches the filter -- each stage only sees the previous
+  # stage's output.
   def table_demo_rows
-    sort_table_demo_rows(filter_table_demo_rows(TABLE_DEMO_ROWS))
+    rows = sort_table_demo_rows(table_demo_filtered_rows)
+    offset = (table_demo_page - 1) * TABLE_DEMO_PER_PAGE
+    rows[offset, TABLE_DEMO_PER_PAGE] || []
+  end
+
+  # @return [Array<Hash>] TABLE_DEMO_ROWS after filter_table_demo_rows --
+  # split out from #table_demo_rows so #table_demo_total_pages can count the
+  # filtered set without also sorting/slicing it.
+  def table_demo_filtered_rows
+    filter_table_demo_rows(TABLE_DEMO_ROWS)
+  end
+
+  # @return [Integer] total pages for the *filtered* row count (never less
+  # than 1, even when the filter matches nothing, so pagination's
+  # total: 0 vs total: 1 degenerate cases -- see its class docs -- never see
+  # a 0 here).
+  def table_demo_total_pages
+    [(table_demo_filtered_rows.size / TABLE_DEMO_PER_PAGE.to_f).ceil, 1].max
+  end
+
+  # @return [Integer] the current page, clamped to 1..table_demo_total_pages.
+  # `params[:page]` is never trusted directly -- a junk value ("abc") coerces
+  # to 0 via #to_i and clamps to 1; an out-of-range value ("999") clamps to
+  # the last real page -- either way this never reaches the pagination
+  # component's current: with an out-of-range value (which raises
+  # ArgumentError -- see its class docs' "Degenerate totals" section).
+  def table_demo_page
+    page = params[:page].to_i
+    return 1 if page < 1
+
+    [page, table_demo_total_pages].min
   end
 
   def filter_table_demo_rows(rows)

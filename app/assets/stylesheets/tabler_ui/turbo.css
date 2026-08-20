@@ -1,0 +1,13 @@
+/* Turbo Frame support
+ * <turbo-frame> is a custom element with no built-in styling, so browsers
+ * fall back to the default `display: inline` for unknown elements. That
+ * breaks layout wherever a turbo-frame wraps block-level content (e.g. the
+ * table component's `frame:` option) in a host app that has not loaded
+ * Turbo yet, or has not loaded it at all. This rule only fixes that
+ * baseline display; loading/spinner styling is deliberately left to the
+ * host app.
+ */
+
+turbo-frame {
+    display: block;
+}

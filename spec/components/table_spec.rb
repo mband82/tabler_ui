@@ -691,4 +691,116 @@ RSpec.describe "TablerUi::Table", type: :component do
       }
     end
   end
+
+  describe "frame:" do
+    it "DEGRADATION: with no frame:, renders no turbo-frame element and no turbo attribute anywhere" do
+      columns = [{ label: "Name", sort: :name, value: ->(row) { row[:name] } }]
+      fragment = component_fragment(
+        :table, columns: columns,
+                sort_url: ->(key, dir) { "/x?sort=#{key}&dir=#{dir}" },
+                filter: { reset: "/reset", fields: [{ name: "q" }] }
+      )
+
+      expect(fragment.css("turbo-frame")).to be_empty
+      expect(fragment.to_html).not_to match(/turbo/i)
+    end
+
+    it "String shorthand and the equivalent Hash form produce identical markup" do
+      string_form = component_fragment(:table, frame: "tbl")
+      hash_form = component_fragment(:table, frame: { id: "tbl" })
+
+      expect(string_form.to_html).to eq(hash_form.to_html)
+    end
+
+    it "wraps .table-responsive in a <turbo-frame>, with card: true" do
+      fragment = component_fragment(:table, frame: "tbl")
+
+      expect(fragment.css("turbo-frame > div.table-responsive")).not_to be_empty
+    end
+
+    it "wraps .table-responsive in a <turbo-frame>, with card: false" do
+      fragment = component_fragment(:table, frame: "tbl", card: false)
+
+      expect(fragment.css("turbo-frame > div.table-responsive")).not_to be_empty
+    end
+
+    it "advance: defaults to true, emitting data-turbo-action=advance on the frame" do
+      fragment = component_fragment(:table, frame: "tbl")
+
+      expect(fragment.css("turbo-frame").first["data-turbo-action"]).to eq("advance")
+    end
+
+    it "advance: false omits data-turbo-action entirely" do
+      fragment = component_fragment(:table, frame: { id: "tbl", advance: false })
+
+      expect(fragment.css("turbo-frame").first.attribute("data-turbo-action")).to be_nil
+    end
+
+    it "src: and loading: pass through as attributes on the frame" do
+      fragment = component_fragment(:table, frame: { id: "tbl", src: "/x", loading: :lazy })
+      frame_el = fragment.css("turbo-frame").first
+
+      expect(frame_el["src"]).to eq("/x")
+      expect(frame_el["loading"]).to eq("lazy")
+    end
+
+    it "raises ArgumentError for an unknown frame: { loading: }" do
+      expect {
+        component_fragment(:table, frame: { id: "tbl", loading: :bogus })
+      }.to raise_error(ArgumentError, /loading/)
+    end
+
+    it "raises ArgumentError for a blank frame: { id: }" do
+      expect {
+        component_fragment(:table, frame: { id: "" })
+      }.to raise_error(ArgumentError, /id/)
+    end
+
+    it "REGRESSION: filter: (auto-submitting :get) and frame: together keep the Stimulus " \
+       "data-controller/data-action AND data-turbo-frame all on the form" do
+      fragment = component_fragment(:table, filter: { fields: [{ name: "q" }] }, frame: "tbl")
+      form = fragment.css("form").first
+
+      expect(form["data-controller"]).to eq("tabler-ui--filter")
+      expect(form["data-action"]).to include("input->tabler-ui--filter#submit")
+      expect(form["data-action"]).to include("change->tabler-ui--filter#submit")
+      expect(form["data-turbo-frame"]).to eq("tbl")
+    end
+
+    it "the Reset link carries data-turbo-frame, but the sortable header link does not" do
+      columns = [{ label: "Name", sort: :name, value: ->(row) { row[:name] } }]
+      fragment = component_fragment(
+        :table, columns: columns,
+                sort_url: ->(key, dir) { "/x?sort=#{key}&dir=#{dir}" },
+                filter: { reset: "/reset", fields: [{ name: "q" }] }, frame: "tbl"
+      )
+
+      reset_link = fragment.css("a.btn.btn-link").first
+      sort_link = fragment.css("a.table-sort").first
+
+      expect(reset_link["data-turbo-frame"]).to eq("tbl")
+      expect(sort_link.attribute("data-turbo-frame")).to be_nil
+    end
+
+    # turbo-frame carries no base class of its own (frame_attributes only
+    # ever sets id/src/loading/data-turbo-action), so the shared example's
+    # "component class survives alongside the caller's" check (which asserts
+    # more than one class ends up on the element) doesn't fit -- hand-written
+    # instead, mirroring the thead_html/tbody_html specs above.
+    it "passes id/data/class through frame_html: onto the <turbo-frame>" do
+      fragment = component_fragment(:table, frame: "tbl",
+                                             frame_html: { class: "hook-extra-class", id: "hook-test-id",
+                                                            data: { testid: "hook-test-data" } })
+      element = fragment.css("turbo-frame").first
+
+      expect(element).not_to be_nil
+      expect(element["class"].to_s.split(/\s+/)).to include("hook-extra-class")
+      expect(element["id"]).to eq("hook-test-id")
+      expect(element["data-testid"]).to eq("hook-test-data")
+    end
+
+    it_behaves_like "an element with an html hook", :table,
+      { filter: { reset: "/reset", fields: [{ name: "q" }] } },
+      hook: :filter_reset_html, selector: "a.btn-link"
+  end
 end
