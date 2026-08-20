@@ -169,6 +169,90 @@ RSpec.describe "TablerUi::Breadcrumb", type: :component do
     expect(items[1]["class"].split(/\s+/)).not_to include("callable-class-first")
   end
 
+  describe "link_html:" do
+    # link_html: reaches the <a> element, and only the <a> element -- a
+    # non-linked item has no element for it to reach (see the class docs'
+    # "The <a> hook and the non-linked case"), so the shared "an element with
+    # an html hook" example can't be reused as-is here: it renders with no
+    # block at all (component_fragment(component_name, **base_options)), and
+    # breadcrumb only ever gets items via its builder block. These mirror
+    # that shared example's assertions by hand instead.
+    def linked_fragment(link_html)
+      component_fragment(:breadcrumb, link_html: link_html) do |breadcrumb|
+        breadcrumb.item("Home", url: "/")
+        breadcrumb.item("Data")
+      end
+    end
+
+    it "keeps no class by default -- the <a> renders with no class attribute at all" do
+      fragment = linked_fragment(nil)
+      link = fragment.css("a").first
+
+      expect(link).not_to be_nil
+      expect(link["class"]).to be_nil
+    end
+
+    it "appends a caller-supplied class to the <a>" do
+      fragment = linked_fragment(class: "hook-extra-class")
+      link = fragment.css("a").first
+
+      expect(link["class"].split(/\s+/)).to include("hook-extra-class")
+    end
+
+    it "passes through a caller-supplied id on the <a>" do
+      fragment = linked_fragment(id: "hook-test-id")
+
+      expect(fragment.css("a").first["id"]).to eq("hook-test-id")
+    end
+
+    it "passes through caller-supplied data attributes on the <a>" do
+      fragment = linked_fragment(data: { testid: "hook-test-data" })
+
+      expect(fragment.css("a").first["data-testid"]).to eq("hook-test-data")
+    end
+
+    it "is not applied to a non-linked item -- there is no <a> there to reach" do
+      fragment = component_fragment(:breadcrumb, link_html: { class: "hook-extra-class" }) do |breadcrumb|
+        breadcrumb.item("Home", url: "/")
+        breadcrumb.item("Data")
+      end
+
+      current = fragment.css("li.breadcrumb-item").last
+      expect(current.css("a")).to be_empty
+      expect(current.text.strip).to eq("Data")
+    end
+
+    it "applies as a callable per item, so links can differ" do
+      fragment = component_fragment(
+        :breadcrumb, link_html: ->(item) { { class: "callable-class-#{item.title.downcase}" } }
+      ) do |breadcrumb|
+        breadcrumb.item("Home", url: "/")
+        breadcrumb.item("Library", url: "/library")
+        breadcrumb.item("Data")
+      end
+
+      home = fragment.css("a").find { |a| a.text.strip == "Home" }
+      library = fragment.css("a").find { |a| a.text.strip == "Library" }
+
+      expect(home["class"].split(/\s+/)).to include("callable-class-home")
+      expect(library["class"].split(/\s+/)).to include("callable-class-library")
+    end
+  end
+
+  describe "regression: rule 5 hooks leave default output unchanged" do
+    it "renders the same markup as before the link_html: hook was added, item by item" do
+      fragment = component_fragment(:breadcrumb) do |breadcrumb|
+        breadcrumb.item("Home", url: "/")
+        breadcrumb.item("Library", url: "/library")
+        breadcrumb.item("Data")
+      end
+
+      home = fragment.css("li.breadcrumb-item")[0].css("a").first
+      expect(home["href"]).to eq("/")
+      expect(home.attribute_nodes.map(&:name)).to eq(["href"])
+    end
+  end
+
   describe "accessibility markup" do
     it "wraps the list in a nav landmark with a translated aria-label" do
       fragment = component_fragment(:breadcrumb)

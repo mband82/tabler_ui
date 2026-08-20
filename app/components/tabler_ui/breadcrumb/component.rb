@@ -31,6 +31,12 @@ module TablerUi
     #                         html: ->(item) { { class: "text-danger" } if item.title == "Library" }) %>
     #   <% end %>
     #
+    # @example link_html: -- Rule 5 hook on the `<a>` element itself (linked items only)
+    #   <%= tabler_ui.breadcrumb(link_html: { class: "fw-bold" }) do |breadcrumb| %>
+    #     <% breadcrumb.item("Home", url: "/") %>
+    #     <% breadcrumb.item("Data") %>
+    #   <% end %>
+    #
     # ## Accessibility
     #
     # The `<ol class="breadcrumb">` is wrapped in a `<nav>` landmark with a
@@ -63,6 +69,19 @@ module TablerUi
     # This keeps the rule explicit rather than magical: either you opt in to
     # marking the current item yourself, or the component makes the one
     # obvious default choice for you.
+    #
+    # ## The `<a>` hook and the non-linked case
+    #
+    # `link_html:` (part :link, see #link_attributes) reaches the `<a>`
+    # element -- and *only* the `<a>` element. An item with no `url:`, or the
+    # current item (see #current? above, which never links even with a
+    # `url:`), renders as bare text directly inside its `<li>` -- there is no
+    # element for `link_html:` to reach, so it is simply not applied in that
+    # case, exactly as documented for `table#row_html:`-style hooks that only
+    # fire when the element they target actually renders (compare `alert`'s
+    # `title_html:`, applied "only when a title renders"). Target the `<li>`
+    # instead via the item's own `html:` (part :item) when you need to reach
+    # a non-linked item.
     class Component
       include TablerUi::Base
       builder_style!
@@ -83,6 +102,11 @@ module TablerUi
       # @option options [Boolean] :muted Renders links in a muted (secondary) colour
       #   via `breadcrumb-muted`.
       # @option options [Hash] :html Rule 5 HTML hook for the `<ol class="breadcrumb">` (part :root)
+      # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to
+      #   every item's `<a>` (part :link) -- a plain Hash, or a callable
+      #   taking the item, same contract as a per-item `html:`. Only applied
+      #   when the item actually renders as a link -- see "The `<a>` hook and
+      #   the non-linked case" above. See #link_attributes.
       def initialize(options = {})
         @style = validate_style(options[:style])
         @muted = options[:muted]
@@ -144,6 +168,18 @@ module TablerUi
       #   item never links, even if it was given a url:.
       def link?(item)
         item.url.present? && !current?(item)
+      end
+
+      # @param item [Item] the item being rendered -- only called when
+      #   #link?(item) is true, so item.url is guaranteed present
+      # @return [Hash] attributes for this item's `<a>` (part :link),
+      #   merging the component-level `link_html:` hook (a Hash applied to
+      #   every linked item, or a callable taking the item -- the
+      #   `pagination#link_html:`/`table#row_html:` pattern) over the base
+      #   `href:`. Not called for non-linked items -- see "The `<a>` hook and
+      #   the non-linked case" in the class docs.
+      def link_attributes(item)
+        html_for(:link, { href: item.url }, item)
       end
 
       # @param item [Item] the item being tested

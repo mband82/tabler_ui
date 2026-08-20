@@ -3,7 +3,7 @@
     <% breadcrumb.items.each do |item| %>
       <%= tag.li(**breadcrumb.item_attributes(item)) do %>
         <% if breadcrumb.link?(item) %>
-          <%= link_to item.title, item.url %>
+          <%= tag.a(item.title, **breadcrumb.link_attributes(item)) %>
         <% else %>
           <%= item.title %>
         <% end %>

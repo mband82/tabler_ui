@@ -287,6 +287,270 @@ RSpec.describe "TablerUi::Navbar", type: :component do
     expect(menu["class"].split(/\s+/)).to include("navbar-nav-scroll")
   end
 
+  # Not routed through the shared "an element with an html hook" example --
+  # that example only supports plain kwargs base_options, and a dropdown
+  # toggle only exists once a builder block has added a #dropdown item.
+  describe "dropdown_toggle_html: -- rule 5 hook contract" do
+    def navbar_with_dropdown(dropdown_toggle_html: nil)
+      component_fragment(:navbar, dropdown_toggle_html: dropdown_toggle_html) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin") { |dd| dd.item("Users", url: "/admin/users", active: false) }
+        end
+      end
+    end
+
+    it "keeps the component's own classes on the .dropdown-toggle element" do
+      fragment = navbar_with_dropdown
+      expect(fragment.css(".dropdown-toggle")).not_to be_empty
+    end
+
+    it "appends a caller-supplied class instead of replacing the component's own" do
+      fragment = navbar_with_dropdown(dropdown_toggle_html: { class: "hook-extra-class" })
+      classes = fragment.css(".dropdown-toggle").first["class"].split(/\s+/)
+
+      expect(classes).to include("nav-link", "dropdown-toggle", "hook-extra-class")
+    end
+
+    it "passes through a caller-supplied id" do
+      fragment = navbar_with_dropdown(dropdown_toggle_html: { id: "hook-test-id" })
+      expect(fragment.css(".dropdown-toggle").first["id"]).to eq("hook-test-id")
+    end
+
+    it "passes through caller-supplied data attributes" do
+      fragment = navbar_with_dropdown(dropdown_toggle_html: { data: { testid: "hook-test-data" } })
+      expect(fragment.css(".dropdown-toggle").first["data-testid"]).to eq("hook-test-data")
+    end
+  end
+
+  describe "link_html:" do
+    it "applies component-level link_html: to a plain nav link's <a>, via a plain Hash" do
+      fragment = component_fragment(:navbar, link_html: { class: "hook-extra-class", id: "hook-test-id" }) do |navbar|
+        navbar.left do |nav|
+          nav.add "Home", url: "/", active: false
+        end
+      end
+
+      link = fragment.css("a.nav-link").first
+      expect(link["class"].split(/\s+/)).to include("nav-link", "hook-extra-class")
+      expect(link["id"]).to eq("hook-test-id")
+    end
+
+    it "applies component-level link_html: as a callable taking the item, varying per link" do
+      fragment = component_fragment(
+        :navbar, link_html: ->(item) { { class: "callable-class-#{item.title.downcase}" } }
+      ) do |navbar|
+        navbar.left do |nav|
+          nav.add "Home", url: "/", active: false
+          nav.add "About", url: "/about", active: false
+        end
+      end
+
+      links = fragment.css("a.nav-link")
+      expect(links[0]["class"].split(/\s+/)).to include("callable-class-home")
+      expect(links[0]["class"].split(/\s+/)).not_to include("callable-class-about")
+      expect(links[1]["class"].split(/\s+/)).to include("callable-class-about")
+    end
+
+    it "applies a per-item link_html: (NavigationGroup#add) to that item's <a> only, via a plain Hash" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.add "Home", url: "/", active: false, link_html: { class: "hook-extra-class", id: "hook-test-id" }
+          nav.add "About", url: "/about", active: false
+        end
+      end
+
+      links = fragment.css("a.nav-link")
+      expect(links[0]["class"].split(/\s+/)).to include("hook-extra-class")
+      expect(links[0]["id"]).to eq("hook-test-id")
+      expect(links[1]["class"].split(/\s+/)).not_to include("hook-extra-class")
+    end
+
+    it "applies a per-item link_html: via a callable taking the item, varying per link" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.add "Home", url: "/", active: false, link_html: ->(item) { { class: "callable-class-#{item.title.downcase}" } }
+          nav.add "About", url: "/about", active: false, link_html: ->(item) { { class: "callable-class-#{item.title.downcase}" } }
+        end
+      end
+
+      links = fragment.css("a.nav-link")
+      expect(links[0]["class"].split(/\s+/)).to include("callable-class-home")
+      expect(links[1]["class"].split(/\s+/)).to include("callable-class-about")
+      expect(links[1]["class"].split(/\s+/)).not_to include("callable-class-home")
+    end
+
+    it "a per-item link_html: wins over the component-level link_html: when both are given" do
+      fragment = component_fragment(:navbar, link_html: { class: "component-level" }) do |navbar|
+        navbar.left do |nav|
+          nav.add "Home", url: "/", active: false, link_html: { id: "item-level" }
+        end
+      end
+
+      link = fragment.css("a.nav-link").first
+      expect(link["class"].split(/\s+/)).to include("nav-link", "component-level")
+      expect(link["id"]).to eq("item-level")
+    end
+
+    it "reaches the <button> inside button_to's <form>, not the <a>, for a non-GET nav link" do
+      fragment = component_fragment(:navbar, link_html: { class: "hook-extra-class" }) do |navbar|
+        navbar.left do |nav|
+          nav.add "Logout", url: "/logout", method: :delete, active: false
+        end
+      end
+
+      button = fragment.css("form.button_to input[type=submit]").first
+      expect(button["class"].split(/\s+/)).to include("nav-link", "hook-extra-class")
+      expect(fragment.css("a.hook-extra-class")).to be_empty
+    end
+  end
+
+  describe "dropdown_toggle_html:" do
+    it "a caller's data: on dropdown_toggle_html: coexists with the component's own " \
+       "data-bs-toggle and data-controller, instead of replacing them" do
+      fragment = component_fragment(
+        :navbar, dropdown_toggle_html: { data: { testid: "admin-toggle" } }
+      ) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin") { |dd| dd.item("Users", url: "/admin/users", active: false) }
+        end
+      end
+
+      toggle = fragment.css(".dropdown-toggle").first
+      expect(toggle["data-bs-toggle"]).to eq("dropdown")
+      expect(toggle["data-controller"]).to eq("tabler-ui--dropdown-menu")
+      expect(toggle["data-testid"]).to eq("admin-toggle")
+    end
+
+    it "applies dropdown_toggle_html: as a callable taking the item" do
+      fragment = component_fragment(
+        :navbar, dropdown_toggle_html: ->(item) { { class: "callable-class-#{item.title.downcase}" } }
+      ) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin") { |dd| dd.item("Users", url: "/admin/users", active: false) }
+        end
+      end
+
+      toggle = fragment.css(".dropdown-toggle").first
+      expect(toggle["class"].split(/\s+/)).to include("callable-class-admin")
+    end
+  end
+
+  describe "per-sub-item link_html: (DropDownProxy#item)" do
+    it "applies to that sub-item's <a> only, via a plain Hash" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin") do |dd|
+            dd.item("Users", url: "/admin/users", active: false, link_html: { class: "hook-extra-class", id: "hook-test-id" })
+            dd.item("Settings", url: "/admin/settings", active: false)
+          end
+        end
+      end
+
+      items = fragment.css(".dropdown-item")
+      expect(items[0]["class"].split(/\s+/)).to include("hook-extra-class")
+      expect(items[0]["id"]).to eq("hook-test-id")
+      expect(items[1]["class"].split(/\s+/)).not_to include("hook-extra-class")
+    end
+
+    it "applies via a callable taking the item, varying per sub-item" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin") do |dd|
+            dd.item("Users", url: "/admin/users", active: false, link_html: ->(item) { { class: "callable-class-#{item.title.downcase}" } })
+            dd.item("Settings", url: "/admin/settings", active: false, link_html: ->(item) { { class: "callable-class-#{item.title.downcase}" } })
+          end
+        end
+      end
+
+      items = fragment.css(".dropdown-item")
+      expect(items[0]["class"].split(/\s+/)).to include("callable-class-users")
+      expect(items[1]["class"].split(/\s+/)).to include("callable-class-settings")
+      expect(items[1]["class"].split(/\s+/)).not_to include("callable-class-users")
+    end
+
+    it "reaches the <button> inside button_to's <form>, not the <a>, for a non-GET sub-item" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin") do |dd|
+            dd.item("Delete", url: "/admin/delete", method: :delete, active: false, link_html: { class: "hook-extra-class" })
+          end
+        end
+      end
+
+      button = fragment.css("form.button_to button").first
+      expect(button["class"].split(/\s+/)).to include("dropdown-item", "hook-extra-class")
+    end
+  end
+
+  describe "REGRESSION: markup with no new rule 5 hook options is unchanged from before link_html:/" \
+           "dropdown_toggle_html: were added" do
+    it "a plain nav link's <a> is byte-identical" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.add "Home", url: "/dashboard", target: "_blank", active: false
+        end
+      end
+
+      expect(fragment.css(".nav-link").first.to_html).to eq('<a class="nav-link" target="_blank" href="/dashboard">Home</a>')
+    end
+
+    it "a non-GET nav link's button_to form is byte-identical" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.add "Logout", url: "/logout", method: :delete, active: false
+        end
+      end
+
+      expect(fragment.css("form.button_to").first.to_html).to eq(
+        '<form class="button_to" method="post" action="/logout">' \
+        '<input type="hidden" name="_method" value="delete" autocomplete="off">' \
+        '<input class="nav-link" type="submit" value="Logout"></form>'
+      )
+    end
+
+    it "a dropdown sub-item link and its non-GET counterpart are byte-identical" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin", align: :end) do |dd|
+            dd.item("Settings", url: "/admin/settings", active: false, disabled: true)
+            dd.item("Delete", url: "/admin/delete", method: :delete, active: false, target: "_blank")
+          end
+        end
+      end
+
+      items = fragment.css(".dropdown-item")
+      expect(items[0].to_html).to eq(
+        "<a class=\"dropdown-item disabled\" disabled=\"disabled\" href=\"/admin/settings\">\n                Settings\n</a>"
+      )
+      expect(items[1].to_html).to eq(
+        "<button class=\"dropdown-item\" target=\"_blank\" type=\"submit\">\n                Delete\n</button>"
+      )
+    end
+
+    it "the dropdown toggle carries exactly its original six attributes, with correct values " \
+       "-- attribute *order* shifted (data: now built into the defaults hash so a caller's " \
+       "own data: can deep-merge with it, see dropdown_toggle_attributes), but nothing is " \
+       "missing, renamed, or added" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.dropdown("Admin") { |dd| dd.item("Users", url: "/admin/users", active: false) }
+        end
+      end
+
+      toggle = fragment.css(".dropdown-toggle").first
+      attrs = toggle.attributes.transform_values(&:value)
+      expect(attrs).to eq(
+        "class" => "nav-link dropdown-toggle",
+        "href" => "#",
+        "data-bs-toggle" => "dropdown",
+        "data-controller" => "tabler-ui--dropdown-menu",
+        "role" => "button",
+        "aria-expanded" => "false"
+      )
+      expect(toggle.text.strip).to eq("Admin")
+    end
+  end
+
   it "marks the current page active automatically" do
     view = tabler_ui_view_context
     view.define_singleton_method(:request) { ActionDispatch::TestRequest.create("PATH_INFO" => "/dashboard") }

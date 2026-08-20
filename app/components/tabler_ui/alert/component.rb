@@ -31,6 +31,11 @@ module TablerUi
     #   <%= tabler_ui.alert text: "Saved!", html: { class: "mb-4" },
     #                       title: "Done", title_html: { class: "text-uppercase" },
     #                       icon_html: { data: { testid: "alert-icon" } } %>
+    #
+    # @example link_html: and dismiss_html:
+    #   <%= tabler_ui.alert text: "New update available.", url: "/changelog",
+    #                       link_html: { data: { testid: "changelog-link" } },
+    #                       dismissible: true, dismiss_html: { class: "hook-extra-class" } %>
     class Component
       include TablerUi::Base
 
@@ -59,6 +64,11 @@ module TablerUi
       #   only applied when a title renders
       # @option options [Hash]    :icon_html   Rule 5 HTML hook for the icon wrapper (part :icon),
       #   only applied when an icon renders
+      # @option options [Hash]    :link_html   Rule 5 HTML hook for the `.alert-link`/`.alert-action`
+      #   action link (part :link), only applied when :url renders one. A plain Hash is enough here --
+      #   there is only one action link, no per-item variation. See #link_attributes.
+      # @option options [Hash]    :dismiss_html Rule 5 HTML hook for the `.btn-close` dismiss link
+      #   (part :dismiss), only applied when :dismissible renders one. See #dismiss_attributes.
       def initialize(options = {})
         @text = options[:text]
         @color = TablerUi::Color.validate!(options[:color], extra: TablerUi::Color::MUTED, context: "alert") || "info"
@@ -94,9 +104,18 @@ module TablerUi
       end
 
       # @return [Hash] attributes for the root .alert element (part :root), merged
-      #   with whatever the caller supplied via html:.
+      #   with whatever the caller supplied via html:. Carries
+      #   `data-controller="tabler-ui--alert"` when dismissible -- folded in
+      #   here (rather than spread separately in the ERB) since it is just
+      #   another attribute on the same element and html_for already knows
+      #   how to merge a caller's own `data:` under it without collision
+      #   (`data-controller` is a literal attribute, not nested under the
+      #   `data:` hook key).
       def root_attributes
-        html_for(:root, class: alert_classes, role: "alert")
+        defaults = { class: alert_classes, role: "alert" }
+        defaults[:"data-controller"] = "tabler-ui--alert" if dismissible
+
+        html_for(:root, defaults)
       end
 
       # @return [Hash] attributes for the .alert-title (part :title), merged with
@@ -114,6 +133,27 @@ module TablerUi
       # @return [String] CSS class for the action link, based on link_style
       def link_class
         link_style == :action ? "alert-action" : "alert-link"
+      end
+
+      # @return [Hash] attributes for the action `<a>` (part :link), merged
+      #   with whatever the caller supplied via link_html:. Only used when
+      #   url.present?.
+      def link_attributes
+        html_for(:link, class: link_class, href: url)
+      end
+
+      # @return [String] translated aria-label for the `.btn-close`
+      def close_label
+        I18n.t("tabler_ui.alert.close")
+      end
+
+      # @return [Hash] attributes for the `.btn-close` dismiss `<a>` (part
+      #   :dismiss), merged with whatever the caller supplied via
+      #   dismiss_html:. Only used when dismissible. The aria-label is
+      #   translated (tabler_ui.alert.close), matching modal's and toast's
+      #   close buttons -- see config/locales/en.yml.
+      def dismiss_attributes
+        html_for(:dismiss, class: "btn-close", "data-bs-dismiss": "alert", "aria-label": close_label)
       end
 
       private

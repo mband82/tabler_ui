@@ -193,5 +193,17 @@ RSpec.describe "TablerUi::Toast", type: :component do
 
       expect(fragment.css(".btn-close")).to be_empty
     end
+
+    it_behaves_like "an element with an html hook", :toast, {},
+      hook: :close_html, selector: ".btn-close"
+
+    it "keeps data-bs-dismiss and the translated aria-label on the .btn-close after close_html:" do
+      fragment = component_fragment(:toast, close_html: { class: "hook-extra-class" })
+      button = fragment.css(".btn-close").first
+
+      expect(button["data-bs-dismiss"]).to eq("toast")
+      expect(button["aria-label"]).to eq("Close")
+      expect(button["type"]).to eq("button")
+    end
   end
 end

@@ -1,7 +1,6 @@
-<%= tag.div(**alert.root_attributes,
-              **(alert.dismissible ? { "data-controller": "tabler-ui--alert" } : {})) do %>
+<%= tag.div(**alert.root_attributes) do %>
   <% if alert.dismissible %>
-    <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+    <%= tag.a(**alert.dismiss_attributes) %>
   <% end %>
 
   <div class="d-flex">
@@ -23,7 +22,7 @@
       <% end %>
 
       <% if alert.url.present? %>
-        <%= link_to alert.link_text, alert.url, class: alert.link_class %>
+        <%= tag.a(alert.link_text, **alert.link_attributes) %>
       <% end %>
     </div>
   </div>

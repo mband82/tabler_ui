@@ -104,6 +104,11 @@ module TablerUi
       # @option options [Hash]    :body_html      Rule 5 HTML hook for the `.toast-body` (part :body)
       # @option options [Hash]    :container_html Rule 5 HTML hook for the `.toast-container`,
       #   when `position:` is given (part :container)
+      # @option options [Hash]    :close_html     Rule 5 HTML hook for the `.btn-close`
+      #   button, when `close_button:` is true (part :close)
+      #
+      # @example close_html: -- Rule 5 hook on the close button
+      #   <%= tabler_ui.toast title: "Saved", close_html: { class: "me-1", data: { testid: "dismiss" } } %>
       def initialize(options = {})
         @title = options[:title]
         @color = TablerUi::Color.validate!(options[:color], context: "toast")
@@ -153,6 +158,16 @@ module TablerUi
       # @return [Hash] attributes for the `.toast-body` (part :body)
       def body_attributes
         html_for(:body, class: "toast-body")
+      end
+
+      # @return [Hash] attributes for the `.btn-close` button (part :close),
+      #   rendered when `close_button:` is true
+      def close_attributes
+        html_for(:close,
+                 type: "button",
+                 class: "btn-close",
+                 "data-bs-dismiss": "toast",
+                 "aria-label": close_label)
       end
 
       private

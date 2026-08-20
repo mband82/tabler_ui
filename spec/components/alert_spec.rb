@@ -19,6 +19,12 @@ RSpec.describe "TablerUi::Alert", type: :component do
   it_behaves_like "an element with an html hook", :alert, {},
     hook: :icon_html, selector: ".alert-icon-wrapper"
 
+  it_behaves_like "an element with an html hook", :alert, { url: "/changelog" },
+    hook: :link_html, selector: "a.alert-link"
+
+  it_behaves_like "an element with an html hook", :alert, { dismissible: true },
+    hook: :dismiss_html, selector: "a.btn-close"
+
   it "appends a caller class to the alert's own classes, not replacing them" do
     fragment = component_fragment(:alert, color: "danger", html: { class: "hook-extra-class" })
     classes = fragment.css(".alert").first["class"].split(/\s+/)
@@ -124,6 +130,13 @@ RSpec.describe "TablerUi::Alert", type: :component do
     expect(fragment.css("a.btn-close[data-bs-dismiss='alert']")).not_to be_empty
   end
 
+  it "renders the dismiss link with a translated aria-label by default" do
+    fragment = component_fragment(:alert, dismissible: true)
+    dismiss = fragment.css("a.btn-close").first
+
+    expect(dismiss["aria-label"]).to eq("Close")
+  end
+
   it "renders no dismiss button when dismissible: is omitted" do
     fragment = component_fragment(:alert)
 
@@ -215,5 +228,78 @@ RSpec.describe "TablerUi::Alert", type: :component do
       .to raise_error(ArgumentError, /bogus/)
     expect { component_fragment(:alert, url: "/changelog", link_style: :bogus) }
       .to raise_error(ArgumentError, /alert/)
+  end
+
+  describe "regression: rule 5 hooks leave default output unchanged" do
+    it "still renders the action link with class before href, no attributes added" do
+      fragment = component_fragment(:alert, url: "/changelog", link_text: "See what's new")
+      link = fragment.css("a.alert-link").first
+
+      expect(link.attribute_nodes.map(&:name)).to eq(%w[class href])
+      expect(link["href"]).to eq("/changelog")
+    end
+
+    it "still renders the dismiss link with the same attributes, still on an <a>" do
+      fragment = component_fragment(:alert, dismissible: true)
+      dismiss = fragment.css("a.btn-close").first
+
+      expect(dismiss).not_to be_nil
+      expect(dismiss["data-bs-dismiss"]).to eq("alert")
+      expect(dismiss["aria-label"]).to eq("Close")
+    end
+
+    it "still puts data-controller on the root element only when dismissible, after class/role" do
+      fragment = component_fragment(:alert, dismissible: true)
+      root = fragment.css(".alert").first
+
+      expect(root["data-controller"]).to eq("tabler-ui--alert")
+      expect(root.attribute_nodes.map(&:name)).to eq(%w[class role data-controller])
+    end
+
+    it "still omits data-controller entirely when not dismissible" do
+      fragment = component_fragment(:alert)
+
+      expect(fragment.css(".alert").first.attribute_nodes.map(&:name)).to eq(%w[class role])
+    end
+  end
+
+  describe "link_html:" do
+    it "applies alongside link_style: :action, on the .alert-action element" do
+      fragment = component_fragment(:alert, url: "/changelog", link_style: :action,
+                                              link_html: { class: "hook-extra-class" })
+      link = fragment.css("a.alert-action").first
+
+      expect(link["class"].split(/\s+/)).to include("alert-action", "hook-extra-class")
+    end
+
+    it "is not applied when url: is absent -- there is no action link to reach" do
+      fragment = component_fragment(:alert, link_html: { class: "hook-extra-class" })
+
+      expect(fragment.to_html).not_to include("hook-extra-class")
+    end
+  end
+
+  describe "dismiss_html:" do
+    it "is not applied when dismissible: is absent -- there is no dismiss link to reach" do
+      fragment = component_fragment(:alert, dismiss_html: { class: "hook-extra-class" })
+
+      expect(fragment.to_html).not_to include("hook-extra-class")
+    end
+
+    it "merges onto the dismiss link without dropping data-bs-dismiss/aria-label" do
+      fragment = component_fragment(:alert, dismissible: true, dismiss_html: { class: "hook-extra-class" })
+      dismiss = fragment.css("a.btn-close").first
+
+      expect(dismiss["class"].split(/\s+/)).to include("btn-close", "hook-extra-class")
+      expect(dismiss["data-bs-dismiss"]).to eq("alert")
+      expect(dismiss["aria-label"]).to eq("Close")
+    end
+
+    it "lets a caller override the default aria-label, same as any other non-class attribute" do
+      fragment = component_fragment(:alert, dismissible: true, dismiss_html: { "aria-label": "Dismiss" })
+      dismiss = fragment.css("a.btn-close").first
+
+      expect(dismiss["aria-label"]).to eq("Dismiss")
+    end
   end
 end

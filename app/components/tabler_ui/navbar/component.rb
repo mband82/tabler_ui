@@ -39,6 +39,17 @@ module TablerUi
     #       <% nav.add "Home", url: root_path, html: { class: "text-danger" } %>
     #     <% end %>
     #   <% end %>
+    #
+    # @example Rule 5 hooks -- the nav link and dropdown toggle `<a>`s themselves
+    #   <%= tabler_ui.navbar(link_html: { data: { testid: "nav-link" } },
+    #                        dropdown_toggle_html: { class: "fw-bold" }) do |navbar| %>
+    #     <% navbar.left do |nav| %>
+    #       <% nav.add "Home", url: root_path, link_html: { class: "text-danger" } %>
+    #       <% nav.dropdown "Admin" do |dd| %>
+    #         <% dd.item "Users", url: admin_users_path, link_html: { class: "fw-bold" } %>
+    #       <% end %>
+    #     <% end %>
+    #   <% end %>
     class Component
       include TablerUi::Base
       builder_style!
@@ -66,6 +77,19 @@ module TablerUi
       # @option options [Hash] :brand_html   Rule 5 HTML hook for `.navbar-brand` (part :brand)
       # @option options [Hash] :toggler_html Rule 5 HTML hook for the mobile toggler button (part :toggler)
       # @option options [Hash] :menu_html    Rule 5 HTML hook for the collapsible menu container (part :menu)
+      # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to every plain nav
+      #   link's `<a>` (or the `<button>` inside `button_to`'s `<form>` for a non-GET
+      #   `method:`) -- part :link. A plain Hash, or a callable taking the item, following
+      #   `pagination#link_html:`'s precedent. Merged underneath this item's own `link_html:`
+      #   given to `NavigationGroup#add` -- see #link_attributes. Does *not* reach the
+      #   dropdown toggle (`dropdown_toggle_html:`) or dropdown sub-item links (their own
+      #   per-item `link_html:` on `DropDownProxy#item`).
+      # @option options [Hash, #call] :dropdown_toggle_html Rule 5 HTML hook applied to every
+      #   dropdown's toggle `<a class="dropdown-toggle">` (part :dropdown_toggle) -- a plain
+      #   Hash, or a callable taking the item. The toggle's own `data-bs-toggle="dropdown"`
+      #   and `data-controller="tabler-ui--dropdown-menu"` are baked into the defaults this
+      #   merges *under*, so a caller's own `data:` deep-merges with them instead of
+      #   replacing them -- see #dropdown_toggle_attributes.
       def initialize(options = {})
         @brand = options[:brand]
         @brand_autodark = options.fetch(:brand_autodark, true)
@@ -133,7 +157,80 @@ module TablerUi
         html_for(:item, { class: item_classes(item, active) }, item)
       end
 
+      # @param item [NavigationGroup::Item] a :link item
+      # @param active [Boolean] whether this item currently points at the
+      #   requested page -- see #item_attributes
+      # @return [Hash] attributes for this item's nav link (part :link) --
+      #   the `<a>` rendered via `link_to`, or the html_options Hash handed
+      #   to `button_to` for a non-GET `method:` (merged with `method:`
+      #   itself by the caller, following `button#root_attributes`'
+      #   precedent). Merges, in order: this method's own defaults
+      #   (class, target), the component-level `link_html:` option (a Hash,
+      #   or a callable taking the item), then this item's own `link_html:`
+      #   (set via NavigationGroup#add) -- same three-layer precedent as
+      #   Pagination#item_attributes.
+      def link_attributes(item, active: false)
+        defaults = { class: link_classes(active), target: item.target }
+
+        TablerUi::HtmlOptions.merge_html(html_for(:link, defaults, item), resolve(item.link_html, item))
+      end
+
+      # @param item [NavigationGroup::Item] a :dropdown item
+      # @return [Hash] attributes for the dropdown toggle `<a>` (part
+      #   :dropdown_toggle). `data-bs-toggle`/`data-controller` are baked
+      #   into the defaults (not spread separately in the ERB) so a caller's
+      #   own `data:` on `dropdown_toggle_html:` deep-merges with them via
+      #   `merge_html` instead of clobbering them.
+      def dropdown_toggle_attributes(item)
+        defaults = {
+          class: "nav-link dropdown-toggle",
+          href: "#",
+          data: { "bs-toggle": "dropdown", controller: "tabler-ui--dropdown-menu" },
+          role: "button",
+          "aria-expanded": "false"
+        }
+
+        html_for(:dropdown_toggle, defaults, item)
+      end
+
+      # @param item [NavigationGroup::DropDownProxy::Item] a dropdown
+      #   sub-item (type :item)
+      # @param active [Boolean] whether this item currently points at the
+      #   requested page -- see #item_attributes
+      # @return [Hash] attributes for this sub-item's link -- the `<a>`
+      #   rendered via `link_to`, or the html_options Hash handed to
+      #   `button_to` for a non-GET `method:`. There is no component-level
+      #   hook for this part (only #link_attributes' `link_html:` reaches
+      #   the *top-level* nav link) -- just this sub-item's own `link_html:`
+      #   (set via `DropDownProxy#item`), merged over the defaults.
+      def dropdown_item_link_attributes(item, active: false)
+        defaults = { class: dropdown_item_classes(item, active), target: item.target, disabled: item.disabled }
+
+        TablerUi::HtmlOptions.merge_html(defaults, resolve(item.link_html, item))
+      end
+
       private
+
+      # @param hook [Hash, #call, nil] a raw rule-5 hook value
+      # @param item [NavigationGroup::Item, NavigationGroup::DropDownProxy::Item]
+      #   passed to +hook+ when it's callable
+      # @return [Hash] the hook resolved to a plain Hash, ready for merge_html
+      def resolve(hook, item)
+        hook.respond_to?(:call) ? hook.call(item) : hook
+      end
+
+      def link_classes(active)
+        classes = ["nav-link"]
+        classes << "active" if active
+        classes.join(" ")
+      end
+
+      def dropdown_item_classes(item, active)
+        classes = ["dropdown-item"]
+        classes << "active" if active
+        classes << "disabled" if item.disabled
+        classes.join(" ")
+      end
 
       def root_classes
         classes = ["navbar", "navbar-expand-#{expand}", "d-print-none"]
@@ -163,8 +260,10 @@ module TablerUi
 
         # :html holds the caller's *raw* per-item hook (Hash or Proc taking
         # the item), not resolved attributes -- see Component#item_attributes.
+        # :link_html is the same kind of raw hook, for the nav link itself
+        # rather than its `<li>` -- see Component#link_attributes.
         Item = Struct.new(:type, :title, :url, :target, :method, :action, :subject,
-                           :active, :submenu, :align, :toggle_options, :html, keyword_init: true)
+                           :active, :submenu, :align, :toggle_options, :html, :link_html, keyword_init: true)
 
         def initialize
           @items = []
@@ -182,6 +281,10 @@ module TablerUi
         # @option options [Boolean] :active Explicit active override. When nil (default), the
         #   template auto-detects via `current_page?(url)`.
         # @option options [Hash, #call] :html Rule 5 HTML hook for this item's `li.nav-item` (part :item)
+        # @option options [Hash, #call] :link_html Rule 5 HTML hook for this item's nav link
+        #   itself (part :link) -- the `<a>`, or the `<button>` inside `button_to`'s `<form>`
+        #   for a non-GET `method:`. Merged on top of the component-level `link_html:` option
+        #   -- see Component#link_attributes.
         def add(title, options = {})
           builder_argument!(title, :title, builder: :add)
 
@@ -194,7 +297,8 @@ module TablerUi
             action: options[:action],
             subject: options[:subject],
             active: options[:active],
-            html: options[:html]
+            html: options[:html],
+            link_html: options[:link_html]
           )
 
           ""
@@ -276,8 +380,11 @@ module TablerUi
         class DropDownProxy
           include TablerUi::Base
 
+          # :link_html holds the caller's *raw* per-item hook (Hash or Proc
+          # taking the item), not resolved attributes -- see
+          # Component#dropdown_item_link_attributes.
           Item = Struct.new(:type, :title, :url, :target, :method, :action, :subject,
-                             :icon, :disabled, :active, keyword_init: true)
+                             :icon, :disabled, :active, :link_html, keyword_init: true)
 
           attr_reader :items
 
@@ -298,6 +405,10 @@ module TablerUi
           # @option options [Boolean] :disabled
           # @option options [Boolean] :active Explicit active override. When nil (default), the
           #   template auto-detects via `current_page?(url)`.
+          # @option options [Hash, #call] :link_html Rule 5 HTML hook for this sub-item's link
+          #   itself (not routed through a component-level option -- see
+          #   Component#dropdown_item_link_attributes) -- the `<a>`, or the `<button>` inside
+          #   `button_to`'s `<form>` for a non-GET `method:`.
           def item(title, options = {})
             builder_argument!(title, :title, builder: :item)
 
@@ -311,7 +422,8 @@ module TablerUi
               subject: options[:subject],
               icon: options[:icon],
               disabled: options[:disabled],
-              active: options[:active]
+              active: options[:active],
+              link_html: options[:link_html]
             )
 
             ""

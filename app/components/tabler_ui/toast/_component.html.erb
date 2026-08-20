@@ -11,7 +11,7 @@
           <%= tag.strong(toast.title, class: "me-auto") %>
         <% end %>
         <% if toast.close_button %>
-          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="<%= toast.close_label %>"></button>
+          <%= tag.button(**toast.close_attributes) %>
         <% end %>
       <% end %>
     <% end %>

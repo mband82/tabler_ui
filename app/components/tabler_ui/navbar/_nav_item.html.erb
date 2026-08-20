@@ -20,10 +20,9 @@
   <% if visible_items.any? { |sub| sub.type != :divider } %>
     <% dropdown_active = visible_items.any? { |sub| sub.type == :item && item_active.call(sub) } %>
     <%= tag.li(**navbar.item_attributes(item, active: dropdown_active)) do %>
-      <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-controller="tabler-ui--dropdown-menu"
-         role="button" aria-expanded="false">
+      <%= tag.a(**navbar.dropdown_toggle_attributes(item)) do %>
         <%= item.title %>
-      </a>
+      <% end %>
       <div class="dropdown-menu<%= ' dropdown-menu-end' if item.align == :end %>">
         <% visible_items.each do |sub| %>
           <% case sub.type %>
@@ -33,7 +32,6 @@
             <h6 class="dropdown-header"><%= sub.title %></h6>
           <% when :item %>
             <% sub_active = item_active.call(sub) %>
-            <% item_class = class_names("dropdown-item", "active" => sub_active, "disabled" => sub.disabled) %>
             <%
               item_content = capture do
                 concat tabler_ui.icon(icon: sub.icon, html: { class: "me-1" }) if sub.icon.present?
@@ -41,11 +39,11 @@
               end
             %>
             <% if sub.method.present? && sub.method != :get %>
-              <%= button_to sub.url, method: sub.method, class: item_class, disabled: sub.disabled, target: sub.target do %>
+              <%= button_to sub.url, navbar.dropdown_item_link_attributes(sub, active: sub_active).merge(method: sub.method) do %>
                 <%= item_content %>
               <% end %>
             <% else %>
-              <%= link_to sub.url, class: item_class, disabled: sub.disabled, target: sub.target do %>
+              <%= link_to sub.url, navbar.dropdown_item_link_attributes(sub, active: sub_active) do %>
                 <%= item_content %>
               <% end %>
             <% end %>
@@ -57,12 +55,11 @@
 <% when :link %>
   <% if authorized.call(item) %>
     <% active = item_active.call(item) %>
-    <% link_class = class_names("nav-link", "active" => active) %>
     <%= tag.li(**navbar.item_attributes(item, active: active)) do %>
       <% if item.method.present? && item.method != :get %>
-        <%= button_to item.title, item.url, method: item.method, class: link_class, target: item.target %>
+        <%= button_to item.title, item.url, navbar.link_attributes(item, active: active).merge(method: item.method) %>
       <% else %>
-        <%= link_to item.title, item.url, class: link_class, target: item.target %>
+        <%= link_to item.title, item.url, navbar.link_attributes(item, active: active) %>
       <% end %>
     <% end %>
   <% end %>
