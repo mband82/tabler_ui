@@ -1,6 +1,6 @@
 <% icon_html = tabler_ui.icon(icon: button.icon).html_safe if button.has_icon? %>
 
-<% if button.get? %>
+<% if button.link? %>
   <%= link_to button.url, **button.root_attributes do %>
     <%= icon_html if icon_html %>
     <%= button.text %>

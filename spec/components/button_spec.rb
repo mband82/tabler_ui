@@ -193,4 +193,57 @@ RSpec.describe "TablerUi::Button", type: :component do
     expect(element["data-turbo"]).to eq("false")
     expect(element["data-testid"]).to eq("save-button")
   end
+
+  it "renders data-turbo-confirm on the <a> for method: :get" do
+    fragment = component_fragment(:button, text: "Save", url: "/save", confirm: "Are you sure?")
+    element = fragment.css("a.btn").first
+
+    expect(element["data-turbo-confirm"]).to eq("Are you sure?")
+  end
+
+  it "renders data-turbo-confirm on the button_to <button> for a non-GET method" do
+    fragment = component_fragment(:button, text: "Delete", url: "/path", method: :delete,
+                                             confirm: "Are you sure?")
+    element = fragment.css("form button.btn").first
+
+    expect(element["data-turbo-confirm"]).to eq("Are you sure?")
+  end
+
+  it "REGRESSION: confirm: coexists with a caller's data: and the html: hook's data: rather than clobbering them" do
+    fragment = component_fragment(:button, text: "Save", url: "/save", confirm: "Are you sure?",
+                                             data: { turbo: "false" },
+                                             html: { data: { testid: "save-button" } })
+    element = fragment.css("a.btn").first
+
+    expect(element["data-turbo-confirm"]).to eq("Are you sure?")
+    expect(element["data-turbo"]).to eq("false")
+    expect(element["data-testid"]).to eq("save-button")
+  end
+
+  it "turbo: true with a non-GET method renders an <a> with data-turbo-method and no <form>" do
+    fragment = component_fragment(:button, text: "Delete", url: "/path", method: :delete, turbo: true)
+    element = fragment.css("a.btn").first
+
+    expect(fragment.css("form")).to be_empty
+    expect(element).not_to be_nil
+    expect(element["href"]).to eq("/path")
+    expect(element["data-turbo-method"]).to eq("delete")
+  end
+
+  it "turbo: true with method: :get is a no-op -- still a plain <a> with no data-turbo-method" do
+    fragment = component_fragment(:button, text: "Save", url: "/save", turbo: true)
+    element = fragment.css("a.btn").first
+
+    expect(fragment.css("form")).to be_empty
+    expect(element["href"]).to eq("/save")
+    expect(element["data-turbo-method"]).to be_nil
+  end
+
+  it "REGRESSION: turbo: false (the default) with a non-GET method still emits the button_to form" do
+    fragment = component_fragment(:button, text: "Delete", url: "/path", method: :delete)
+
+    expect(fragment.css("form")).not_to be_empty
+    expect(fragment.css("form button.btn")).not_to be_empty
+    expect(fragment.css("a.btn")).to be_empty
+  end
 end

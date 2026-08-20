@@ -4,7 +4,9 @@ module TablerUi
   module Button
     # Button component for Tabler UI. Renders a Bootstrap/Tabler styled
     # `<a>` (via `link_to`) when `method:` is the default `:get`, or a
-    # `<form>`/`<button>` (via `button_to`) for any other HTTP method.
+    # `<form>`/`<button>` (via `button_to`) for any other HTTP method --
+    # unless `turbo: true` is given, in which case a non-GET method also
+    # renders as a plain `<a>` (see #turbo_link? and "Turbo" below).
     #
     # @example Basic usage
     #   <%= tabler_ui.button text: "Save", color: "primary", url: "/save" %>
@@ -20,12 +22,47 @@ module TablerUi
     #
     # @example Rule 5 hook on the root <a>/<button>
     #   <%= tabler_ui.button text: "Save", html: { class: "me-2", data: { testid: "save-button" } } %>
+    #
+    # @example Confirmation dialog
+    #   <%= tabler_ui.button text: "Delete", color: "danger", url: "/widgets/1", method: :delete,
+    #                        confirm: "Are you sure?" %>
+    #
+    # @example Non-GET action as a Turbo link, no nested <form>
+    #   <%= tabler_ui.button text: "Delete", color: "danger", url: "/widgets/1", method: :delete,
+    #                        turbo: true %>
+    #
+    # ## Turbo
+    #
+    # As with `table`/`pagination`'s `frame:`, the gem takes no `turbo-rails`
+    # dependency here -- it only emits Turbo-flavoured markup. Both `confirm:`
+    # and `turbo:` are inert without Turbo loaded in the host app.
+    #
+    # `confirm:` renders `data-turbo-confirm="<string>"` on whichever element
+    # this component renders (the `<a>` in the `method: :get` branch, or the
+    # `<button>` inside the `button_to`-generated form otherwise). This is
+    # read by Turbo, NOT by the old rails-ujs `data-confirm` -- the gem never
+    # emits `data-confirm`. Without Turbo loaded, `data-turbo-confirm` does
+    # nothing at all; the action fires unconfirmed.
+    #
+    # `turbo:` (default `false`) only changes anything when the method is
+    # non-GET. `button_to` wraps its `<button>` in a `<form>` -- a `<form>`
+    # nested inside another `<form>` (an edit form with a delete button, for
+    # example) is invalid HTML that browsers silently mangle. `turbo: true`
+    # sidesteps that: instead of a form, it renders a plain
+    # `<a href="...">` carrying `data-turbo-method="<verb>"`, exactly like
+    # Turbo's own idiomatic non-GET link. No `<form>` is emitted. This needs
+    # Turbo loaded to actually perform the non-GET request -- without it, the
+    # link just GETs the URL like any other `<a href>`.
+    #
+    # `turbo: true` combined with `method: :get` (the default) is a no-op --
+    # the method is already rendered as a plain `<a>`, so there is nothing
+    # non-GET to convert. It does not raise.
     class Component
       include TablerUi::Base
 
       attr_reader :text, :color, :outline, :size, :shape, :icon_only, :url,
                   :http_method, :target, :title, :disabled, :icon, :action,
-                  :loading, :floating, :animate_icon, :ghost
+                  :loading, :floating, :animate_icon, :ghost, :confirm, :turbo
 
       ANIMATE_ICON_MODIFIERS = %w[rotate shake tada pulse move-start].freeze
 
@@ -60,6 +97,12 @@ module TablerUi
       # @option options [Boolean] :disabled    Rendered as disabled="..."
       # @option options [Hash]    :data        Data attributes, merged with the html: hook's :data
       # @option options [String]  :icon        Tabler icon name, rendered before the text
+      # @option options [String]  :confirm     Confirmation prompt -- renders as
+      #   `data-turbo-confirm="..."`, merged with :data/html:'s :data rather than
+      #   clobbering them. See "Turbo" above for what this needs to actually work.
+      # @option options [Boolean] :turbo       Render a non-GET action as a Turbo link
+      #   (`<a data-turbo-method="...">`) instead of `button_to`'s `<form>`. No-op when
+      #   method: is :get (default: false). See "Turbo" above.
       # @option options [Hash]    :html        Rule 5 HTML hook for the root <a>/<button> (part :root)
       def initialize(options = {})
         @action = options[:action]
@@ -82,6 +125,8 @@ module TablerUi
         @disabled = options[:disabled]
         @data = options[:data]
         @icon = options[:icon]
+        @confirm = options[:confirm]
+        @turbo = options[:turbo] || false
 
         raise ArgumentError, "ghost: true cannot be combined with outline: true -- " \
                               "Tabler defines no outline+ghost combination" if @ghost && @outline
@@ -89,9 +134,24 @@ module TablerUi
         initialize_html_options(options)
       end
 
-      # @return [Boolean] whether the button renders via `link_to` (true) or `button_to` (false)
+      # @return [Boolean] whether the button renders via `link_to` (true) or `button_to`/#turbo_link? (false)
       def get?
         @http_method.to_s == "get"
+      end
+
+      # @return [Boolean] whether a non-GET action renders as a Turbo link
+      #   (`<a data-turbo-method="...">`, no <form>) rather than `button_to`.
+      #   Always false for method: :get -- see the class docs' "Turbo" section.
+      def turbo_link?
+        @turbo && !get?
+      end
+
+      # @return [Boolean] whether the root element renders as `<a>` -- either
+      #   the plain method: :get case, or a non-GET action rendered via
+      #   #turbo_link?. The ERB dispatches on this rather than repeating
+      #   `get? || turbo_link?` itself.
+      def link?
+        get? || turbo_link?
       end
 
       # @return [Boolean] whether the button has an icon to render before its text
@@ -101,9 +161,10 @@ module TablerUi
 
       # @return [Hash] attributes for the root <a>/<button> (part :root),
       #   merged with whatever the caller supplied via html:. Does not
-      #   include :method -- callers rendering via `button_to` add that
-      #   themselves, since it would otherwise leak onto `link_to` as a
-      #   literal method="..." HTML attribute.
+      #   include a literal :method key -- callers rendering via `button_to`
+      #   add that themselves, since it would otherwise leak onto `link_to`
+      #   as a literal method="..." HTML attribute. #turbo_link?'s verb is
+      #   carried instead as data-turbo-method, inside :data -- see #root_data.
       def root_attributes
         defaults = {
           class: button_classes,
@@ -111,12 +172,26 @@ module TablerUi
           title: @title,
           disabled: @disabled
         }
-        defaults[:data] = @data if @data.present?
+        defaults[:data] = root_data if root_data.present?
 
         html_for(:root, defaults)
       end
 
       private
+
+      # @return [Hash] the :data hash for #root_attributes -- the caller's
+      #   own :data option, plus data-turbo-confirm (when :confirm was
+      #   given) and data-turbo-method (when #turbo_link?). Built here,
+      #   rather than merged in a second step on top of #root_attributes'
+      #   result, so TablerUi::HtmlOptions.merge_html only ever sees one
+      #   :data hash on our side and merges it against the html: hook's
+      #   :data exactly once -- see rule 5.
+      def root_data
+        data = @data ? @data.dup : {}
+        data[:turbo_confirm] = @confirm if @confirm.present?
+        data[:turbo_method] = @http_method if turbo_link?
+        data
+      end
 
       def default_text
         @action ? nil : "Button"
