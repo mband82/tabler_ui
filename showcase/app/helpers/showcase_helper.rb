@@ -214,11 +214,13 @@ module ShowcaseHelper
                                  include_blank: true, options: %w[active away inactive] }
                              ],
                              reset: layout_path(sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir])
-                           } %>
-      <%= tabler_ui.pagination current: @table_demo_page, total: @table_demo_total_pages,
-                                url: ->(page) { layout_path(sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir],
-                                                             q: params[:q], status: params[:status], page: page) },
-                                frame: "table-demo" %>
+                           } do |slots| %>
+        <% slots.footer do %>
+          <%= tabler_ui.pagination current: @table_demo_page, total: @table_demo_total_pages,
+                                   url: ->(page) { layout_path(sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir],
+                                                                q: params[:q], status: params[:status], page: page) } %>
+        <% end %>
+      <% end %>
     ERBSRC
     layout_29: <<~'ERBSRC',
       columns = [
@@ -226,16 +228,19 @@ module ShowcaseHelper
         { label: "Status", value: ->(row) { row[:status].capitalize } }
       ]
 
-      # No frame: on this table -- min_chars: 3 is accepted but is a silent
-      # no-op (see the table component's "Filtering" docs): typing even a
-      # single character submits and filters immediately, no hint appears.
+      # No frame: on this table -- min_chars: 3 is accepted but needs BOTH
+      # auto-submit and frame: to take effect (see the table component's
+      # "Filtering" docs), so it is a silent no-op here. auto: false is
+      # spelled out explicitly rather than relied on as the default, and a
+      # manual Search button (button:) replaces auto-submit.
 
       <%= tabler_ui.table columns: columns, data: filtered_rows, hover: true,
                            filter: {
                              url: layout_path,
+                             auto: false,
                              min_chars: 3,
                              fields: [
-                               { name: "inert_q", value: params[:inert_q] }
+                               { name: "inert_q", value: params[:inert_q], button: "Search" }
                              ]
                            } %>
     ERBSRC

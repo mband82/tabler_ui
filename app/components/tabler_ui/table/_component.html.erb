@@ -79,16 +79,23 @@
   <% end %>
 <% end %>
 
+<% has_footer_slot = defined?(slots) && slots.present?(:footer) %>
+<% footer_markup = has_footer_slot ? tag.div(slots.footer, **table.footer_attributes) : nil %>
+
 <% if table.card? %>
   <%= tag.div(**table.root_attributes) do %>
     <%= filter_markup if table.filter? %>
     <% responsive_markup = tag.div(table_markup, **table.responsive_attributes) %>
-    <%# frame: wraps only .table-responsive, never the .card -- see the %>
-    <%# component's "Turbo Frames" class docs for why %>
-    <%= table.frame? ? tag.turbo_frame(responsive_markup, **table.frame_attributes) : responsive_markup %>
+    <%# frame: wraps .table-responsive AND the footer slot (if any), but %>
+    <%# never the .card/filter toolbar -- see the component's "Turbo %>
+    <%# Frames" class docs (the "Footer in, filter out" section) for why %>
+    <%# the two are on opposite sides of the frame boundary. %>
+    <% framed_markup = has_footer_slot ? safe_join([responsive_markup, footer_markup]) : responsive_markup %>
+    <%= table.frame? ? tag.turbo_frame(framed_markup, **table.frame_attributes) : framed_markup %>
   <% end %>
 <% else %>
   <%= filter_markup if table.filter? %>
   <% root_markup = tag.div(table_markup, **table.root_attributes) %>
-  <%= table.frame? ? tag.turbo_frame(root_markup, **table.frame_attributes) : root_markup %>
+  <% framed_markup = has_footer_slot ? safe_join([root_markup, footer_markup]) : root_markup %>
+  <%= table.frame? ? tag.turbo_frame(framed_markup, **table.frame_attributes) : framed_markup %>
 <% end %>

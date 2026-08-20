@@ -538,8 +538,8 @@ RSpec.describe "TablerUi::Table", type: :component do
     end
 
     describe "method:/auto:" do
-      it "method: :get (default) auto-submits via Stimulus and renders no Apply button" do
-        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }] })
+      it "method: :get (default) with a frame: auto-submits via Stimulus and renders no Apply button" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }] }, frame: "tbl")
         form = fragment.css("form").first
 
         expect(form["data-controller"]).to eq("tabler-ui--filter")
@@ -558,8 +558,10 @@ RSpec.describe "TablerUi::Table", type: :component do
         expect(button["type"]).to eq("submit")
       end
 
-      it "method: :get, auto: false overrides the default -- Apply button renders, no Stimulus wiring" do
-        fragment = component_fragment(:table, filter: { method: :get, auto: false, fields: [{ name: "q" }] })
+      it "method: :get, auto: false overrides the default -- Apply button renders, no Stimulus wiring, " \
+         "even with a frame: that would otherwise default auto: to true" do
+        fragment = component_fragment(:table, filter: { method: :get, auto: false, fields: [{ name: "q" }] },
+                                               frame: "tbl")
         form = fragment.css("form").first
 
         expect(form["data-controller"]).to be_nil
@@ -575,8 +577,62 @@ RSpec.describe "TablerUi::Table", type: :component do
       end
     end
 
-    it "debounce: 500 renders as data-tabler-ui--filter-debounce-value on the form" do
-      fragment = component_fragment(:table, filter: { debounce: 500, fields: [{ name: "q" }] })
+    describe "auto: default depends on frame: (an auto-submitting filter with no frame: is a full page " \
+             "navigation on every debounced keystroke -- see the component's :auto docs)" do
+      it "method: :get with frame: auto-submits (Stimulus wiring present, no Apply button)" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }] }, frame: "tbl")
+        form = fragment.css("form").first
+
+        expect(form["data-controller"]).to eq("tabler-ui--filter")
+        expect(fragment.css("button.btn.btn-primary")).to be_empty
+      end
+
+      it "method: :get with no frame: does NOT auto-submit (no data-controller, Apply button renders)" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }] })
+        form = fragment.css("form").first
+
+        expect(form["data-controller"]).to be_nil
+        expect(fragment.css("button.btn.btn-primary")).not_to be_empty
+      end
+
+      it "method: :post with frame: still does NOT auto-submit -- a frame: alone is not enough" do
+        fragment = component_fragment(:table, filter: { method: :post, fields: [{ name: "q" }] }, frame: "tbl")
+        form = fragment.css("form").first
+
+        expect(form["data-controller"]).to be_nil
+        expect(fragment.css("button.btn.btn-primary")).not_to be_empty
+      end
+
+      it "CAVEAT: explicit auto: true with no frame: still auto-submits -- a deliberate opt-in into a " \
+         "form that loses focus/scroll position on every debounced submit (e.g. a host driving the form " \
+         "with Turbo Streams or its own JS)" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], auto: true })
+        form = fragment.css("form").first
+
+        expect(form["data-controller"]).to eq("tabler-ui--filter")
+        expect(fragment.css("button.btn.btn-primary")).to be_empty
+      end
+
+      it "explicit auto: false with a frame: does NOT auto-submit" do
+        fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], auto: false }, frame: "tbl")
+        form = fragment.css("form").first
+
+        expect(form["data-controller"]).to be_nil
+        expect(fragment.css("button.btn.btn-primary")).not_to be_empty
+      end
+
+      it "debounce: is only emitted when auto-submit is actually on" do
+        auto_fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], debounce: 500 },
+                                                     frame: "tbl")
+        non_auto_fragment = component_fragment(:table, filter: { fields: [{ name: "q" }], debounce: 500 })
+
+        expect(auto_fragment.css("form").first["data-tabler-ui--filter-debounce-value"]).to eq("500")
+        expect(non_auto_fragment.css("form").first.attribute("data-tabler-ui--filter-debounce-value")).to be_nil
+      end
+    end
+
+    it "debounce: 500 renders as data-tabler-ui--filter-debounce-value on the form, when auto-submitting" do
+      fragment = component_fragment(:table, filter: { debounce: 500, fields: [{ name: "q" }] }, frame: "tbl")
 
       expect(fragment.css("form").first["data-tabler-ui--filter-debounce-value"]).to eq("500")
     end
@@ -716,8 +772,8 @@ RSpec.describe "TablerUi::Table", type: :component do
       end
 
       it "INERT: with auto-submit but no frame:, output is byte-identical to the same call without min_chars:" do
-        base = { filter: { fields: [{ name: "q" }] } }
-        with_min_chars = { filter: { fields: [{ name: "q" }], min_chars: 3 } }
+        base = { filter: { fields: [{ name: "q" }], auto: true } }
+        with_min_chars = { filter: { fields: [{ name: "q" }], auto: true, min_chars: 3 } }
 
         expect(render_component(:table, **with_min_chars)).to eq(render_component(:table, **base))
       end
@@ -843,6 +899,107 @@ RSpec.describe "TablerUi::Table", type: :component do
         expect(error.cause).to be_a(ArgumentError)
         expect(error.cause.message).to match(/filter/i)
       }
+    end
+  end
+
+  describe "footer slot:" do
+    it "renders a .card-footer div containing the block's content" do
+      fragment = component_fragment(:table) do |slots|
+        slots.footer { '<div class="slot-marker">Page 1 of 3</div>'.html_safe }
+      end
+
+      footer = fragment.css(".card-footer").first
+      marker = fragment.css(".slot-marker").first
+
+      expect(footer).not_to be_nil
+      expect(marker).not_to be_nil
+      expect(marker.text).to eq("Page 1 of 3")
+      expect(marker.ancestors).to include(footer)
+    end
+
+    it "card: false renders the footer as .mt-3 instead of .card-footer" do
+      fragment = component_fragment(:table, card: false) do |slots|
+        slots.footer { "Page 1 of 3" }
+      end
+
+      expect(fragment.css(".card-footer")).to be_empty
+      footer = fragment.css(".mt-3").first
+      expect(footer).not_to be_nil
+      expect(footer.text).to eq("Page 1 of 3")
+    end
+
+    it "no footer slot renders no footer div at all, and the rest of the output is unchanged" do
+      without_block = render_component(:table)
+      with_unused_block = render_component(:table) { |slots| }
+
+      expect(with_unused_block).to eq(without_block)
+
+      fragment = component_fragment(:table)
+      expect(fragment.css(".card-footer")).to be_empty
+      expect(fragment.css(".mt-3")).to be_empty
+    end
+
+    it "DESIGN: with frame: and a footer, .table-responsive and the footer both render inside the " \
+       "<turbo-frame>, table-responsive first -- a footer/pager rendered outside the frame would go " \
+       "stale (e.g. keep showing 'page 1' as current) after the frame navigates" do
+      fragment = component_fragment(:table, frame: "tbl") do |slots|
+        slots.footer { "Page 1 of 3" }
+      end
+
+      frame = fragment.css("turbo-frame").first
+      element_children = frame.children.select(&:element?)
+
+      expect(element_children.map { |el| el["class"] }).to eq(%w[table-responsive card-footer])
+    end
+
+    it "CONTRAST: with frame:, the filter toolbar is NOT inside the <turbo-frame> -- unlike the footer " \
+       "above, the search input must not be re-rendered out from under the user while they are typing" do
+      fragment = component_fragment(:table, filter: { fields: [{ name: "q" }] }, frame: "tbl")
+
+      frame = fragment.css("turbo-frame").first
+      expect(frame.css("form")).to be_empty
+      expect(fragment.css("form")).not_to be_empty
+    end
+
+    # The shared example's `hook_fragment` never passes a block, but the
+    # footer only renders via `slots.footer { ... }` -- there is no
+    # `footer:` options hash to trigger it any other way (see the class
+    # docs). Hand-written instead, mirroring the thead_html/tbody_html/
+    # frame_html specs elsewhere in this file for the same reason.
+    describe "footer_html: hook" do
+      it "keeps the component's own class on the .card-footer element" do
+        fragment = component_fragment(:table) { |slots| slots.footer { "content" } }
+
+        expect(fragment.css(".card-footer")).not_to be_empty
+      end
+
+      it "appends a caller-supplied class instead of replacing the component's own" do
+        fragment = component_fragment(:table, footer_html: { class: "hook-extra-class" }) do |slots|
+          slots.footer { "content" }
+        end
+        element = fragment.css(".card-footer").first
+
+        expect(element).not_to be_nil
+        classes = element["class"].to_s.split(/\s+/)
+        expect(classes).to include("hook-extra-class")
+        expect(classes.size).to be > 1
+      end
+
+      it "passes through a caller-supplied id" do
+        fragment = component_fragment(:table, footer_html: { id: "hook-test-id" }) do |slots|
+          slots.footer { "content" }
+        end
+
+        expect(fragment.css(".card-footer").first["id"]).to eq("hook-test-id")
+      end
+
+      it "passes through caller-supplied data attributes" do
+        fragment = component_fragment(:table, footer_html: { data: { testid: "hook-test-data" } }) do |slots|
+          slots.footer { "content" }
+        end
+
+        expect(fragment.css(".card-footer").first["data-testid"]).to eq("hook-test-data")
+      end
     end
   end
 
