@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `table` takes `sort:`, `sort_url:` and `sort_reset:`, plus a per-column `sort:` key marking a
+  column sortable. The component renders the header links and the asc/desc state; working out the
+  order stays with the caller, as it already does for the rows themselves.
+- `table` takes `filter:`, a search/filter toolbar rendered above the table. Either declarative
+  (`fields:` of `:search`/`:text`/`:select`/`:date`) or a `slots.filter` block supplying the form
+  contents. A `:get` form auto-submits through the `tabler-ui--filter` Stimulus controller; a
+  `:post` form gets an Apply button. `hidden:` carries the current sort across a filter submit.
+- `table` and `pagination` take `frame:`, emitting the markup for Turbo Frame navigation so
+  sorting, filtering and paging update the table without a page reload. `table` renders the
+  `<turbo-frame>` around the table itself and points the filter form at it from outside, so the
+  debounced search input is never re-rendered mid-typing; `pagination` only targets the frame.
+  Opt-in and markup-only — the gem takes no `turbo-rails` dependency.
+- New HTML hooks: `sort_html:`, `filter_html:`, `filter_form_html:`, `filter_reset_html:` and
+  `frame_html:` on `table`, and `link_html:` on `pagination`. The last two close rule 5 gaps on
+  elements that previously had no hook at all.
+
+### Fixed
+
+- `navbar.css` was in the engine's precompile list but missing from the stylesheet manifest, so it
+  was compiled and served but never actually loaded. Its alignment fixes now apply, which makes nav
+  items reach the full navbar height and puts Tabler's active indicator on the bottom edge.
+
 ## [0.5.0] - 2026-08-17
 
 Closes every gap an audit of all 33 components against the bundled Tabler v1.4.0 stylesheet
