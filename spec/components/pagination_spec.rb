@@ -6,21 +6,31 @@ RSpec.describe "TablerUi::Pagination", type: :component do
   # Reduces a rendered fragment to the sequence of page numbers/gaps between
   # prev and next -- e.g. [1, :gap, 8, 9, 10] -- so range-algorithm specs can
   # assert on shape without caring about URLs or exact markup.
+  #
+  # Positional, not class-based: every fragment this is called on follows the
+  # component's own convention of adding prev first and next last (computed
+  # mode always does; the "equivalent markup" spec does too by hand), so the
+  # first/last <li class="page-item"> are prev/next regardless of whether
+  # they happen to carry page-prev/page-next -- see #pure_prev_next? in the
+  # component, which drops those classes the moment page items are present.
   def page_shape(fragment)
-    fragment.css("li.page-item").filter_map do |li|
+    lis = fragment.css("li.page-item")
+    lis[1..-2].filter_map do |li|
       classes = li["class"].to_s.split(/\s+/)
-      next nil if (classes & %w[page-prev page-next]).any?
-
       classes.include?("disabled") ? :gap : Integer(li.text.strip)
     end
   end
 
+  # Prev/next-only pagers still carry page-prev/page-next (see the
+  # component's "page-prev / page-next" docs), so prefer that selector; fall
+  # back to first/last position for a pager that also has page items, where
+  # those classes are deliberately absent.
   def prev_li(fragment)
-    fragment.css("li.page-item.page-prev").first
+    fragment.css("li.page-item.page-prev").first || fragment.css("li.page-item").first
   end
 
   def next_li(fragment)
-    fragment.css("li.page-item.page-next").first
+    fragment.css("li.page-item.page-next").first || fragment.css("li.page-item").last
   end
 
   it "renders with no arguments and no block, without raising" do
@@ -59,6 +69,11 @@ RSpec.describe "TablerUi::Pagination", type: :component do
       expect(prev_li(fragment)).not_to be_nil
       expect(next_li(fragment)).not_to be_nil
       expect(page_shape(fragment)).to eq([1, 2, :gap, 5])
+
+      # page items are present alongside prev/next, so neither gets
+      # page-prev/page-next -- see #pure_prev_next? in the component.
+      expect(prev_li(fragment)["class"].split(/\s+/)).not_to include("page-prev")
+      expect(next_li(fragment)["class"].split(/\s+/)).not_to include("page-next")
     end
 
     it "item: with url: renders a link, page number as the text" do
@@ -107,20 +122,22 @@ RSpec.describe "TablerUi::Pagination", type: :component do
       expect(li.css("span.page-link").first.text.strip).to eq(I18n.t("tabler_ui.pagination.gap", default: "…"))
     end
 
-    it "prev renders page-item page-prev, with a translated default label" do
+    it "prev renders page-item page-prev when it's the only item (article-pager shape)" do
       fragment = component_fragment(:pagination) { |p| p.prev(url: "/0") }
 
       li = prev_li(fragment)
       expect(li).not_to be_nil
+      expect(li["class"].split(/\s+/)).to include("page-item", "page-prev")
       expect(li.css("a.page-link").first["href"]).to eq("/0")
       expect(li.text.strip).to eq(I18n.t("tabler_ui.pagination.prev", default: "Previous"))
     end
 
-    it "next renders page-item page-next, with a translated default label" do
+    it "next renders page-item page-next when it's the only item (article-pager shape)" do
       fragment = component_fragment(:pagination) { |p| p.next(url: "/2") }
 
       li = next_li(fragment)
       expect(li).not_to be_nil
+      expect(li["class"].split(/\s+/)).to include("page-item", "page-next")
       expect(li.css("a.page-link").first["href"]).to eq("/2")
       expect(li.text.strip).to eq(I18n.t("tabler_ui.pagination.next", default: "Next"))
     end
@@ -191,13 +208,16 @@ RSpec.describe "TablerUi::Pagination", type: :component do
       expect(fragment.css("li.page-item")).to be_empty
     end
 
-    it "total: 1 renders a single active page with prev/next both disabled" do
+    it "total: 1 renders a single active page with prev/next both disabled, and plain (not " \
+       "page-prev/page-next) since a page item is present" do
       fragment = component_fragment(:pagination, current: 1, total: 1, url: ->(n) { "/p/#{n}" })
 
       expect(page_shape(fragment)).to eq([1])
       expect(fragment.css("li.page-item.active").first["class"].split(/\s+/)).to include("active")
       expect(prev_li(fragment)["class"].split(/\s+/)).to include("disabled")
       expect(next_li(fragment)["class"].split(/\s+/)).to include("disabled")
+      expect(prev_li(fragment)["class"].split(/\s+/)).not_to include("page-prev")
+      expect(next_li(fragment)["class"].split(/\s+/)).not_to include("page-next")
     end
 
     it "total: 2 shows both pages with no gap" do
@@ -286,6 +306,40 @@ RSpec.describe "TablerUi::Pagination", type: :component do
       expect {
         component_fragment(:pagination, current: 1, total: 5, url: ->(n) { "/p/#{n}" }) { |p| p.item(1) }
       }.to raise_error(ArgumentError, /mutually exclusive/)
+    end
+
+    it "prev and next render as plain page-item, without page-prev/page-next, since computed " \
+       "mode always shows page numbers" do
+      fragment = component_fragment(:pagination, current: 3, total: 10, url: ->(n) { "/p/#{n}" })
+
+      expect(prev_li(fragment)["class"].split(/\s+/)).to eq(%w[page-item])
+      expect(next_li(fragment)["class"].split(/\s+/)).to eq(%w[page-item])
+    end
+  end
+
+  # REGRESSION: page-prev/page-next are `flex: 0 0 50%` in Tabler's CSS --
+  # each claims half the pagination row. That's correct for a prev/next-only
+  # "article" pager, but the moment page-number items sit between them, prev
+  # + next alone already total 100% of the row and push page-next out past
+  # the container's right edge (confirmed in a browser: Next rendered
+  # outside the card footer). Nobody should reinstate these classes
+  # unconditionally -- assert directly that no element carries them once
+  # page numbers are in the mix, in both ways of building a pager.
+  it "REGRESSION: never emits page-prev/page-next anywhere once page numbers are present " \
+     "(they are flex: 0 0 50% in Tabler's CSS and overflow the container when combined " \
+     "with numbers)" do
+    computed = component_fragment(:pagination, current: 3, total: 10, url: ->(n) { "/p/#{n}" })
+    builder = component_fragment(:pagination) do |p|
+      p.prev(url: "/1")
+      p.item(1, url: "/1")
+      p.item(2, url: "/2", active: true)
+      p.next(url: "/3")
+    end
+
+    [computed, builder].each do |fragment|
+      classes = fragment.css("li.page-item").flat_map { |li| li["class"].split(/\s+/) }
+      expect(classes).not_to include("page-prev")
+      expect(classes).not_to include("page-next")
     end
   end
 

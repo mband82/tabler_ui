@@ -130,10 +130,43 @@ module TablerUi
     # inert markup without Turbo loaded in the host app, exactly like every
     # other `data-*` attribute this gem emits.
     #
+    # ## page-prev / page-next
+    #
+    # Tabler's stylesheet defines `.page-item.page-prev`/`.page-item.page-next`
+    # for a completely different widget than this component's usual output:
+    # the article-style "‹ PREVIOUS / *Article title*" pager, where prev and
+    # next are the *only* two items in the row. To make that work, Tabler
+    # gives each of them `flex: 0 0 50%` -- prev claims the left half of the
+    # row, next (`margin-left: auto`, right-aligned text) claims the right
+    # half. `.pagination` is a plain, non-wrapping flex row, so that 50/50
+    # split is only correct when prev and next really are the only two
+    # items. The moment page-number items sit between them, prev + next
+    # alone already total 100% of the row's flex basis, and the numbers
+    # push `page-next` straight out past the container's right edge --
+    # confirmed in a browser: Previous stays put, the numbers center
+    # themselves, and Next renders outside the card footer entirely.
+    #
+    # So these two classes are applied conditionally, via #pure_prev_next?:
+    # only when @items contains no `:page` item, i.e. only for a pager built
+    # from #prev/#next alone. The instant a single #item is present -- which
+    # is every computed-mode render, since that always shows page numbers --
+    # prev and next fall back to plain `page-item` (plus `disabled` as
+    # normal), which is standard Bootstrap pagination and exactly what
+    # Tabler's own table card-footers use for their prev/next controls.
+    # #pure_prev_next? is evaluated at render time (via #item_classes, called
+    # from #item_attributes), not cached in #initialize, because builder mode
+    # doesn't know its final item list until the caller's block has run --
+    # see #item_attributes' docs.
+    #
+    # Do not reinstate these classes unconditionally "to match Tabler's
+    # markup" -- that markup is for the article pager, not this one, and
+    # combining them with page numbers is precisely the overflow bug this
+    # section documents.
+    #
     # ## CSS surface
     #
     #   ul.pagination[.pagination-sm|.pagination-lg][.pagination-circle][.pagination-outline]
-    #     li.page-item[.active][.disabled][.page-prev|.page-next]
+    #     li.page-item[.active][.disabled][.page-prev|.page-next -- prev/next-only pagers, see above]
     #       a.page-link (linkable items) or span.page-link (gaps, disabled prev/next)
     #       -- both built by #link_attributes (part :link, hook link_html:)
     #
@@ -266,7 +299,9 @@ module TablerUi
       # @option options [String] :label Link text (default: the component's
       #   prev_label: option, then a translated "Previous").
       # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
-      #   `<li class="page-item page-prev">` (part :item)
+      #   `<li class="page-item">` (part :item) -- gains `page-prev` too, but
+      #   only when this is a prev/next-only pager with no #item calls; see
+      #   "page-prev / page-next" above.
       # @return [String] empty string, to avoid stray output in a capture context
       def prev(options = {})
         guard_against_computed!(:prev)
@@ -525,11 +560,23 @@ module TablerUi
 
       def item_classes(item)
         classes = ["page-item"]
-        classes << "page-prev" if item.kind == :prev
-        classes << "page-next" if item.kind == :next
+        classes << "page-prev" if item.kind == :prev && pure_prev_next?
+        classes << "page-next" if item.kind == :next && pure_prev_next?
         classes << "active" if current_page?(item)
         classes << "disabled" if item.disabled
         classes.join(" ")
+      end
+
+      # @return [Boolean] whether this pager has no :page items -- i.e. is a
+      #   pure prev/next "article" pager, the only shape #page-prev/#page-next
+      #   are safe on (see "page-prev / page-next" in the class docs).
+      #   Deliberately read from @items at call time rather than cached in
+      #   #initialize -- in builder mode the full item list isn't known
+      #   until the caller's block has finished running, and #item_classes
+      #   (via #item_attributes) is only ever invoked at render time, after
+      #   that block, so this always sees the final list.
+      def pure_prev_next?
+        @items.none? { |i| i.kind == :page }
       end
     end
   end
