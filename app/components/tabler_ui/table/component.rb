@@ -1077,18 +1077,14 @@ module TablerUi
       # @return [Hash, nil] the normalized frame state used by #frame_attributes
       #   and every frame-aware filter_* method, or nil when frame: was not given
       def build_frame(frame_options)
-        return nil if frame_options.nil?
-
-        frame_options = { id: frame_options } if frame_options.is_a?(String)
-
-        id = frame_options[:id]
-        raise ArgumentError, "table frame: is missing id: -- #{frame_options.inspect}" if id.blank?
+        normalized = TablerUi::Frame.normalize(frame_options, context: "table")
+        return nil if normalized.nil?
 
         {
-          id: id,
-          advance: frame_options.fetch(:advance, true),
-          src: frame_options[:src],
-          loading: validate_frame_loading!(frame_options[:loading])
+          id: normalized[:id],
+          advance: normalized.fetch(:advance, true),
+          src: normalized[:src],
+          loading: validate_frame_loading!(normalized[:loading])
         }
       end
 

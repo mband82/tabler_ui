@@ -526,17 +526,10 @@ module TablerUi
       #   `advance:`/`src:`/`loading:` are silently ignored if present --
       #   see the class docs' "Turbo Frames" section for why.
       def build_frame(value)
-        return nil if value.nil?
+        normalized = TablerUi::Frame.normalize(value, context: "pagination")
+        return nil if normalized.nil?
 
-        frame = value.is_a?(String) ? { id: value } : value
-        id = frame[:id]
-
-        if id.blank?
-          raise ArgumentError,
-                "pagination frame: needs an id: to target -- got #{value.inspect}"
-        end
-
-        { id: id }
+        { id: normalized[:id] }
       end
 
       def validate_size!(value)
