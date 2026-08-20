@@ -98,12 +98,12 @@ RSpec.describe "TablerUi::Rating", type: :component do
     expect(select["data-tabler-ui--rating-clearable-value"]).to eq("true")
   end
 
-  it "defaults name to 'rating' and generates an id" do
+  it "defaults name to 'rating' and generates a deterministic id from it" do
     fragment = component_fragment(:rating)
     select = fragment.css("select").first
 
     expect(select["name"]).to eq("rating")
-    expect(select["id"]).to match(/\Arating-[0-9a-f]+\z/)
+    expect(select["id"]).to eq("rating-rating")
   end
 
   it "renders a custom id: and name:" do
@@ -112,6 +112,38 @@ RSpec.describe "TablerUi::Rating", type: :component do
 
     expect(select["id"]).to eq("custom-id")
     expect(select["name"]).to eq("custom_name")
+  end
+
+  # Regression: app/components/tabler_ui/rating/component.rb used to generate
+  # a random id (SecureRandom.hex) when id: was omitted, so every render of
+  # the same options produced different markup -- breaking fragment/HTTP
+  # caching and any output-stability assertion. Fixed by deriving the id
+  # deterministically from name: instead, mirroring table's filter_field_id.
+  describe "deterministic id generation" do
+    it "renders byte-identical HTML across two renders of the same options" do
+      first = render_component(:rating, name: "satisfaction")
+      second = render_component(:rating, name: "satisfaction")
+
+      expect(first).to eq(second)
+    end
+
+    it "derives the generated id from name: -- different names get different ids" do
+      fragment_a = component_fragment(:rating, name: "satisfaction")
+      fragment_b = component_fragment(:rating, name: "quality")
+
+      id_a = fragment_a.css("select").first["id"]
+      id_b = fragment_b.css("select").first["id"]
+
+      expect(id_a).to eq("rating-satisfaction")
+      expect(id_b).to eq("rating-quality")
+      expect(id_a).not_to eq(id_b)
+    end
+
+    it "an explicit id: still overrides the generated one" do
+      fragment = component_fragment(:rating, name: "satisfaction", id: "explicit-id")
+
+      expect(fragment.css("select").first["id"]).to eq("explicit-id")
+    end
   end
 
   it "marks the value: option selected" do

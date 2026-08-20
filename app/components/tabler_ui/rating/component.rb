@@ -22,7 +22,7 @@ module TablerUi
       attr_reader :id, :name, :value, :required, :disabled, :size, :color, :tooltip, :clearable, :max_stars
 
       # @param options [Hash]
-      # @option options [String]  :id        HTML id (default: generated "rating-<hex>")
+      # @option options [String]  :id        HTML id (default: deterministic, derived from :name)
       # @option options [String]  :name      <select> name (default: "rating")
       # @option options [Object]  :value     Currently selected value
       # @option options [Array<Hash>] :choices List of { value:, label: } choices. Defaults to
@@ -35,9 +35,14 @@ module TablerUi
       # @option options [Boolean] :clearable (default: true)
       # @option options [Integer] :max_stars (default: 5)
       # @option options [Hash]    :html      Rule 5 HTML hook for the <select> (part :root)
+      #
+      # Generated ids are deterministic -- derived from :name -- so rendered
+      # output stays cache-stable across identical requests; pass :id
+      # explicitly when two ratings with the same name: appear on one page,
+      # to avoid duplicate DOM ids.
       def initialize(options = {})
-        @id = options[:id] || "rating-#{SecureRandom.hex(4)}"
         @name = options.fetch(:name, "rating")
+        @id = options[:id] || default_id(@name)
         @value = options[:value]
         @choices = options[:choices]
         @required = options.fetch(:required, false)
@@ -95,6 +100,18 @@ module TablerUi
                  required: required,
                  disabled: disabled,
                  data: controller_attributes)
+      end
+
+      private
+
+      # @param name [String, Symbol] the rating's :name
+      # @return [String] a deterministic id derived from name -- keeps
+      #   rendered output cache-stable across identical requests (see the
+      #   :id option docs above). Falls back to "rating" when name
+      #   parameterizes to blank (e.g. a name: made entirely of
+      #   non-alphanumeric characters).
+      def default_id(name)
+        "rating-#{name.to_s.parameterize.presence || 'rating'}"
       end
     end
   end
