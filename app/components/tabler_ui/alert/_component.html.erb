@@ -3,27 +3,23 @@
     <%= tag.a(**alert.dismiss_attributes) %>
   <% end %>
 
-  <div class="d-flex">
-    <% if alert.has_icon? %>
-      <%= tag.div(**alert.icon_attributes) do %>
-        <%= tabler_ui.icon(icon: alert.default_icon, html: { class: "alert-icon" }) %>
-      <% end %>
+  <% if alert.has_icon? %>
+    <%= tabler_ui.icon(icon: alert.default_icon, html: alert.icon_attributes) %>
+  <% end %>
+
+  <div>
+    <% if alert.title.present? %>
+      <%= tag.h4(alert.title, **alert.title_attributes) %>
     <% end %>
 
-    <div>
-      <% if alert.title.present? %>
-        <%= tag.h4(alert.title, **alert.title_attributes) %>
-      <% end %>
+    <% if alert.text.present? %>
+      <div class="alert-description"><%= alert.text %></div>
+    <% elsif defined?(slots) && slots.present?(:body) %>
+      <%= slots.body %>
+    <% end %>
 
-      <% if alert.text.present? %>
-        <div class="text-secondary"><%= alert.text %></div>
-      <% elsif defined?(slots) && slots.present?(:body) %>
-        <%= slots.body %>
-      <% end %>
-
-      <% if alert.url.present? %>
-        <%= tag.a(alert.link_text, **alert.link_attributes) %>
-      <% end %>
-    </div>
+    <% if alert.url.present? %>
+      <%= tag.a(alert.link_text, **alert.link_attributes) %>
+    <% end %>
   </div>
 <% end %>

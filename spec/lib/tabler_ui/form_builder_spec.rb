@@ -386,5 +386,62 @@ RSpec.describe TablerUi::FormBuilder do
 
       expect(form.error_notification).to be_nil
     end
+
+    it "honours a custom message:" do
+      model = FakeModel.new({ name: "" }, types: { name: :string }, errors: { name: ["can't be blank"] })
+      form = build_form(model)
+
+      fragment = fragment_for(form.error_notification(message: "Fix these problems:"))
+
+      expect(fragment.css(".alert-heading").text).to eq("Fix these problems:")
+    end
+
+    it "uses the translated default message when message: is omitted" do
+      model = FakeModel.new({ name: "" }, types: { name: :string }, errors: { name: ["can't be blank"] })
+      form = build_form(model)
+
+      fragment = fragment_for(form.error_notification)
+
+      expect(fragment.css(".alert-heading").text).to eq(I18n.t("tabler_ui.form.error_notification"))
+    end
+
+    it "puts the heading in .alert-heading, matching the alert component (not the inert alert-title)" do
+      model = FakeModel.new({ name: "" }, types: { name: :string }, errors: { name: ["can't be blank"] })
+      form = build_form(model)
+
+      fragment = fragment_for(form.error_notification)
+
+      expect(fragment.css(".alert-heading")).not_to be_empty
+      expect(fragment.css(".alert-title")).to be_empty
+    end
+
+    it "wraps the error list in .alert-description, not text-secondary (Tabler's own class -- " \
+       "also what alert-important's contrast override targets)" do
+      model = FakeModel.new({ name: "" }, types: { name: :string }, errors: { name: ["can't be blank"] })
+      form = build_form(model)
+
+      fragment = fragment_for(form.error_notification)
+
+      expect(fragment.css(".alert-description li")).not_to be_empty
+      expect(fragment.css(".text-secondary")).to be_empty
+    end
+
+    it "nests the heading and the error list inside one content div, not as sibling flex children " \
+       "(Tabler's .alert is flex-direction: row, so direct children sit side by side -- the icon " \
+       "alert renders for color: danger is a legitimate extra flex child, so this checks specifically " \
+       "that the heading/description are not themselves direct children of .alert)" do
+      model = FakeModel.new({ name: "" }, types: { name: :string }, errors: { name: ["can't be blank"] })
+      form = build_form(model)
+
+      fragment = fragment_for(form.error_notification)
+
+      expect(fragment.css(".alert > .alert-heading")).to be_empty
+      expect(fragment.css(".alert > .alert-description")).to be_empty
+      expect(fragment.css(".alert .alert-heading")).not_to be_empty
+      expect(fragment.css(".alert .alert-description")).not_to be_empty
+
+      content_div = fragment.css(".alert-heading").first.parent
+      expect(content_div.css(".alert-description")).not_to be_empty
+    end
   end
 end

@@ -107,21 +107,35 @@ module TablerUi
       end
     end
 
-    # Display model errors as a Tabler alert at the top of the form
+    # Display model errors as a Tabler alert at the top of the form.
+    #
+    # Delegates to the tabler_ui alert component (see
+    # app/components/tabler_ui/alert) rather than hand-rolling the markup --
+    # this used to duplicate the component's structure and drifted out of
+    # sync with it (alert-title instead of alert-heading, a bare
+    # text-secondary div instead of alert-description, and a heading/body
+    # that were siblings rather than one flex child -- Tabler's .alert is
+    # `display: flex; flex-direction: row`, so direct children sit side by
+    # side, not stacked). Going through @template.tabler_ui, same as
+    # #toggle_button_input's icon and #rating_input above, means any future
+    # fix to the alert component's markup is inherited here for free.
+    #
+    # The error list is passed via the :body slot rather than :text so it
+    # can be a <ul> instead of plain text; the alert component only wraps
+    # :text in .alert-description automatically; the slot's raw content is
+    # the caller's responsibility, so the div is added here to keep
+    # Tabler's alert-important contrast override (tabler.css
+    # .alert-important .alert-description { color: inherit }) working.
     def error_notification(message: nil)
       return unless @object.respond_to?(:errors) && @object.errors.any?
 
       message ||= I18n.t('tabler_ui.form.error_notification')
+      error_list = tag.ul do
+        safe_join(@object.errors.full_messages.map { |msg| tag.li(msg) })
+      end
 
-      tag.div(class: 'alert alert-danger mb-3', role: 'alert') do
-        safe_join [
-          tag.h4(message, class: 'alert-title'),
-          tag.div(class: 'text-secondary') do
-            tag.ul do
-              safe_join(@object.errors.full_messages.map { |msg| tag.li(msg) })
-            end
-          end
-        ]
+      @template.tabler_ui.alert(color: 'danger', title: message, html: { class: 'mb-3' }) do |slots|
+        slots.body { tag.div(error_list, class: 'alert-description') }
       end
     end
 

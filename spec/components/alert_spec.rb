@@ -14,10 +14,10 @@ RSpec.describe "TablerUi::Alert", type: :component do
     hook: :html, selector: ".alert"
 
   it_behaves_like "an element with an html hook", :alert, { title: "Error" },
-    hook: :title_html, selector: ".alert-title"
+    hook: :title_html, selector: ".alert-heading"
 
   it_behaves_like "an element with an html hook", :alert, {},
-    hook: :icon_html, selector: ".alert-icon-wrapper"
+    hook: :icon_html, selector: ".alert-icon"
 
   it_behaves_like "an element with an html hook", :alert, { url: "/changelog" },
     hook: :link_html, selector: "a.alert-link"
@@ -71,10 +71,11 @@ RSpec.describe "TablerUi::Alert", type: :component do
     expect(fragment.css(".alert-link")).to be_empty
   end
 
-  it "renders text: in a text-secondary div" do
+  it "renders text: in an alert-description div (Tabler's own class -- also what " \
+     "alert-important's contrast override targets, tabler.css .alert-important .alert-description)" do
     fragment = component_fragment(:alert, text: "Saved!")
 
-    expect(fragment.css(".text-secondary").text).to eq("Saved!")
+    expect(fragment.css(".alert-description").text).to eq("Saved!")
   end
 
   it "renders the body slot's rich content when text: is omitted" do
@@ -88,19 +89,19 @@ RSpec.describe "TablerUi::Alert", type: :component do
   it "renders no body content when neither text: nor the body slot are given" do
     fragment = component_fragment(:alert)
 
-    expect(fragment.css(".text-secondary")).to be_empty
+    expect(fragment.css(".alert-description")).to be_empty
   end
 
-  it "renders title: in an h4.alert-title" do
+  it "renders title: in an h4.alert-heading (Tabler's own class, tabler.css .alert-heading)" do
     fragment = component_fragment(:alert, title: "Error")
 
-    expect(fragment.css("h4.alert-title").text).to eq("Error")
+    expect(fragment.css("h4.alert-heading").text).to eq("Error")
   end
 
   it "renders no title element when title: is omitted" do
     fragment = component_fragment(:alert)
 
-    expect(fragment.css(".alert-title")).to be_empty
+    expect(fragment.css(".alert-heading")).to be_empty
   end
 
   it "renders a default icon based on color" do
@@ -119,8 +120,39 @@ RSpec.describe "TablerUi::Alert", type: :component do
   it "renders no icon when icon: false" do
     fragment = component_fragment(:alert, icon: false)
 
-    expect(fragment.css(".alert-icon-wrapper")).to be_empty
+    expect(fragment.css(".alert-icon")).to be_empty
     expect(fragment.css("svg")).to be_empty
+  end
+
+  describe "regression: icon spacing -- no extra wrapper div between the icon and the content" do
+    # Tabler's own .alert is `display: flex; flex-direction: row; gap: 1rem`
+    # (tabler.css) -- it is itself the flex container, and `gap` only spaces
+    # its own direct children. An earlier version wrapped the icon and the
+    # content block in an extra `<div class="d-flex">`, which became a single
+    # flex child of .alert with nothing for its own (unset) gap to separate,
+    # so the icon rendered flush against the text. Asserting the parent/child
+    # relationship directly so a reintroduced wrapper fails this test.
+    it "keeps the icon svg as a direct child of .alert" do
+      fragment = component_fragment(:alert, color: "danger")
+
+      expect(fragment.css(".alert > svg.alert-icon")).not_to be_empty,
+        "expected .alert-icon to be a direct child of .alert, in:\n#{fragment.to_html}"
+    end
+
+    it "keeps the content block as a direct child of .alert, a sibling of the icon" do
+      fragment = component_fragment(:alert, color: "danger", title: "Error", text: "Something went wrong.")
+
+      expect(fragment.css(".alert > div")).not_to be_empty,
+        "expected the content block to be a direct child of .alert, in:\n#{fragment.to_html}"
+      expect(fragment.css(".alert > div > h4.alert-heading")).not_to be_empty
+      expect(fragment.css(".alert > div > .alert-description")).not_to be_empty
+    end
+
+    it "no longer wraps the icon and content in a d-flex div" do
+      fragment = component_fragment(:alert, color: "danger", title: "Error", text: "Something went wrong.")
+
+      expect(fragment.css(".d-flex")).to be_empty
+    end
   end
 
   it "renders a dismiss button and alert-dismissible class for dismissible: true" do

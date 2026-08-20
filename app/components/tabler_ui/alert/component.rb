@@ -60,10 +60,12 @@ module TablerUi
       # @option options [Symbol]  :link_style  :link (default, bold underline-free) or :action
       #   (underlined, no bold) for the action link's style
       # @option options [Hash]    :html        Rule 5 HTML hook for the root .alert element (part :root)
-      # @option options [Hash]    :title_html  Rule 5 HTML hook for the .alert-title (part :title),
+      # @option options [Hash]    :title_html  Rule 5 HTML hook for the .alert-heading (part :title),
       #   only applied when a title renders
-      # @option options [Hash]    :icon_html   Rule 5 HTML hook for the icon wrapper (part :icon),
-      #   only applied when an icon renders
+      # @option options [Hash]    :icon_html   Rule 5 HTML hook for the icon itself -- the rendered
+      #   icon's root <svg> (part :icon), only applied when an icon renders. There is no wrapper
+      #   element: Tabler's .alert is itself `display: flex; gap: 1rem` (tabler.css), so the icon
+      #   and the content block must be direct children of .alert for that gap to space them.
       # @option options [Hash]    :link_html   Rule 5 HTML hook for the `.alert-link`/`.alert-action`
       #   action link (part :link), only applied when :url renders one. A plain Hash is enough here --
       #   there is only one action link, no per-item variation. See #link_attributes.
@@ -118,16 +120,23 @@ module TablerUi
         html_for(:root, defaults)
       end
 
-      # @return [Hash] attributes for the .alert-title (part :title), merged with
+      # @return [Hash] attributes for the .alert-heading (part :title), merged with
       #   whatever the caller supplied via title_html:. Only used when title.present?.
+      #   Tabler defines .alert-heading (tabler.css) for margin/font-weight; the
+      #   previous "alert-title" class matched no CSS at all.
       def title_attributes
-        html_for(:title, class: "alert-title")
+        html_for(:title, class: "alert-heading")
       end
 
-      # @return [Hash] attributes for the icon wrapper (part :icon), merged with
-      #   whatever the caller supplied via icon_html:. Only used when has_icon?.
+      # @return [Hash] attributes for the icon (part :icon), merged with whatever
+      #   the caller supplied via icon_html:. Only used when has_icon?. This is
+      #   passed straight through as the `html:` hook to the icon component
+      #   itself -- there is no wrapper <div> any more, so the hook lands on the
+      #   rendered icon's own root <svg>, which is the element that actually
+      #   needs to be a direct flex child of .alert. :class contributes the real
+      #   .alert-icon class (tabler.css), which sets the icon's color/size.
       def icon_attributes
-        html_for(:icon, class: "alert-icon-wrapper")
+        html_for(:icon, class: "alert-icon")
       end
 
       # @return [String] CSS class for the action link, based on link_style
