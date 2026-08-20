@@ -5,6 +5,7 @@
  * Import this file in your application to use Tabler UI components.
  *
  *= require tabler_ui/tabler
+ *= require tabler_ui/navbar
  *= require tabler_ui/datepicker
  *= require tabler_ui/turbo
  *= require star-rating
