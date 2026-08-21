@@ -5,7 +5,7 @@
 # found: the SNIPPETS entry already matched the live block.
 TablerUi::Docs::DemoRegistry.define(:icon) do |c|
   c.demo :variants,
-         title: "outline/filled, color, animations, rule 5 html:",
+         title: "outline/filled, color, animations, HTML attributes",
          source: <<~'ERB'
            <span class="me-3"><%= tabler_ui.icon icon: "heart" %></span>
            <span class="me-3"><%= tabler_ui.icon icon: "heart", filled: true, color: "danger" %></span>

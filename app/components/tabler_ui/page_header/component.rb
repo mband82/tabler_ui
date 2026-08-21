@@ -22,7 +22,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.page_header title: "Dashboard", pretitle: "Overview",
     #                             html: { class: "mb-4" },
     #                             title_html: { class: "text-uppercase" },
@@ -53,17 +53,17 @@ module TablerUi
       #   the root element (part :root) when true.
       # @option options [String] :title_size "lg" adds `page-title-lg` (part
       #   :title). Any other value raises ArgumentError.
-      # @option options [Hash] :html          Rule 5 HTML hook for the
+      # @option options [Hash] :html          HTML attributes for the
       #   outermost `.page-header` element (part :root)
-      # @option options [Hash] :title_html    Rule 5 HTML hook for the
+      # @option options [Hash] :title_html    HTML attributes for the
       #   `h2.page-title` (part :title)
-      # @option options [Hash] :pretitle_html Rule 5 HTML hook for the
+      # @option options [Hash] :pretitle_html HTML attributes for the
       #   `.page-pretitle` div (part :pretitle), only used when a pretitle
       #   renders
-      # @option options [Hash] :subtitle_html Rule 5 HTML hook for the
+      # @option options [Hash] :subtitle_html HTML attributes for the
       #   `.page-subtitle` div (part :subtitle), only used when a subtitle
       #   renders
-      # @option options [Hash] :buttons_html  Rule 5 HTML hook for the
+      # @option options [Hash] :buttons_html  HTML attributes for the
       #   right-aligned buttons column (part :buttons), only used when the
       #   `buttons` slot has content
       def initialize(options = {})

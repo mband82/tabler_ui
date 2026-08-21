@@ -27,7 +27,7 @@ module TablerUi
     #     <% steps.item("Confirm") %>
     #   <% end %>
     #
-    # @example Colour, light variant, and rule 5 hooks
+    # @example Colour, light variant, and HTML attributes
     #   <%= tabler_ui.steps(color: "azure", light: true, html: { class: "mb-3" }) do |steps| %>
     #     <% steps.item("Account", html: { class: "fw-bold" }) %>
     #     <% steps.item("Profile", html: ->(item) { { class: "text-muted" } if item.title == "Profile" }) %>
@@ -60,7 +60,7 @@ module TablerUi
       #   semantic names other components accept. Raises ArgumentError otherwise.
       # @option options [Boolean] :light    Use the light/subtle variant
       #   (`steps-<color>-lt`). Has no effect without `color:`.
-      # @option options [Hash]    :html     Rule 5 HTML hook for the outer list (part :root)
+      # @option options [Hash]    :html     HTML attributes for the outer list (part :root)
       def initialize(options = {})
         @current = options.fetch(:current, 1)
         @vertical = options[:vertical]
@@ -78,7 +78,7 @@ module TablerUi
       # @param options [Hash]
       # @option options [String] :url Step URL -- renders an <a> when given;
       #   a plain <li> (no link) otherwise
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this step's
+      # @option options [Hash, #call] :html HTML attributes for this step's
       #   element (part :item) -- a plain Hash, or a callable taking the item
       # @return [String] empty string, to avoid stray output in a capture context
       def item(title, options = {})

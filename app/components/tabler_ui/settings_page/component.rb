@@ -17,7 +17,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Rule 5 hooks -- component-level and per-item
+    # @example HTML attributes -- component-level and per-item
     #   <%= tabler_ui.settings_page("my-settings",
     #                                html: { class: "mb-4" },
     #                                sidebar_html: { class: "bg-dark" },
@@ -39,9 +39,9 @@ module TablerUi
       #   namespace each item's list-group-item / tab-pane anchor pair.
       # @param options [Hash]
       # @option options [String] :title        Displayed above the sidebar navigation (default: "Settings")
-      # @option options [Hash]   :html          Rule 5 HTML hook for the outer `.card` (part :root)
-      # @option options [Hash]   :sidebar_html  Rule 5 HTML hook for the sidebar column/card-body (part :sidebar)
-      # @option options [Hash]   :content_html  Rule 5 HTML hook for the content area (part :content)
+      # @option options [Hash]   :html          HTML attributes for the outer `.card` (part :root)
+      # @option options [Hash]   :sidebar_html  HTML attributes for the sidebar column/card-body (part :sidebar)
+      # @option options [Hash]   :content_html  HTML attributes for the content area (part :content)
       def initialize(id, options = {})
         @id = id
         @title = options.fetch(:title, "Settings")
@@ -59,7 +59,7 @@ module TablerUi
       # @option options [Boolean] :active Whether this item is initially active
       #   (the first item added is active by default unless a later item is
       #   explicitly marked active: true)
-      # @option options [Hash, Proc] :html Rule 5 HTML hook for this item's own
+      # @option options [Hash, Proc] :html HTML attributes for this item's own
       #   `a.list-group-item` (part :item). May be a plain Hash, or a callable
       #   taking the item and returning a Hash -- see #item_attributes.
       # @param block [Proc] Content block for the settings panel (stored as a

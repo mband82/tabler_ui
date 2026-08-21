@@ -51,7 +51,7 @@
   <p class="text-secondary">No demos registered for <code><%= @name %></code> yet.</p>
 <% end %>
 
-<h2>Options</h2>
+<h2 id="options">Options</h2>
 <% if @parsed.options.any? %>
   <% option_columns = [
        { label: "Name", value: ->(opt) { tag.code(opt.name) } },
@@ -86,7 +86,7 @@
     ERB's scanner has no nesting awareness and stops at the first one it
     finds, full stop. %>
 <% if @parsed.examples.any? %>
-  <h2>Examples</h2>
+  <h2 id="examples">Examples</h2>
   <% @parsed.examples.each do |example| %>
     <% if example.title.present? %>
       <h4><%= example.title %></h4>
@@ -95,7 +95,57 @@
   <% end %>
 <% end %>
 
-<% @parsed.sections.each do |section| %>
-  <%= content_tag("h#{section.level}", section.title) %>
-  <div class="docs-section-body mb-3"><%= TablerUi::Docs::MarkdownHelper.render(section.body) %></div>
+<%# Each prose section gets a stable anchor id derived from its OWN title
+    text ("section-" + title.parameterize -- the same helper
+    _sidebar.html.erb already uses for its category ids), not from its
+    position in @parsed.sections. Position would repoint every anchor below
+    an edit each time a section is reordered or one is added/removed above
+    it; the title text only changes when someone actually rewrites that
+    heading, which is the one case an anchor SHOULD move. Two sections
+    sharing an identical title (not seen in any real component today) get
+    "-2", "-3", ... appended so ids still can't collide.
+
+    These ids feed both the heading itself, right below, and the Contents
+    column's link to it (see the contents_entries build further down) --
+    one identifier scheme, reused, per this task's own instruction not to
+    invent a second one (compare demo.slug, reused unchanged from
+    _demo.html.erb for the very same reason). %>
+<% section_entries = []
+   section_id_counts = Hash.new(0)
+   @parsed.sections.each do |section|
+     base_id = "section-#{section.title.parameterize}"
+     section_id_counts[base_id] += 1
+     count = section_id_counts[base_id]
+     id = count > 1 ? "#{base_id}-#{count}" : base_id
+     section_entries << { section: section, id: id }
+   end %>
+
+<% section_entries.each do |entry| %>
+  <%= content_tag("h#{entry[:section].level}", entry[:section].title, id: entry[:id]) %>
+  <div class="docs-section-body mb-3"><%= TablerUi::Docs::MarkdownHelper.render(entry[:section].body) %></div>
+<% end %>
+
+<%# Contents column (docs/app/views/tabler_ui/docs/shared/_contents.html.erb):
+    one entry per demo (linking to the id _demo.html.erb already gives its
+    card -- demo.slug, globally unique, see that partial's own comment) and
+    per prose section (linking to the id just assigned above), plus
+    "Options"/"Examples" when this component actually has either (skipped
+    when the page only shows their "nothing documented yet" fallback text,
+    which carries no id worth linking to).
+
+    content_for(:contents) is only called -- at all -- when there's
+    something in this list; the layout (application.html.erb) checks
+    content_for?(:contents) to decide whether to render the column's own
+    grid space, so a component with no demos, no documented options, no
+    examples and no prose sections gets no empty "Contents" box linking to
+    nothing (see spec/lib/tabler_ui/docs/contents_spec.rb). %>
+<% contents_entries =
+     @demos.map { |demo| { label: demo.title, href: "##{demo.slug}" } } +
+     (@parsed.options.any? ? [{ label: "Options", href: "#options" }] : []) +
+     (@parsed.examples.any? ? [{ label: "Examples", href: "#examples" }] : []) +
+     section_entries.map { |entry| { label: entry[:section].title, href: "##{entry[:id]}" } } %>
+<% if contents_entries.any? %>
+  <% content_for :contents do %>
+    <%= render "tabler_ui/docs/shared/contents", entries: contents_entries %>
+  <% end %>
 <% end %>

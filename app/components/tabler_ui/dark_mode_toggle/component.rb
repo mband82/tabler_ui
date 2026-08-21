@@ -14,7 +14,7 @@ module TablerUi
     # @example Small icons, custom title
     #   <%= tabler_ui.dark_mode_toggle size: :sm, title: "Switch theme" %>
     #
-    # @example Rule 5 hooks on the root <div> and the <button>
+    # @example HTML attributes on the root <div> and the <button>
     #   <%= tabler_ui.dark_mode_toggle html: { class: "me-2" }, button_html: { data: { testid: "theme-toggle" } } %>
     class Component
       include TablerUi::Base
@@ -22,8 +22,8 @@ module TablerUi
       # @param options [Hash]
       # @option options [Symbol] :size  :sm / :lg -- drives the SVG icons' pixel dimensions (default: 24)
       # @option options [String] :title Rendered as title="..." on the <button> (default: "Switch theme")
-      # @option options [Hash]   :html        Rule 5 HTML hook for the outer <div> (part :root)
-      # @option options [Hash]   :button_html Rule 5 HTML hook for the <button> (part :button)
+      # @option options [Hash]   :html        HTML attributes for the outer <div> (part :root)
+      # @option options [Hash]   :button_html HTML attributes for the <button> (part :button)
       def initialize(options = {})
         @size = options[:size]
         @title = options.fetch(:title, I18n.t("tabler_ui.dark_mode_toggle.title"))

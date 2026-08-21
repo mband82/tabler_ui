@@ -525,9 +525,8 @@ module TablerUi
                                data: { "tabler-ui--toggle-button-target": "input" } },
                              options[:input_html]
                            )),
-              # Rule 5: button_html: is the hook for this element, merged so a
-              # caller's class appends to the btn-* classes above rather than
-              # replacing them. Replaces the old custom_class: option.
+              # button_html: carries HTML attributes for this element.
+              # Replaces the old custom_class: option.
               tag.button(button_content, **merge_input_options(
                 { type: "button",
                   class: btn_classes.join(" "),

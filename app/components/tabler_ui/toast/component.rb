@@ -35,7 +35,7 @@ module TablerUi
     # @example Suppress the close button
     #   <%= tabler_ui.toast title: "Saved", close_button: false %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.toast title: "Saved", position: "top-right",
     #                       html:           { class: "mb-2" },
     #                       header_html:    { class: "bg-dark" },
@@ -86,15 +86,15 @@ module TablerUi
       #   `middle-left`, `middle-center`, `middle-right`, `bottom-left`, `bottom-center`,
       #   `bottom-right`. To stack several toasts in one corner, render each with no
       #   `position:` inside your own `.toast-container`.
-      # @option options [Hash]    :html           Rule 5 HTML hook for the root `.toast` (part :root)
-      # @option options [Hash]    :header_html    Rule 5 HTML hook for the `.toast-header` (part :header)
-      # @option options [Hash]    :body_html      Rule 5 HTML hook for the `.toast-body` (part :body)
-      # @option options [Hash]    :container_html Rule 5 HTML hook for the `.toast-container`,
+      # @option options [Hash]    :html           HTML attributes for the root `.toast` (part :root)
+      # @option options [Hash]    :header_html    HTML attributes for the `.toast-header` (part :header)
+      # @option options [Hash]    :body_html      HTML attributes for the `.toast-body` (part :body)
+      # @option options [Hash]    :container_html HTML attributes for the `.toast-container`,
       #   when `position:` is given (part :container)
-      # @option options [Hash]    :close_html     Rule 5 HTML hook for the `.btn-close`
+      # @option options [Hash]    :close_html     HTML attributes for the `.btn-close`
       #   button, when `close_button:` is true (part :close)
       #
-      # @example close_html: -- Rule 5 hook on the close button
+      # @example close_html: -- HTML attributes on the close button
       #   <%= tabler_ui.toast title: "Saved", close_html: { class: "me-1", data: { testid: "dismiss" } } %>
       def initialize(options = {})
         @title = options[:title]

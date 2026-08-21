@@ -32,7 +32,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Rule 5 hooks -- component-level and per-item
+    # @example HTML attributes -- component-level and per-item
     #   <%= tabler_ui.timeline html: { class: "mb-4" },
     #                          item_html: ->(item) { { class: "fw-bold" } if item.color == "red" } do |t| %>
     #     <% t.item icon: "flag", color: "red", icon_html: { class: "border" },
@@ -54,8 +54,8 @@ module TablerUi
       # @param options [Hash]
       # @option options [Boolean] :simple Hides the icon column entirely and drops the
       #   card's left margin (`timeline-simple`, default: false).
-      # @option options [Hash]       :html      Rule 5 HTML hook for the outer `ul.timeline` (part :root)
-      # @option options [Hash, Proc] :item_html Rule 5 HTML hook for each `li.timeline-event` (part :item).
+      # @option options [Hash]       :html      HTML attributes for the outer `ul.timeline` (part :root)
+      # @option options [Hash, Proc] :item_html HTML attributes for each `li.timeline-event` (part :item).
       #   Either a plain Hash (applied to every item) or a callable taking the
       #   item and returning a Hash.
       def initialize(options = {})
@@ -85,10 +85,10 @@ module TablerUi
       #   same `color:` forwarded to `tabler_ui.icon` for the glyph itself --
       #   the same "-lt box + coloured icon" pairing StatCard's icon box
       #   already uses, reused rather than inventing a new convention.
-      # @option options [Hash, #call] :icon_html Rule 5 HTML hook for this
+      # @option options [Hash, #call] :icon_html HTML attributes for this
       #   item's `.timeline-event-icon` (part :icon) -- a plain Hash, or a
       #   callable taking the item
-      # @option options [Hash, #call] :card_html Rule 5 HTML hook for this
+      # @option options [Hash, #call] :card_html HTML attributes for this
       #   item's `.timeline-event-card` (part :card) -- a plain Hash, or a
       #   callable taking the item
       # @param block [Proc] Event content, captured at render time and

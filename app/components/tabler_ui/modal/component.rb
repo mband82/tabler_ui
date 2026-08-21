@@ -32,7 +32,7 @@ module TablerUi
     # @example Suppress the close button
     #   <%= tabler_ui.modal "my-modal", close_button: false %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.modal "my-modal", title: "Confirm",
     #                       html: { class: "mb-4" },
     #                       dialog_html: { class: "modal-lg" },
@@ -77,12 +77,12 @@ module TablerUi
       # @option options [String]  :status       Colour for a `.modal-status` strip --
       #   validated against TablerUi::Color
       # @option options [Boolean] :close_button Whether to render the `.btn-close` (default: true)
-      # @option options [Hash]    :html         Rule 5 HTML hook for the root `.modal` (part :root)
-      # @option options [Hash]    :dialog_html  Rule 5 HTML hook for the `.modal-dialog` (part :dialog)
-      # @option options [Hash]    :content_html Rule 5 HTML hook for the `.modal-content` (part :content)
-      # @option options [Hash]    :header_html  Rule 5 HTML hook for the `.modal-header` (part :header)
-      # @option options [Hash]    :body_html    Rule 5 HTML hook for the `.modal-body` (part :body)
-      # @option options [Hash]    :footer_html  Rule 5 HTML hook for the `.modal-footer` (part :footer)
+      # @option options [Hash]    :html         HTML attributes for the root `.modal` (part :root)
+      # @option options [Hash]    :dialog_html  HTML attributes for the `.modal-dialog` (part :dialog)
+      # @option options [Hash]    :content_html HTML attributes for the `.modal-content` (part :content)
+      # @option options [Hash]    :header_html  HTML attributes for the `.modal-header` (part :header)
+      # @option options [Hash]    :body_html    HTML attributes for the `.modal-body` (part :body)
+      # @option options [Hash]    :footer_html  HTML attributes for the `.modal-footer` (part :footer)
       def initialize(id, options = {})
         @id = id
         @title = options[:title]

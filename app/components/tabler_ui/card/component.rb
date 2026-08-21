@@ -28,7 +28,7 @@ module TablerUi
     #   <%= tabler_ui.card title: "x", status: "red", borderless: true,
     #                       stacked: true, size: "lg" %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.card title: "x", html: { class: "mb-4" },
     #                       header_html: { class: "bg-dark" },
     #                       body_html: { class: "p-0" },
@@ -55,11 +55,11 @@ module TablerUi
       #   "start" or "bottom". Has no effect without `status:`.
       # @option options [Boolean] :borderless  card-borderless (default: false)
       # @option options [Boolean] :stacked     card-stacked (default: false)
-      # @option options [Hash]    :html        Rule 5 HTML hook for the outer `.card` (part :root)
-      # @option options [Hash]    :header_html Rule 5 HTML hook for the `.card-header` (part :header)
-      # @option options [Hash]    :body_html   Rule 5 HTML hook for the `.card-body` (part :body)
-      # @option options [Hash]    :footer_html Rule 5 HTML hook for the `.card-footer` (part :footer)
-      # @option options [Hash]    :status_html Rule 5 HTML hook for the status strip (part :status)
+      # @option options [Hash]    :html        HTML attributes for the outer `.card` (part :root)
+      # @option options [Hash]    :header_html HTML attributes for the `.card-header` (part :header)
+      # @option options [Hash]    :body_html   HTML attributes for the `.card-body` (part :body)
+      # @option options [Hash]    :footer_html HTML attributes for the `.card-footer` (part :footer)
+      # @option options [Hash]    :status_html HTML attributes for the status strip (part :status)
       def initialize(options = {})
         @title = options[:title]
         @size = options[:size]

@@ -29,7 +29,7 @@ module TablerUi
     #     <% slots.img do %><img src="/custom.svg" alt=""><% end %>
     #   <% end %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.empty title: "x", html: { class: "mb-4" },
     #                        title_html: { class: "text-danger" },
     #                        subtitle_html: { class: "text-muted" } %>
@@ -49,13 +49,13 @@ module TablerUi
       #   `tabler_ui.illustration` inside `.empty-img` when no `img` slot is given.
       #   For an arbitrary external image/URL, use the `img` slot instead.
       # @option options [Boolean] :bordered   empty-bordered (default: false)
-      # @option options [Hash]    :html          Rule 5 HTML hook for the outer `.empty` (part :root)
-      # @option options [Hash]    :img_html      Rule 5 HTML hook for the `.empty-img` (part :img)
-      # @option options [Hash]    :icon_html     Rule 5 HTML hook for the `.empty-icon` (part :icon)
-      # @option options [Hash]    :header_html   Rule 5 HTML hook for the `.empty-header` (part :header)
-      # @option options [Hash]    :title_html    Rule 5 HTML hook for the `.empty-title` (part :title)
-      # @option options [Hash]    :subtitle_html Rule 5 HTML hook for the `.empty-subtitle` (part :subtitle)
-      # @option options [Hash]    :action_html   Rule 5 HTML hook for the `.empty-action` (part :action)
+      # @option options [Hash]    :html          HTML attributes for the outer `.empty` (part :root)
+      # @option options [Hash]    :img_html      HTML attributes for the `.empty-img` (part :img)
+      # @option options [Hash]    :icon_html     HTML attributes for the `.empty-icon` (part :icon)
+      # @option options [Hash]    :header_html   HTML attributes for the `.empty-header` (part :header)
+      # @option options [Hash]    :title_html    HTML attributes for the `.empty-title` (part :title)
+      # @option options [Hash]    :subtitle_html HTML attributes for the `.empty-subtitle` (part :subtitle)
+      # @option options [Hash]    :action_html   HTML attributes for the `.empty-action` (part :action)
       def initialize(options = {})
         @title = options[:title]
         @subtitle = options[:subtitle]

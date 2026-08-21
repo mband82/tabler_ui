@@ -20,7 +20,7 @@ module TablerUi
     # @example Custom height and size
     #   <%= tabler_ui.progress percent: 30, height: "4px", size: :sm %>
     #
-    # @example Rule 5 hooks on all three parts
+    # @example HTML attributes on all three parts
     #   <%= tabler_ui.progress percent: 50,
     #                          html: { class: "mb-3" },
     #                          bar_html: { data: { testid: "upload-bar" } },
@@ -64,9 +64,9 @@ module TablerUi
       # @option options [Boolean] :separated Adds `.progress-separated` to the track. No
       #   visible effect with a single bar -- only matters for stacked progress bars,
       #   which this component does not yet render.
-      # @option options [Hash] :html Rule 5 HTML hook for the outer .progress <div> (part :root)
-      # @option options [Hash] :bar_html Rule 5 HTML hook for the inner .progress-bar <div> (part :bar)
-      # @option options [Hash] :label_html Rule 5 HTML hook for the label row <div> (part :label),
+      # @option options [Hash] :html HTML attributes for the outer .progress <div> (part :root)
+      # @option options [Hash] :bar_html HTML attributes for the inner .progress-bar <div> (part :bar)
+      # @option options [Hash] :label_html HTML attributes for the label row <div> (part :label),
       #   only rendered when label_row? is true
       def initialize(options = {})
         @indeterminate = options[:indeterminate]

@@ -34,7 +34,7 @@ module TablerUi
     # @example Always-visible sidebar from lg upward
     #   <%= tabler_ui.offcanvas "my-offcanvas", expand: "lg" %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.offcanvas "my-offcanvas", title: "Filters",
     #                           html: { class: "mb-4" },
     #                           header_html: { class: "bg-dark" },
@@ -79,10 +79,10 @@ module TablerUi
       # @option options [Boolean] :scroll   Bootstrap's `data-bs-scroll` option -- allow
       #   body scrolling while the offcanvas is open (default: false)
       # @option options [Boolean] :close_button Whether to render the `.btn-close` (default: true)
-      # @option options [Hash]    :html         Rule 5 HTML hook for the root `.offcanvas` (part :root)
-      # @option options [Hash]    :header_html  Rule 5 HTML hook for the `.offcanvas-header` (part :header)
-      # @option options [Hash]    :body_html    Rule 5 HTML hook for the `.offcanvas-body` (part :body)
-      # @option options [Hash]    :footer_html  Rule 5 HTML hook for the `.offcanvas-footer` (part :footer)
+      # @option options [Hash]    :html         HTML attributes for the root `.offcanvas` (part :root)
+      # @option options [Hash]    :header_html  HTML attributes for the `.offcanvas-header` (part :header)
+      # @option options [Hash]    :body_html    HTML attributes for the `.offcanvas-body` (part :body)
+      # @option options [Hash]    :footer_html  HTML attributes for the `.offcanvas-footer` (part :footer)
       def initialize(id, options = {})
         @id = id
         @position = TablerUi::Position.validate!(options[:position] || :start, context: "offcanvas")

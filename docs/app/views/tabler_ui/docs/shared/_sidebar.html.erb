@@ -8,7 +8,11 @@
     form_builder's own top-level entry underneath -- see navigation.rb's
     comment on FORM_BUILDER for why it has no category of its own (it isn't
     an app/components/tabler_ui directory, so Navigation.components/
-    CATEGORIES correctly omit it).
+    CATEGORIES correctly omit it). The html: / <part>_html: reference page
+    (Navigation::HTML_ATTRIBUTES) is the same story, but sits above the
+    categories instead, alongside "Overview" -- it's a cross-cutting
+    mechanism every component uses, not a component or a sibling concern
+    like form_builder.
 
     Each category is a Bootstrap collapse pane (data-bs-toggle="collapse" /
     data-controller="tabler-ui--collapse" on the pane itself) -- the exact
@@ -25,6 +29,9 @@
   <div class="list-group list-group-transparent mb-3">
     <%= link_to "Overview", root_path,
                  class: ["list-group-item", "list-group-item-action", ("active" if current.nil?)].compact.join(" ") %>
+    <%= link_to "HTML attributes", html_attributes_path,
+                 class: ["list-group-item", "list-group-item-action",
+                         ("active" if current == TablerUi::Docs::Navigation::HTML_ATTRIBUTES)].compact.join(" ") %>
   </div>
 
   <% TablerUi::Docs::Navigation.category_names.each do |category| %>

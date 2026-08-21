@@ -29,7 +29,7 @@ module TablerUi
     #     ...
     #   <% end %>
     #
-    # @example Rule 5 hooks -- component-level and per-item
+    # @example HTML attributes -- component-level and per-item
     #   <%= tabler_ui.carousel("my-carousel", html: { class: "mb-3" },
     #                          inner_html: { class: "rounded" },
     #                          indicators_html: { class: "mb-0" },
@@ -92,11 +92,11 @@ module TablerUi
       #   continuously (default: true) or hard-stops at the first/last slide.
       # @option options [Boolean] :keyboard Whether the carousel responds to
       #   arrow keys while focused (default: true).
-      # @option options [Hash] :html Rule 5 HTML hook for the root `.carousel` (part :root)
-      # @option options [Hash] :inner_html Rule 5 HTML hook for the `.carousel-inner` (part :inner)
-      # @option options [Hash] :indicators_html Rule 5 HTML hook for the `.carousel-indicators` (part :indicators)
-      # @option options [Hash] :prev_html Rule 5 HTML hook for the prev control (part :prev)
-      # @option options [Hash] :next_html Rule 5 HTML hook for the next control (part :next)
+      # @option options [Hash] :html HTML attributes for the root `.carousel` (part :root)
+      # @option options [Hash] :inner_html HTML attributes for the `.carousel-inner` (part :inner)
+      # @option options [Hash] :indicators_html HTML attributes for the `.carousel-indicators` (part :indicators)
+      # @option options [Hash] :prev_html HTML attributes for the prev control (part :prev)
+      # @option options [Hash] :next_html HTML attributes for the next control (part :next)
       def initialize(id, options = {})
         @id = id
         @fade = options[:fade]
@@ -128,9 +128,9 @@ module TablerUi
       #   slide (first slide added is active by default unless a later slide
       #   is explicitly marked active: true -- see the class docs' "Which
       #   slide is active" section)
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this slide's
+      # @option options [Hash, #call] :html HTML attributes for this slide's
       #   `.carousel-item` (part :item) -- a plain Hash, or a callable taking the item
-      # @option options [Hash, #call] :caption_html Rule 5 HTML hook for this
+      # @option options [Hash, #call] :caption_html HTML attributes for this
       #   slide's `.carousel-caption` (part :caption) -- a plain Hash, or a
       #   callable taking the item
       # @param block [Proc] Slide content, captured in the template --

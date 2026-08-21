@@ -39,7 +39,7 @@ module TablerUi
     # @example Icon-only badge (no padding-x -- only meaningful without text/content)
     #   <%= tabler_ui.badge color: "blue", icon: "star", icon_only: true %>
     #
-    # @example Rule 5 hook on the root <a>/<span>
+    # @example HTML attributes on the root <a>/<span>
     #   <%= tabler_ui.badge text: "New", html: { class: "me-2", data: { testid: "new-badge" } } %>
     class Component
       include TablerUi::Base
@@ -72,7 +72,7 @@ module TablerUi
       #   Block/caller-supplied body content. A plain String is escaped like
       #   any other <%= %> output; only a value that already arrived as an
       #   ActiveSupport::SafeBuffer is trusted verbatim.
-      # @option options [Hash]    :html         Rule 5 HTML hook for the root <a>/<span> (part :root)
+      # @option options [Hash]    :html         HTML attributes for the root <a>/<span> (part :root)
       def initialize(options = {})
         @text = options[:text]
         @color = TablerUi::Color.validate!(options[:color], context: "badge")

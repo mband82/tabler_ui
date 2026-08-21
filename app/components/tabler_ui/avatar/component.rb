@@ -31,7 +31,7 @@ module TablerUi
     # @example With details
     #   <%= tabler_ui.avatar initials: "JD", show_details: true, title: "Jane Doe", subtitle: "Admin" %>
     #
-    # @example Rule 5 hooks on the root <span>/<svg> and the details <div>
+    # @example HTML attributes on the root <span>/<svg> and the details <div>
     #   <%= tabler_ui.avatar initials: "JD", html: { class: "me-2" }, show_details: true, details_html: { class: "ms-1" } %>
     class Component
       include TablerUi::Base
@@ -49,8 +49,8 @@ module TablerUi
       # @option options [String] :title         Shown in the details block
       # @option options [String] :subtitle      Shown in the details block
       # @option options [Boolean] :cover        Adds avatar-cover, the "overlaps the card header" modifier
-      # @option options [Hash]   :html          Rule 5 HTML hook for the root <span>/<svg> (part :root)
-      # @option options [Hash]   :details_html  Rule 5 HTML hook for the show_details wrapper <div> (part :details)
+      # @option options [Hash]   :html          HTML attributes for the root <span>/<svg> (part :root)
+      # @option options [Hash]   :details_html  HTML attributes for the show_details wrapper <div> (part :details)
       def initialize(options = {})
         @initials = options[:initials]
         @name = options[:name].to_s
@@ -145,7 +145,7 @@ module TablerUi
       #   merged with whatever the caller supplied via html:. The
       #   background-image: url(...) / background-color: ... declarations
       #   are folded into this hash's :style so a caller-supplied html: {
-      #   style: ... } (ordinary overwrite semantics, per rule 5) replaces
+      #   style: ... } (ordinary overwrite semantics) replaces
       #   them rather than being silently clobbered by a second .merge done
       #   in the template. The image URL is only ever placed inside an
       #   attribute value built by `tag.span`, which HTML-escapes it like

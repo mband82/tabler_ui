@@ -22,46 +22,99 @@
     <%# Not a full Tabler .page shell with its own <body>-level chrome --
         this engine may be mounted inside a host app that already owns
         page-wide layout/CSS (see this task's own notes on not assuming
-        body/global CSS ownership). The navbar + sticky breadcrumb bar +
-        page-wrapper/sidebar/content grid below are self-contained Tabler
-        markup that renders correctly whether this <body> is the whole
-        page or not.
+        body/global CSS ownership). The navbar + breadcrumb bar +
+        page-wrapper/sidebar/content/contents grid below are self-contained
+        Tabler markup that renders correctly whether this <body> is the
+        whole page or not.
 
         The breadcrumb bar is a content_for(:breadcrumb) slot, not
         rendered unconditionally here -- only components/show.html.erb
         currently fills it (see its own comment), so the index and forms
         harness pages render with no breadcrumb bar at all rather than an
-        empty sticky strip. content_for(:breadcrumb) is guaranteed
-        populated by the time this layout runs (Rails renders the child
-        template -- which sets it -- before wrapping it in the layout). %>
+        empty strip. content_for(:breadcrumb) is guaranteed populated by
+        the time this layout runs (Rails renders the child template --
+        which sets it -- before wrapping it in the layout). Same guarantee,
+        same reasoning, for content_for(:contents) below (see
+        components/show.html.erb's own comment on when it does and does
+        not call content_for(:contents)). %>
     <% search_and_brand = capture do %>
       <%= link_to "Tabler UI Docs", root_path %>
       <%= render "tabler_ui/docs/shared/search" %>
     <% end %>
 
-    <%= tabler_ui.navbar(brand: search_and_brand) do |navbar| %>
-      <% navbar.right do |nav| %>
-        <% nav.dark_mode_toggle %>
-      <% end %>
-    <% end %>
+    <%# The navbar and the (page-dependent) breadcrumb bar used to be two
+        separate elements -- only the breadcrumb bar was `sticky-top`, and
+        it lost its own stickiness as soon as the navbar above it (not
+        sticky at all) scrolled out of view, since a sticky element sticks
+        relative to its OWN normal-flow position, not to whatever else is
+        on screen. Wrapping both in one `position: fixed` header fixes
+        that: reusing Bootstrap's own `.fixed-top` utility (position:
+        fixed; inset-x: 0; top: 0; z-index: 1030) rather than hand-rolling
+        the same three declarations in docs.css.
 
-    <% if content_for?(:breadcrumb) %>
-      <div class="docs-breadcrumb-bar sticky-top bg-body border-bottom">
-        <div class="container-xl py-2">
-          <%= yield :breadcrumb %>
-        </div>
-      </div>
-    <% end %>
+        A fixed header is out of normal flow, so everything below it needs
+        an explicit offset -- and that offset has two possible values,
+        since the breadcrumb bar (and therefore the header's height) is
+        only present on component pages. --docs-header-height holds
+        whichever one applies to the current page, set once here on
+        .docs-shell (a class this engine's own markup applies, never
+        `body` or another page-wide selector -- see docs.css's own header
+        comment) so every piece of layout that needs to sit clear of the
+        fixed header can read the SAME value: .docs-shell's own
+        padding-top (offsets the page-wrapper below), .docs-sidebar and
+        .docs-contents' sticky `top` (docs.css), and .docs-content [id]'s
+        scroll-margin-top (so clicking an anchor link doesn't land its
+        target underneath the fixed header).
 
-    <div class="page-wrapper">
-      <div class="page-body">
-        <div class="container-xl">
-          <div class="row">
-            <div class="col-12 col-lg-2 mb-4">
-              <%= render "tabler_ui/docs/shared/sidebar", current: @nav_current %>
+        The two values below are the real rendered heights of the navbar
+        (4rem) and the breadcrumb bar (2.3125rem) -- both fixed by
+        Tabler's own padding tokens, not by their content, so a static
+        number is safe here. Re-measure both if either bar's padding ever
+        changes. %>
+    <% header_height = content_for?(:breadcrumb) ? "6.3125rem" : "4rem" %>
+
+    <div class="docs-shell" style="--docs-header-height: <%= header_height %>;">
+      <header class="docs-fixed-header fixed-top">
+        <%= tabler_ui.navbar(brand: search_and_brand) do |navbar| %>
+          <% navbar.right do |nav| %>
+            <% nav.dark_mode_toggle %>
+          <% end %>
+        <% end %>
+
+        <% if content_for?(:breadcrumb) %>
+          <div class="docs-breadcrumb-bar bg-body border-bottom">
+            <div class="container-xl py-2">
+              <%= yield :breadcrumb %>
             </div>
-            <div class="col-12 col-lg-10">
-              <%= yield %>
+          </div>
+        <% end %>
+      </header>
+
+      <div class="page-wrapper">
+        <div class="page-body">
+          <div class="container-xl">
+            <div class="row">
+              <div class="col-12 col-lg-2 mb-4">
+                <%= render "tabler_ui/docs/shared/sidebar", current: @nav_current %>
+              </div>
+              <%# Contents (docs/app/views/tabler_ui/docs/shared/_contents.html.erb)
+                  only takes up a column when there's one to render -- see
+                  components/show.html.erb's own comment on when it calls
+                  content_for(:contents). Content widens to fill the space
+                  it would have used otherwise, same as the sidebar/content
+                  split already did for the breadcrumb bar above. %>
+              <div class="col-12 <%= content_for?(:contents) ? "col-lg-8" : "col-lg-10" %> mb-4 docs-content">
+                <%= yield %>
+              </div>
+              <% if content_for?(:contents) %>
+                <%# Hidden below the lg breakpoint here, on the column, not
+                    inside the partial -- there's no room for a third nav
+                    column on a narrow viewport, and everything it links to
+                    is already in reading order right above it. %>
+                <div class="col-lg-2 mb-4 d-none d-lg-block">
+                  <%= yield :contents %>
+                </div>
+              <% end %>
             </div>
           </div>
         </div>

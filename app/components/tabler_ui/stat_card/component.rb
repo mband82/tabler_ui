@@ -18,7 +18,7 @@ module TablerUi
     # @example Colored icon
     #   <%= tabler_ui.stat_card label: "Revenue", value: "$9,600", icon: "currency-dollar", color: "green" %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.stat_card label: "Sales", value: "456", icon: "shopping-cart",
     #                          html: { class: "mb-3" },
     #                          body_html: { data: { testid: "sales-card" } },
@@ -40,12 +40,12 @@ module TablerUi
       # @option options [String]           :color       Color variant for the icon box -- validated against
       #   TablerUi::Color (Tabler palette + Bootstrap semantic names). Defaults to "primary".
       # @option options [String]           :url         When present, renders a "Details" link
-      # @option options [Hash]             :html        Rule 5 HTML hook for the outer <div class="card"> (part :root)
-      # @option options [Hash]             :body_html   Rule 5 HTML hook for the <div class="card-body"> (part :body)
-      # @option options [Hash]             :value_html  Rule 5 HTML hook for the value element (part :value)
-      # @option options [Hash]             :icon_html   Rule 5 HTML hook for the icon badge (part :icon),
+      # @option options [Hash]             :html        HTML attributes for the outer <div class="card"> (part :root)
+      # @option options [Hash]             :body_html   HTML attributes for the <div class="card-body"> (part :body)
+      # @option options [Hash]             :value_html  HTML attributes for the value element (part :value)
+      # @option options [Hash]             :icon_html   HTML attributes for the icon badge (part :icon),
       #   only rendered when icon: is present
-      # @option options [Hash]             :link_html   Rule 5 HTML hook for the Details link (part :link),
+      # @option options [Hash]             :link_html   HTML attributes for the Details link (part :link),
       #   only rendered when url: is present
       def initialize(options = {})
         @label = options[:label]

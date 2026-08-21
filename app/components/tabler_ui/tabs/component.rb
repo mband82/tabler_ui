@@ -26,7 +26,7 @@ module TablerUi
     #   <% tabs.tab("Inbox", badge: "3") %>
     #   <% tabs.tab("Inbox", badge: { text: "3", color: "red" }) %>
     #
-    # @example Rule 5 hooks -- component-level and per-tab
+    # @example HTML attributes -- component-level and per-tab
     #   <%= tabler_ui.tabs("my-tabs", html: { class: "mb-3" },
     #                       nav_html: { class: "mb-0" },
     #                       content_html: { class: "p-2" }) do |tabs| %>
@@ -59,9 +59,9 @@ module TablerUi
       #   exclusive with :fill.
       # @option options [Boolean] :vertical Adds `nav-segmented-vertical`. Only valid
       #   together with style: :segmented -- raises ArgumentError otherwise.
-      # @option options [Hash] :html         Rule 5 HTML hook for the outer wrapper (part :root)
-      # @option options [Hash] :nav_html     Rule 5 HTML hook for the `ul.nav` (part :nav)
-      # @option options [Hash] :content_html Rule 5 HTML hook for the `.tab-content` (part :content)
+      # @option options [Hash] :html         HTML attributes for the outer wrapper (part :root)
+      # @option options [Hash] :nav_html     HTML attributes for the `ul.nav` (part :nav)
+      # @option options [Hash] :content_html HTML attributes for the `.tab-content` (part :content)
       def initialize(id, options = {})
         @id = id
         @style = validate_style(options[:style])
@@ -87,7 +87,7 @@ module TablerUi
       # @option options [Boolean] :active Whether this tab is initially active
       #   (the first tab added is active by default unless a later tab is
       #   explicitly marked active: true)
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this tab's
+      # @option options [Hash, #call] :html HTML attributes for this tab's
       #   `a.nav-link` (part :tab) -- a plain Hash, or a callable taking the tab
       # @param block [Proc] Content block for the tab panel, captured in the template
       # @return [String] empty string, to avoid stray output in a capture context

@@ -24,14 +24,14 @@ module TablerUi
     #     <% breadcrumb.item("2024", url: "/reports/2024") %>
     #   <% end %>
     #
-    # @example Rule 5 hooks -- root and per-item
+    # @example HTML attributes -- root and per-item
     #   <%= tabler_ui.breadcrumb(html: { class: "mb-3" }) do |breadcrumb| %>
     #     <% breadcrumb.item("Home", url: "/", html: { class: "fw-bold" }) %>
     #     <% breadcrumb.item("Library", url: "/library",
     #                         html: ->(item) { { class: "text-danger" } if item.title == "Library" }) %>
     #   <% end %>
     #
-    # @example link_html: -- Rule 5 hook on the `<a>` element itself (linked items only)
+    # @example link_html: -- HTML attributes on the `<a>` element itself (linked items only)
     #   <%= tabler_ui.breadcrumb(link_html: { class: "fw-bold" }) do |breadcrumb| %>
     #     <% breadcrumb.item("Home", url: "/") %>
     #     <% breadcrumb.item("Data") %>
@@ -84,8 +84,8 @@ module TablerUi
       #   the plain "/" divider. Anything else raises `ArgumentError`.
       # @option options [Boolean] :muted Renders links in a muted (secondary)
       #   colour via `breadcrumb-muted`.
-      # @option options [Hash] :html Rule 5 HTML hook for the `<ol class="breadcrumb">` (part :root)
-      # @option options [Hash, #call] :link_html Rule 5 HTML hook for every
+      # @option options [Hash] :html HTML attributes for the `<ol class="breadcrumb">` (part :root)
+      # @option options [Hash, #call] :link_html HTML attributes for every
       #   item's `<a>` (part :link) -- a Hash, or a callable taking the item.
       #   Only applied when the item renders as a link -- see "The
       #   `link_html:` hook and non-linked items" above.
@@ -108,7 +108,7 @@ module TablerUi
       # @option options [Boolean] :active Marks this item as the current page.
       #   See the class docs above for how this interacts with the automatic
       #   last-item default.
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
+      # @option options [Hash, #call] :html HTML attributes for this item's
       #   `<li class="breadcrumb-item">` (part :item) -- a plain Hash, or a
       #   callable taking the item
       # @return [String] empty string, to avoid stray output in a capture context

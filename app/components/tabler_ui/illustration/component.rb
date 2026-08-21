@@ -13,7 +13,7 @@ module TablerUi
     # @example Dark theme, sized
     #   <%= tabler_ui.illustration name: "empty", theme: "dark", size: :lg %>
     #
-    # @example Rule 5 hook on the root <svg>
+    # @example HTML attributes on the root <svg>
     #   <%= tabler_ui.illustration name: "empty", html: { class: "me-2", data: { testid: "empty-illustration" } } %>
     class Component
       include TablerUi::Base
@@ -46,7 +46,7 @@ module TablerUi
       # @option options [String]        :theme Asset folder to load from: "light" or "dark" (default: "light")
       # @option options [String,Symbol,Integer] :size Named size (:xs..:xxl) or a raw pixel width;
       #   height is scaled proportionally from the source viewBox
-      # @option options [Hash]          :html  Rule 5 HTML hook for the root <svg> element
+      # @option options [Hash]          :html  HTML attributes for the root <svg> element
       def initialize(name, options = {})
         @name = name
         @theme = options.fetch(:theme, "light")
@@ -114,9 +114,8 @@ module TablerUi
       # Builds the final attribute hash for the root <svg>: the tag's own
       # existing attributes (width, viewBox, ... and its own class), with
       # width/height overridden per the :size option, merged with whatever
-      # the caller passed via the html: hook (rule 5 -- see TablerUi::Base
-      # and TablerUi::HtmlOptions.merge_html: caller class is appended, other
-      # attributes overwrite).
+      # the caller passed via html: (see TablerUi::Base and
+      # TablerUi::HtmlOptions.merge_html).
       def root_attributes(opening_tag)
         existing = parse_attributes(opening_tag)
         own_class = existing.delete("class")

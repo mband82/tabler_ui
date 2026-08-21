@@ -14,7 +14,7 @@ module TablerUi
     #   <%= tabler_ui.rating choices: [{ value: 1, label: "Bad" }, { value: 2, label: "Ok" }, { value: 3, label: "Great" }],
     #                        max_stars: 3, color: "yellow" %>
     #
-    # @example Rule 5 hook on the <select>
+    # @example HTML attributes on the <select>
     #   <%= tabler_ui.rating html: { class: "me-2", data: { testid: "rating" } } %>
     class Component
       include TablerUi::Base
@@ -34,8 +34,8 @@ module TablerUi
       # @option options [Boolean] :tooltip   (default: true)
       # @option options [Boolean] :clearable (default: true)
       # @option options [Integer] :max_stars (default: 5)
-      # @option options [Hash]    :html      Rule 5 HTML hook for the <select> (part :root)
-      # @option options [Hash]    :wrapper_html Rule 5 HTML hook for the wrapping
+      # @option options [Hash]    :html      HTML attributes for the <select> (part :root)
+      # @option options [Hash]    :wrapper_html HTML attributes for the wrapping
       #   <span> (part :wrapper) that carries the Stimulus controller. The
       #   controller lives here, not on the <select>.
       #

@@ -27,7 +27,7 @@ module TablerUi
     # @example Animated status indicator
     #   <%= tabler_ui.status color: "blue", indicator: true, animated: true %>
     #
-    # @example Rule 5 hooks on the root <span> and the inner dot <span>
+    # @example HTML attributes on the root <span> and the inner dot <span>
     #   <%= tabler_ui.status text: "Online", dot: true,
     #                        html: { class: "me-2" }, dot_html: { data: { testid: "status-dot" } } %>
     class Component
@@ -41,8 +41,8 @@ module TablerUi
       # @option options [Boolean] :light     Use the light/subtle variant (renders "status-lite")
       # @option options [Boolean] :standalone Render as a standalone dot (no text)
       # @option options [Boolean] :indicator Use the status indicator style (3 circles)
-      # @option options [Hash]    :html      Rule 5 HTML hook for the root <span> (part :root)
-      # @option options [Hash]    :dot_html  Rule 5 HTML hook for the inner dot <span> (part :dot),
+      # @option options [Hash]    :html      HTML attributes for the root <span> (part :root)
+      # @option options [Hash]    :dot_html  HTML attributes for the inner dot <span> (part :dot),
       #   only rendered when a dot is shown alongside text (dot: true, standalone/indicator both false)
       def initialize(options = {})
         @text = options[:text]

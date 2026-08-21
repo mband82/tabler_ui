@@ -40,4 +40,10 @@ TablerUi::Docs::Engine.routes.draw do
   # client-side -- see docs/lib/tabler_ui/docs/search_index.rb and
   # docs/app/javascript/controllers/tabler_ui/docs/search_controller.js.
   get "search", to: "search#index", as: :search
+
+  # Cross-cutting reference for the html: / <part>_html: mechanism every
+  # component uses (TablerUi::HtmlOptions.merge_html / TablerUi::Base#html_for)
+  # -- explained once here instead of on each of the 35 component pages. See
+  # PagesController#html_attributes and Navigation::HTML_ATTRIBUTES.
+  get "html-attributes", to: "pages#html_attributes", as: :html_attributes
 end

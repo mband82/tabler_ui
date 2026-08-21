@@ -53,6 +53,16 @@ module TablerUi
       # is visible rather than silently absent.
       FORM_BUILDER = "form_builder"
 
+      # The html: / <part>_html: reference page (GET /ui/html-attributes,
+      # PagesController#html_attributes) is likewise not a component
+      # directory -- it documents a mechanism every component uses, not one
+      # component's own options -- so it gets its own top-level sidebar
+      # entry too, above the categories rather than below like
+      # FORM_BUILDER, since it applies to all of them rather than being a
+      # sibling concern. Named here, the same way, so the sidebar can mark
+      # it active without hardcoding the string.
+      HTML_ATTRIBUTES = "html_attributes"
+
       # Ordered Hash: category display name => Array of component names
       # (Strings, matching the directory name under app/components/tabler_ui).
       # Order here is the sidebar's order, top to bottom -- a literal Hash

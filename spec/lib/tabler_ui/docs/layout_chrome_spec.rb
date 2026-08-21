@@ -4,12 +4,14 @@ require "rails_helper"
 require "tabler_ui/docs/navigation"
 
 # Structural checks for the docs engine's chrome
-# (docs/app/views/layouts/tabler_ui/docs/application.html.erb): the navbar
-# (brand + search + dark mode toggle), the sticky breadcrumb bar (component
-# pages only), and the widened content column. Visual/interactive
-# properties (does it actually stay pinned while scrolling, does the toggle
-# actually flip the theme) are out of scope for a request spec -- these
-# only assert the markup/classes that drive that behaviour are present.
+# (docs/app/views/layouts/tabler_ui/docs/application.html.erb): the fixed
+# header (navbar + brand + search + dark mode toggle, plus the breadcrumb
+# bar on component pages only), and the widened content column. Visual/
+# interactive properties (does it actually stay pinned while scrolling, does
+# the offset actually clear the fixed header, does the toggle actually flip
+# the theme) are out of scope for a request spec -- these only assert the
+# markup/classes/custom-property values that drive that behaviour are
+# present.
 RSpec.describe "TablerUi::Docs layout chrome", type: :request do
   describe "the navbar" do
     it "renders on every kind of docs page, with a brand link to the index" do
@@ -50,15 +52,68 @@ RSpec.describe "TablerUi::Docs layout chrome", type: :request do
     end
   end
 
-  describe "the sticky breadcrumb bar" do
-    it "is present on a component page, sticky, with Overview/category/component items" do
+  # The navbar and the breadcrumb bar used to be two independent elements --
+  # only the breadcrumb bar was sticky, so it lost its own stickiness as
+  # soon as the (not sticky at all) navbar above it scrolled out of view.
+  # Both are now wrapped in one fixed-position header instead, so the whole
+  # thing (navbar included) stays pinned together.
+  describe "the fixed header" do
+    it "wraps the navbar in a fixed-position header, on every kind of docs page" do
+      ["/ui", "/ui/forms", "/ui/components/badge"].each do |path|
+        get path
+
+        fragment = Nokogiri::HTML5.fragment(response.body)
+        header = fragment.at_css("header.docs-fixed-header")
+
+        expect(header).not_to be_nil, "expected header.docs-fixed-header on #{path}"
+        expect(header["class"]).to include("fixed-top")
+        expect(header.at_css("header.navbar")).not_to be_nil
+      end
+    end
+
+    it "also wraps the breadcrumb bar, on a component page" do
+      get "/ui/components/badge"
+
+      fragment = Nokogiri::HTML5.fragment(response.body)
+      header = fragment.at_css("header.docs-fixed-header")
+      bar = header.at_css(".docs-breadcrumb-bar")
+
+      expect(bar).not_to be_nil
+      items = bar.css(".breadcrumb-item").map { |item| item.text.strip }
+      expect(items).to eq(%w[Overview Content Badge])
+    end
+
+    it "sets --docs-header-height once, on the shell wrapping the whole header + page-wrapper" do
+      get "/ui/components/badge"
+
+      fragment = Nokogiri::HTML5.fragment(response.body)
+      shell = fragment.at_css(".docs-shell")
+
+      expect(shell).not_to be_nil
+      expect(shell.at_css("header.docs-fixed-header")).not_to be_nil
+      expect(shell.at_css(".page-wrapper")).not_to be_nil
+      expect(shell["style"]).to match(/--docs-header-height:\s*[^;]+/)
+    end
+
+    it "uses a taller --docs-header-height on a page with a breadcrumb bar than one without" do
+      get "/ui/components/badge"
+      with_breadcrumb_height = Nokogiri::HTML5.fragment(response.body).at_css(".docs-shell")["style"][/--docs-header-height:\s*([^;]+)/, 1]
+
+      get "/ui"
+      without_breadcrumb_height = Nokogiri::HTML5.fragment(response.body).at_css(".docs-shell")["style"][/--docs-header-height:\s*([^;]+)/, 1]
+
+      expect(with_breadcrumb_height).not_to eq(without_breadcrumb_height)
+    end
+  end
+
+  describe "the breadcrumb bar" do
+    it "is present on a component page, with Overview/category/component items" do
       get "/ui/components/badge"
 
       fragment = Nokogiri::HTML5.fragment(response.body)
       bar = fragment.at_css(".docs-breadcrumb-bar")
 
       expect(bar).not_to be_nil
-      expect(bar["class"]).to include("sticky-top")
 
       items = bar.css(".breadcrumb-item").map { |item| item.text.strip }
       expect(items).to eq(%w[Overview Content Badge])
@@ -86,7 +141,19 @@ RSpec.describe "TablerUi::Docs layout chrome", type: :request do
       fragment = Nokogiri::HTML5.fragment(response.body)
 
       expect(fragment.at_css(".col-lg-2 nav.docs-sidebar")).not_to be_nil
-      expect(fragment.at_css(".col-lg-10")).not_to be_nil
+      # badge has demos and documented options, so the Contents column
+      # renders too (see contents_spec.rb) and the content column narrows
+      # to make room for it, rather than staying the full col-lg-10 it is
+      # when there's no Contents column to share the row with.
+      expect(fragment.at_css(".col-lg-8.docs-content")).not_to be_nil
+    end
+
+    it "falls back to the full-width column when there's no Contents to make room for" do
+      get "/ui"
+
+      fragment = Nokogiri::HTML5.fragment(response.body)
+      expect(fragment.at_css(".col-lg-10.docs-content")).not_to be_nil
+      expect(fragment.at_css(".col-lg-8.docs-content")).to be_nil
     end
   end
 end

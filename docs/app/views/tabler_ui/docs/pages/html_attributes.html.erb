@@ -1,0 +1,107 @@
+<%# Cross-cutting reference for the html: / <part>_html: mechanism every component
+    uses to accept caller-supplied HTML attributes -- see
+    lib/tabler_ui/html_options.rb (TablerUi::HtmlOptions.merge_html) and
+    lib/tabler_ui/base.rb (TablerUi::Base#html_for). Component pages name their own
+    html:/<part>_html: keys and point here for the merge rule rather than
+    restating it -- see this page's spec
+    (spec/lib/tabler_ui/docs/html_attributes_page_spec.rb) for the exact claims it
+    is expected to keep documenting. %>
+<%= tabler_ui.icon icon: "adjustments", class: "me-2" %>
+<%= tabler_ui.page_header title: "HTML attributes", pretitle: "Customization" %>
+
+<p class="text-secondary docs-section-body">
+  Most components take a hash of HTML attributes for one or more of the elements
+  they render. You supply the hash, the component merges it onto its own
+  defaults, and the result becomes that element's attributes. Every component
+  page names its own <code>html:</code> keys; this page is the one place the
+  merge itself is explained.
+</p>
+
+<h2>The naming convention</h2>
+<p class="text-secondary docs-section-body">
+  <code>html:</code> targets a component's root element. A part-specific hook is
+  named <code>&lt;part&gt;_html:</code>. <%= link_to "Card", component_path("card") %>
+  renders three named parts, each with its own hook:
+</p>
+<pre class="bg-dark-lt rounded p-2 mb-0"><code>tabler_ui.card title: "Invoices",
+              header_html: { class: "bg-dark" },
+              body_html:   { class: "p-0" },
+              footer_html: { class: "text-end" } do |slots|
+  ...
+end</code></pre>
+
+<h2>The merge rule</h2>
+<p class="text-secondary docs-section-body">
+  What happens depends on the attribute name, decided by
+  <code>TablerUi::HtmlOptions.merge_html</code>:
+</p>
+<div class="table-responsive mb-3">
+  <table class="table table-vcenter card-table">
+    <thead>
+      <tr><th>Attribute</th><th>Rule</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>class</code></td>
+        <td>Appended to the component's own classes, deduplicated. Never replaces them.</td>
+      </tr>
+      <tr>
+        <td><code>data</code></td>
+        <td>Merged one level deep -- your keys and the component's own keys both survive; a key given by both sides, yours wins.</td>
+      </tr>
+      <tr>
+        <td><code>aria</code></td>
+        <td>Same rule as <code>data</code> -- merged one level deep.</td>
+      </tr>
+      <tr>
+        <td>anything else</td>
+        <td>Yours overwrites the component's outright.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<p class="text-secondary docs-section-body">
+  A worked example -- <%= link_to "Button", component_path("button") %>'s
+  <code>confirm:</code> option already puts a <code>turbo_confirm</code> key
+  into the root element's <code>:data</code>. Adding your own <code>data:</code>
+  via <code>html:</code> does not replace it:
+</p>
+<pre class="bg-dark-lt rounded p-2 mb-0"><code>tabler_ui.button text: "Delete", color: "danger", confirm: "Are you sure?",
+                 html: { data: { testid: "delete-button" } }
+
+# component's own defaults for the root element:
+{ class: "btn btn-danger", data: { turbo_confirm: "Are you sure?" } }
+
+# your html: option:
+{ data: { testid: "delete-button" } }
+
+# merged -- both data keys survive, class is untouched by data at all:
+{ class: "btn btn-danger", data: { turbo_confirm: "Are you sure?", testid: "delete-button" } }</code></pre>
+
+<h2>Per-item hooks: callables</h2>
+<p class="text-secondary docs-section-body">
+  Parts that repeat -- table rows, pagination links, breadcrumb items -- also
+  accept a <strong>proc</strong> instead of a Hash. It is called once per item
+  and receives that item; whatever Hash it returns is merged exactly like a
+  static one. A proc returning <code>{}</code> or <code>nil</code> contributes
+  nothing. <%= link_to "Table", component_path("table") %>'s <code>row_html:</code>:
+</p>
+<pre class="bg-dark-lt rounded p-2 mb-0"><code>tabler_ui.table columns: columns, data: invoices,
+               row_html: ->(row) { row.overdue? ? { class: "table-danger" } : {} }</code></pre>
+<p class="text-secondary docs-section-body">
+  On the component side, that hook is resolved with
+  <code>html_for(:row, {}, row)</code> -- the extra argument after the
+  defaults hash is what the stored proc gets called with.
+</p>
+
+<h2>When the element doesn't render</h2>
+<p class="text-secondary docs-section-body">
+  A hook only applies to an element the component actually renders.
+  <%= link_to "Breadcrumb", component_path("breadcrumb") %>'s <code>link_html:</code>
+  targets each item's <code>&lt;a&gt;</code> -- but the current item, and any
+  item with no <code>url:</code>, renders as plain text with no
+  <code>&lt;a&gt;</code> to apply it to. <code>link_html:</code> is silently
+  skipped for that item; use the item's own <code>html:</code> (part
+  <code>:item</code>, its <code>&lt;li&gt;</code>) to reach it instead.
+</p>

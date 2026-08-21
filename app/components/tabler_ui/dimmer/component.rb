@@ -16,7 +16,7 @@ module TablerUi
     #     <% slots.content do %>Table rows go here<% end %>
     #   <% end %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.dimmer active: true, html: { class: "mb-4" },
     #                         loader_html: { class: "text-primary" },
     #                         content_html: { class: "p-3" } do |slots| %>
@@ -29,9 +29,9 @@ module TablerUi
 
       # @param options [Hash]
       # @option options [Boolean] :active Adds `.active` (default: false)
-      # @option options [Hash] :html         Rule 5 HTML hook for the outer `.dimmer` (part :root)
-      # @option options [Hash] :loader_html  Rule 5 HTML hook for the `.loader` (part :loader)
-      # @option options [Hash] :content_html Rule 5 HTML hook for the `.dimmer-content` (part :content)
+      # @option options [Hash] :html         HTML attributes for the outer `.dimmer` (part :root)
+      # @option options [Hash] :loader_html  HTML attributes for the `.loader` (part :loader)
+      # @option options [Hash] :content_html HTML attributes for the `.dimmer-content` (part :content)
       def initialize(options = {})
         @active = options[:active] || false
 

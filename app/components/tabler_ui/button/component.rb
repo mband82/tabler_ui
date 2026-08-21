@@ -20,7 +20,7 @@ module TablerUi
     # @example Icon-only action button
     #   <%= tabler_ui.button icon: "trash", icon_only: true, action: true, url: "/widgets/1", method: :delete %>
     #
-    # @example Rule 5 hook on the root <a>/<button>
+    # @example HTML attributes on the root <a>/<button>
     #   <%= tabler_ui.button text: "Save", html: { class: "me-2", data: { testid: "save-button" } } %>
     #
     # @example Confirmation dialog
@@ -85,7 +85,7 @@ module TablerUi
       #   `data-turbo-confirm="..."`, merged into `:data`. See "Turbo" above.
       # @option options [Boolean] :turbo       Render a non-GET action as a Turbo link instead of
       #   `button_to`'s `<form>`. No-op when `method:` is `:get` (default: false). See "Turbo" above.
-      # @option options [Hash]    :html        Rule 5 HTML hook for the root <a>/<button> (part :root)
+      # @option options [Hash]    :html        HTML attributes for the root <a>/<button> (part :root)
       def initialize(options = {})
         @action = options[:action]
         @text = options.key?(:text) ? options[:text] : default_text
@@ -166,8 +166,8 @@ module TablerUi
       #   given) and data-turbo-method (when #turbo_link?). Built here,
       #   rather than merged in a second step on top of #root_attributes'
       #   result, so TablerUi::HtmlOptions.merge_html only ever sees one
-      #   :data hash on our side and merges it against the html: hook's
-      #   :data exactly once -- see rule 5.
+      #   :data hash on our side and merges it against the caller's html:
+      #   :data exactly once.
       def root_data
         data = @data ? @data.dup : {}
         data[:turbo_confirm] = @confirm if @confirm.present?

@@ -27,7 +27,7 @@ module TablerUi
     # @example With an action link
     #   <%= tabler_ui.alert color: "info", text: "New update available.", url: "/changelog", link_text: "See what's new" %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.alert text: "Saved!", html: { class: "mb-4" },
     #                       title: "Done", title_html: { class: "text-uppercase" },
     #                       icon_html: { data: { testid: "alert-icon" } } %>
@@ -59,15 +59,15 @@ module TablerUi
       # @option options [Boolean] :minor       Transparent background, bordered style (default: false)
       # @option options [Symbol]  :link_style  :link (default, bold underline-free) or :action
       #   (underlined, no bold) for the action link's style
-      # @option options [Hash]    :html        Rule 5 HTML hook for the root .alert element (part :root)
-      # @option options [Hash]    :title_html  Rule 5 HTML hook for the .alert-heading (part :title),
+      # @option options [Hash]    :html        HTML attributes for the root .alert element (part :root)
+      # @option options [Hash]    :title_html  HTML attributes for the .alert-heading (part :title),
       #   only applied when a title renders
-      # @option options [Hash]    :icon_html   Rule 5 HTML hook for the icon's root <svg>
+      # @option options [Hash]    :icon_html   HTML attributes for the icon's root <svg>
       #   (part :icon) -- there is no wrapper element, so the hook lands directly on the
       #   svg. Only applied when an icon renders.
-      # @option options [Hash]    :link_html   Rule 5 HTML hook for the `.alert-link`/`.alert-action`
+      # @option options [Hash]    :link_html   HTML attributes for the `.alert-link`/`.alert-action`
       #   action link (part :link). Only applied when :url renders one.
-      # @option options [Hash]    :dismiss_html Rule 5 HTML hook for the `.btn-close` dismiss link
+      # @option options [Hash]    :dismiss_html HTML attributes for the `.btn-close` dismiss link
       #   (part :dismiss), only applied when :dismissible renders one. See #dismiss_attributes.
       def initialize(options = {})
         @text = options[:text]

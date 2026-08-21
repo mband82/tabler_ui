@@ -12,7 +12,7 @@ module TablerUi
     # @example Filled variant, colored, animated
     #   <%= tabler_ui.icon icon: "heart", filled: true, color: "danger", pulse: true %>
     #
-    # @example Rule 5 hook on the root <svg>
+    # @example HTML attributes on the root <svg>
     #   <%= tabler_ui.icon icon: "user", html: { class: "me-2", data: { testid: "user-icon" } } %>
     class Component
       include TablerUi::Base
@@ -40,7 +40,7 @@ module TablerUi
       # @option options [Boolean] :rotate Adds the "icon-rotate" animation class
       # @option options [String]  :size   Rendered as "icon-<size>" on the root svg
       # @option options [String]  :title  Rendered as a title="..." attribute on the root svg
-      # @option options [Hash]    :html   Rule 5 HTML hook for the root <svg> element
+      # @option options [Hash]    :html   HTML attributes for the root <svg> element
       def initialize(icon, options = {})
         @icon = icon
         @filled = options[:filled]
@@ -114,9 +114,8 @@ module TablerUi
       # Builds the final attribute hash for the root <svg>: the tag's own
       # existing attributes (width, viewBox, stroke, ... and its own class),
       # plus this component's computed classes/title, merged with whatever
-      # the caller passed via the html: hook (rule 5 -- see TablerUi::Base
-      # and TablerUi::HtmlOptions.merge_html: caller class is appended, other
-      # attributes overwrite).
+      # the caller passed via html: (see TablerUi::Base and
+      # TablerUi::HtmlOptions.merge_html).
       def root_attributes(opening_tag)
         existing = parse_attributes(opening_tag)
         own_class = existing.delete("class")

@@ -27,7 +27,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Rule 5 hooks -- component-level and per nav-item
+    # @example HTML attributes -- component-level and per nav-item
     #   <%= tabler_ui.navbar(html: { class: "shadow-sm" },
     #                        brand_html: { class: "fw-bold" },
     #                        toggler_html: { class: "border-0" },
@@ -37,7 +37,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Rule 5 hooks -- the nav link and dropdown toggle `<a>`s themselves
+    # @example HTML attributes -- the nav link and dropdown toggle `<a>`s themselves
     #   <%= tabler_ui.navbar(link_html: { data: { testid: "nav-link" } },
     #                        dropdown_toggle_html: { class: "fw-bold" }) do |navbar| %>
     #     <% navbar.left do |nav| %>
@@ -67,17 +67,17 @@ module TablerUi
       # @option options [Boolean] :nav_scroll  Adds `navbar-nav-scroll` to the collapsible menu, capping it at
       #   `var(--tblr-scroll-height, 75vh)` with a scrollbar. Only takes effect while collapsed. Set a custom
       #   cap via `menu_html: { style: "--tblr-scroll-height: 300px" }`.
-      # @option options [Hash] :html         Rule 5 HTML hook for the outer `header.navbar` (part :root)
-      # @option options [Hash] :brand_html   Rule 5 HTML hook for `.navbar-brand` (part :brand)
-      # @option options [Hash] :toggler_html Rule 5 HTML hook for the mobile toggler button (part :toggler)
-      # @option options [Hash] :menu_html    Rule 5 HTML hook for the collapsible menu container (part :menu)
-      # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to every plain nav
+      # @option options [Hash] :html         HTML attributes for the outer `header.navbar` (part :root)
+      # @option options [Hash] :brand_html   HTML attributes for `.navbar-brand` (part :brand)
+      # @option options [Hash] :toggler_html HTML attributes for the mobile toggler button (part :toggler)
+      # @option options [Hash] :menu_html    HTML attributes for the collapsible menu container (part :menu)
+      # @option options [Hash, #call] :link_html HTML attributes applied to every plain nav
       #   link's `<a>` (or the `<button>` inside `button_to`'s `<form>` for a non-GET
       #   `method:`) -- part :link. A Hash, or a callable taking the item. Merged underneath
       #   this item's own `link_html:` given to `NavigationGroup#add`. Does *not* reach the
       #   dropdown toggle (`dropdown_toggle_html:`) or dropdown sub-item links (their own
       #   per-item `link_html:` on `DropDownProxy#item`).
-      # @option options [Hash, #call] :dropdown_toggle_html Rule 5 HTML hook applied to every
+      # @option options [Hash, #call] :dropdown_toggle_html HTML attributes applied to every
       #   dropdown's toggle `<a class="dropdown-toggle">` (part :dropdown_toggle) -- a Hash,
       #   or a callable taking the item. A caller's own `data:` deep-merges with the toggle's
       #   built-in `data-bs-toggle`/`data-controller` rather than replacing them.
@@ -271,8 +271,8 @@ module TablerUi
         #   if the view responds to `can?`, shown unconditionally otherwise
         # @option options [Boolean] :active Explicit active override. When nil (default), the
         #   template auto-detects via `current_page?(url)`.
-        # @option options [Hash, #call] :html Rule 5 HTML hook for this item's `li.nav-item` (part :item)
-        # @option options [Hash, #call] :link_html Rule 5 HTML hook for this item's nav link
+        # @option options [Hash, #call] :html HTML attributes for this item's `li.nav-item` (part :item)
+        # @option options [Hash, #call] :link_html HTML attributes for this item's nav link
         #   itself (part :link) -- the `<a>`, or the `<button>` inside `button_to`'s `<form>`
         #   for a non-GET `method:`. Merged on top of the component-level `link_html:` option
         #   -- see Component#link_attributes.
@@ -302,7 +302,7 @@ module TablerUi
         # @option options [Symbol, String] :align Dropdown menu alignment -- :start (default) or :end.
         #   Also tolerates the strings "start"/"end". Any other value (including the old "left"/"right")
         #   raises ArgumentError -- see TablerUi::Align.validate!.
-        # @option options [Hash, #call] :html Rule 5 HTML hook for this item's `li.nav-item` (part :item)
+        # @option options [Hash, #call] :html HTML attributes for this item's `li.nav-item` (part :item)
         # @yield [DropDownProxy]
         def dropdown(title, options = {})
           builder_argument!(title, :title, builder: :dropdown)
@@ -325,7 +325,7 @@ module TablerUi
         # `tabler_ui.dark_mode_toggle` component rather than hand-rolled markup.
         #
         # @param options [Hash]
-        # @option options [Hash, #call] :html Rule 5 HTML hook for this item's `li.nav-item` (part :item)
+        # @option options [Hash, #call] :html HTML attributes for this item's `li.nav-item` (part :item)
         # @option options remaining keys forwarded to `tabler_ui.dark_mode_toggle` (e.g. :size, :title)
         def dark_mode_toggle(options = {})
           @items << Item.new(type: :dark_mode_toggle, html: options[:html], toggle_options: options.except(:html))
@@ -396,7 +396,7 @@ module TablerUi
           # @option options [Boolean] :disabled
           # @option options [Boolean] :active Explicit active override. When nil (default), the
           #   template auto-detects via `current_page?(url)`.
-          # @option options [Hash, #call] :link_html Rule 5 HTML hook for this sub-item's link
+          # @option options [Hash, #call] :link_html HTML attributes for this sub-item's link
           #   itself (not routed through a component-level option -- see
           #   Component#dropdown_item_link_attributes) -- the `<a>`, or the `<button>` inside
           #   `button_to`'s `<form>` for a non-GET `method:`.

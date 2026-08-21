@@ -32,7 +32,7 @@ module TablerUi
     #     ...
     #   <% end %>
     #
-    # @example Rule 5 hooks -- component-level and per-item
+    # @example HTML attributes -- component-level and per-item
     #   <%= tabler_ui.accordion("my-accordion", html: { class: "mb-3" }) do |accordion| %>
     #     <% accordion.item("First", icon: "home",
     #                        html: { class: "fw-bold" },
@@ -61,7 +61,7 @@ module TablerUi
       # @option options [Symbol]  :toggle_style Toggle icon: :chevron (default) or :plus
       # @option options [Boolean] :multiple Allow more than one item open at once (default: false --
       #   single-open, each pane closes its siblings via data-bs-parent)
-      # @option options [Hash] :html Rule 5 HTML hook for the outer wrapper (part :root)
+      # @option options [Hash] :html HTML attributes for the outer wrapper (part :root)
       def initialize(id, options = {})
         @id = id
         @flush = options[:flush]
@@ -82,11 +82,11 @@ module TablerUi
       # @option options [Boolean] :open Whether this item starts expanded (default: false --
       #   see #validate! for why more than one :open in single-open mode raises)
       # @option options [String] :icon Optional Tabler icon name, rendered via tabler_ui.icon
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
+      # @option options [Hash, #call] :html HTML attributes for this item's
       #   `.accordion-button` (part :item) -- a plain Hash, or a callable taking the item
-      # @option options [Hash, #call] :header_html Rule 5 HTML hook for this item's
+      # @option options [Hash, #call] :header_html HTML attributes for this item's
       #   `.accordion-header` (part :item_header)
-      # @option options [Hash, #call] :body_html Rule 5 HTML hook for this item's
+      # @option options [Hash, #call] :body_html HTML attributes for this item's
       #   `.accordion-body` (part :item_body)
       # @param block [Proc] Content block for the item's body, captured in the template
       # @return [String] empty string, to avoid stray output in a capture context

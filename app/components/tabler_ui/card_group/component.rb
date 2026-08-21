@@ -27,7 +27,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Rule 5 hook
+    # @example HTML attribute
     #   <%= tabler_ui.card_group html: { class: "mb-4" } do |slots| %>
     #     <% slots.body do %>...<% end %>
     #   <% end %>
@@ -35,7 +35,7 @@ module TablerUi
       include TablerUi::Base
 
       # @param options [Hash]
-      # @option options [Hash] :html Rule 5 HTML hook for the outer `.card-group` (part :root)
+      # @option options [Hash] :html HTML attributes for the outer `.card-group` (part :root)
       def initialize(options = {})
         initialize_html_options(options)
       end

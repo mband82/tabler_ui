@@ -23,7 +23,7 @@ module TablerUi
     #     <% slots.body do %><strong>Hot</strong><% end %>
     #   <% end %>
     #
-    # @example Rule 5 hook on the root element
+    # @example HTML attributes on the root element
     #   <%= tabler_ui.ribbon text: "New", html: { class: "me-2" } %>
     class Component
       include TablerUi::Base
@@ -41,7 +41,7 @@ module TablerUi
       #   `:end` (default).
       # @option options [Boolean] :bookmark Bookmark shape (default: false)
       # @option options [String] :icon Tabler icon name
-      # @option options [Hash] :html Rule 5 HTML hook for the root element (part :root)
+      # @option options [Hash] :html HTML attributes for the root element (part :root)
       def initialize(options = {})
         @text = options[:text]
         @color = TablerUi::Color.validate!(options[:color], context: "ribbon")

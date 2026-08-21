@@ -1,23 +1,58 @@
 /* TablerUi::Docs engine styles. Deliberately minimal -- the layout, sidebar
    and per-component page are built almost entirely from Tabler's own
-   classes (list-group, row-cards, card, sticky-top, page-wrapper,
+   classes (list-group, row-cards, card, fixed-top, page-wrapper,
    page-body, btn-link, etc). Never touches `body` or any other page-wide
    selector: this engine may be mounted inside a host app that owns its own
    global styles, so everything here is scoped to classes this engine's own
-   markup applies. */
+   markup applies.
 
-/* Sticks below the sticky breadcrumb bar (component pages only -- see
+   --docs-header-height is set once, per request, on .docs-shell (see
+   application.html.erb's own comment on the two values it can hold --
+   component pages have a breadcrumb bar under the fixed navbar, index/forms
+   pages don't). Every rule below that needs to sit clear of that fixed
+   header reads the same property rather than repeating a magic number that
+   would only be right for one of those two cases. */
+
+/* Offsets the page-wrapper below the fixed header (.docs-fixed-header,
+   application.html.erb) -- a fixed-position element is out of normal flow,
+   so without this the page-wrapper would start underneath it instead of
+   below it. */
+.docs-shell {
+  padding-top: var(--docs-header-height);
+}
+
+/* Sticks just below the fixed header (component pages only -- see
    application.html.erb's content_for(:breadcrumb)) with a small gap; on
-   pages with no breadcrumb bar (index, forms) this just leaves a bit of
-   extra headroom above the sidebar rather than branching the CSS over
-   whether that bar is present. Capped at the viewport height and scrolls
-   on its own once the (now collapsible) component list is taller than
-   that, instead of driving the whole page's height. */
+   pages with no breadcrumb bar (index, forms) --docs-header-height is
+   simply the shorter of its two values, so this still lines up right below
+   it rather than branching the CSS over whether that bar is present.
+   Capped at the viewport height and scrolls on its own once the (now
+   collapsible) component list is taller than that, instead of driving the
+   whole page's height. */
 .docs-sidebar {
   position: sticky;
-  top: 4rem;
-  max-height: calc(100vh - 5rem);
+  top: var(--docs-header-height);
+  max-height: calc(100vh - var(--docs-header-height) - 1rem);
   overflow-y: auto;
+}
+
+/* The Contents column (shared/_contents.html.erb) -- same sticky-below-the-
+   header treatment as .docs-sidebar, so both side columns stop scrolling on
+   the same line. */
+.docs-contents {
+  position: sticky;
+  top: var(--docs-header-height);
+  max-height: calc(100vh - var(--docs-header-height) - 1rem);
+  overflow-y: auto;
+}
+
+/* Every element the Contents column links to (a demo's card, a section
+   heading, the Options/Examples headings -- all carry their own id inside
+   the content column, never elsewhere) needs this, or clicking its anchor
+   link would land the target right underneath the fixed header instead of
+   just below it. */
+.docs-content [id] {
+  scroll-margin-top: var(--docs-header-height);
 }
 
 /* The search box sits inside the navbar's .navbar-brand (an inline-flex

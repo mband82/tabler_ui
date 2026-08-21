@@ -16,7 +16,7 @@ module TablerUi
     # @example Custom accessible label
     #   <%= tabler_ui.spinner label: "Saving..." %>
     #
-    # @example Rule 5 hook on the root <div>
+    # @example HTML attributes on the root <div>
     #   <%= tabler_ui.spinner html: { class: "me-2" } %>
     class Component
       include TablerUi::Base
@@ -38,7 +38,7 @@ module TablerUi
       # @option options [String] :label Visually-hidden text for screen
       #   readers, read out via role="status". Defaults to a translated
       #   "Loading..." (see config/locales/en.yml, tabler_ui.spinner.label).
-      # @option options [Hash] :html Rule 5 HTML hook for the root <div> (part :root)
+      # @option options [Hash] :html HTML attributes for the root <div> (part :root)
       def initialize(options = {})
         @type = validate_type(options[:type])
         @size = options[:size]

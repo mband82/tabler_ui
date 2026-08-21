@@ -14,7 +14,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Rule 5 hook
+    # @example HTML attribute
     #   <%= tabler_ui.badge_list html: { class: "mb-2" } do |slots| %>
     #     <% slots.body do %><%= tabler_ui.badge text: "New" %><% end %>
     #   <% end %>
@@ -22,7 +22,7 @@ module TablerUi
       include TablerUi::Base
 
       # @param options [Hash]
-      # @option options [Hash] :html Rule 5 HTML hook for the outer `.badges-list` (part :root)
+      # @option options [Hash] :html HTML attributes for the outer `.badges-list` (part :root)
       def initialize(options = {})
         initialize_html_options(options)
       end

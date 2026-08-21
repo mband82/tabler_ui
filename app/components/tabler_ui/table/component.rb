@@ -26,7 +26,7 @@ module TablerUi
     #   <%= tabler_ui.table columns: columns, data: rows,
     #                       row_html: ->(row) { row.overdue? ? { class: "table-danger" } : {} } %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.table columns: columns, data: rows,
     #                       html: { class: "mb-4" }, table_html: { class: "table-xl" },
     #                       thead_html: { class: "text-uppercase" },
@@ -142,40 +142,40 @@ module TablerUi
       #   see "Turbo Frames" below. A String is shorthand for `{ id: the
       #   String }`. Absent (the default) renders no `<turbo-frame>` at all;
       #   the rest of the table's output is unaffected.
-      # @option options [Hash]    :html       Rule 5 HTML hook for the outermost
+      # @option options [Hash]    :html       HTML attributes for the outermost
       #   element -- the `.card` wrapper, or the `.table-responsive` div when
       #   `card: false` (part :root)
-      # @option options [Hash]    :table_html Rule 5 HTML hook for the `<table>` (part :table)
-      # @option options [Hash]    :thead_html Rule 5 HTML hook for the `<thead>` (part :thead)
-      # @option options [Hash]    :tbody_html Rule 5 HTML hook for the `<tbody>` (part :tbody)
-      # @option options [Hash, Proc] :row_html Rule 5 HTML hook applied to each
+      # @option options [Hash]    :table_html HTML attributes for the `<table>` (part :table)
+      # @option options [Hash]    :thead_html HTML attributes for the `<thead>` (part :thead)
+      # @option options [Hash]    :tbody_html HTML attributes for the `<tbody>` (part :tbody)
+      # @option options [Hash, Proc] :row_html HTML attributes applied to each
       #   `<tr>` in the body (part :row). Either a plain Hash (applied to every
       #   row) or a callable taking the row object and returning a Hash (so
       #   callers can style rows conditionally, e.g. highlighting overdue
       #   records).
-      # @option options [Hash, Proc] :sort_html Rule 5 HTML hook applied to a
+      # @option options [Hash, Proc] :sort_html HTML attributes applied to a
       #   sortable column's `<a class="table-sort">` (part :sort). Either a
       #   plain Hash (applied to every sortable header) or a callable taking
       #   the column hash and returning a Hash, following `row_html:`'s
       #   pattern, so callers can vary it per column.
-      # @option options [Hash] :filter_html Rule 5 HTML hook for the filter
+      # @option options [Hash] :filter_html HTML attributes for the filter
       #   toolbar's outer element (part :filter), only rendered when
       #   `filter:` is given.
-      # @option options [Hash] :filter_form_html Rule 5 HTML hook for the
+      # @option options [Hash] :filter_form_html HTML attributes for the
       #   filter toolbar's `<form>` (part :filter_form).
-      # @option options [Hash] :filter_reset_html Rule 5 HTML hook for the
+      # @option options [Hash] :filter_reset_html HTML attributes for the
       #   filter toolbar's Reset link (part :filter_reset), only rendered
       #   when `filter: { reset: }` is given.
-      # @option options [Hash] :filter_button_html Rule 5 HTML hook for a
+      # @option options [Hash] :filter_button_html HTML attributes for a
       #   filter field's attached search button (part :filter_button), only
       #   rendered for a field carrying `button:` -- see "Filtering" below.
-      # @option options [Hash] :filter_hint_html Rule 5 HTML hook for the
+      # @option options [Hash] :filter_hint_html HTML attributes for the
       #   `min_chars:` hint element (part :filter_hint), only rendered when
       #   `filter: { min_chars: }` is given -- see "Filtering" below.
-      # @option options [Hash] :frame_html Rule 5 HTML hook for the
+      # @option options [Hash] :frame_html HTML attributes for the
       #   `<turbo-frame>` element (part :frame), only rendered when `frame:`
       #   is given.
-      # @option options [Hash] :footer_html Rule 5 HTML hook for the footer
+      # @option options [Hash] :footer_html HTML attributes for the footer
       #   slot's wrapper (part :footer), rendered only when the caller sets
       #   `slots.footer { ... }` -- see "Footer" below. There is no `footer:`
       #   options hash; the footer is slot-only, on/off by whether the block
@@ -504,8 +504,8 @@ module TablerUi
 
       # @param field [Hash] a normalized filter field
       # @return [String] the field's column-wrapper class -- the field's own
-      #   :col overrides this outright (it's a plain default, not a rule 5
-      #   hook, so no merge)
+      #   :col overrides this outright (it's a plain default, not an HTML
+      #   attribute, so no merge)
       def filter_field_wrapper_class(field)
         return field[:col] if field[:col].present?
 

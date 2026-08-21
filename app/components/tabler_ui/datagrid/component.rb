@@ -18,7 +18,7 @@ module TablerUi
     # @example items: passed directly at construction
     #   <%= tabler_ui.datagrid items: [{ title: "Name", content: "Ada" }] %>
     #
-    # @example Rule 5 hooks
+    # @example HTML attributes
     #   <%= tabler_ui.datagrid html: { class: "mb-4" },
     #                          item_html: ->(item) { item[:title] == "Name" ? { class: "fw-bold" } : {} },
     #                          title_html: { class: "text-muted" },
@@ -34,12 +34,12 @@ module TablerUi
       # @param options [Hash]
       # @option options [Array<Hash>] :items Pre-built items, each a Hash with
       #   `:title` and `:content` (default: [])
-      # @option options [Hash]           :html         Rule 5 HTML hook for the outer `.datagrid` (part :root)
-      # @option options [Hash, Proc]     :item_html    Rule 5 HTML hook for each `.datagrid-item` (part :item).
+      # @option options [Hash]           :html         HTML attributes for the outer `.datagrid` (part :root)
+      # @option options [Hash, Proc]     :item_html    HTML attributes for each `.datagrid-item` (part :item).
       #   Either a plain Hash (applied to every item) or a callable taking the
       #   item and returning a Hash.
-      # @option options [Hash, Proc]     :title_html   Rule 5 HTML hook for each `.datagrid-title` (part :title)
-      # @option options [Hash, Proc]     :content_html Rule 5 HTML hook for each `.datagrid-content` (part :content)
+      # @option options [Hash, Proc]     :title_html   HTML attributes for each `.datagrid-title` (part :title)
+      # @option options [Hash, Proc]     :content_html HTML attributes for each `.datagrid-content` (part :content)
       def initialize(options = {})
         @items = options[:items] || []
 

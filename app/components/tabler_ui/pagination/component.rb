@@ -29,7 +29,7 @@ module TablerUi
     #   <%= tabler_ui.pagination current: 1, total: 5, url: ->(n) { "?page=#{n}" },
     #                            size: :sm, circle: true %>
     #
-    # @example Rule 5 hooks -- root and per-item
+    # @example HTML attributes -- root and per-item
     #   <%= tabler_ui.pagination(html: { class: "mb-3" }) do |p| %>
     #     <% p.item 1, url: "/1", html: { class: "fw-bold" } %>
     #     <% p.item 2, url: "/2", html: ->(item) { { class: "text-danger" } if item.page == 2 } %>
@@ -39,7 +39,7 @@ module TablerUi
     #   <%= tabler_ui.pagination current: 3, total: 10, url: ->(n) { posts_path(page: n) },
     #                            frame: "posts-table" %>
     #
-    # @example link_html: -- Rule 5 hook on the `<a>`/`<span>` element itself
+    # @example link_html: -- HTML attributes on the `<a>`/`<span>` element itself
     #   <%= tabler_ui.pagination current: 3, total: 10, url: ->(n) { posts_path(page: n) },
     #                            link_html: { class: "fw-bold" } %>
     #
@@ -154,12 +154,12 @@ module TablerUi
       #   to `table`'s `frame:` alone. Absent (the default) renders no
       #   `data-turbo-frame` attribute at all; the rest of the component's
       #   output is unaffected.
-      # @option options [Hash] :html Rule 5 HTML hook for the `<ul class="pagination">` (part :root)
-      # @option options [Hash, #call] :item_html Rule 5 HTML hook applied to
+      # @option options [Hash] :html HTML attributes for the `<ul class="pagination">` (part :root)
+      # @option options [Hash, #call] :item_html HTML attributes applied to
       #   every `<li class="page-item">` (part :item) -- a plain Hash, or a
       #   callable taking the item. Merged underneath any per-item `html:`
       #   given to #item/#prev/#next directly.
-      # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to
+      # @option options [Hash, #call] :link_html HTML attributes applied to
       #   every `<a class="page-link">`/`<span class="page-link">` (part
       #   :link) -- a plain Hash, or a callable taking the item, same
       #   contract as :item_html.
@@ -202,7 +202,7 @@ module TablerUi
       #   drives the `active` class and `aria-current="page"`.
       # @option options [Boolean] :disabled Forces the item to render as
       #   non-linkable text even if a :url was given.
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
+      # @option options [Hash, #call] :html HTML attributes for this item's
       #   `<li class="page-item">` (part :item) -- a plain Hash, or a
       #   callable taking the item
       # @return [String] empty string, to avoid stray output in a capture context
@@ -231,7 +231,7 @@ module TablerUi
       # @option options [Boolean] :disabled Forces non-linkable text.
       # @option options [String] :label Link text (default: the component's
       #   prev_label: option, then a translated "Previous").
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
+      # @option options [Hash, #call] :html HTML attributes for this item's
       #   `<li class="page-item">` (part :item) -- gains `page-prev` too, but
       #   only when this is a prev/next-only pager with no #item calls; see
       #   "page-prev / page-next" above.

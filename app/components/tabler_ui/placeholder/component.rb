@@ -23,7 +23,7 @@ module TablerUi
     # @example Card placeholder with glow animation
     #   <%= tabler_ui.placeholder type: :card, animation: :glow %>
     #
-    # @example Rule 5 hooks -- the card's outer wrapper vs. its inner body
+    # @example HTML attributes -- the card's outer wrapper vs. its inner body
     #   <%= tabler_ui.placeholder type: :card, html: { class: "mb-3" }, body_html: { class: "p-4" } %>
     class Component
       include TablerUi::Base
@@ -50,8 +50,8 @@ module TablerUi
       # @option options [Boolean] :rounded     Whether the :avatar placeholder is rounded (default: true)
       # @option options [Boolean] :show_image  Show the image block in the :card placeholder (default: true)
       # @option options [Boolean] :show_button Show the button block in the :card placeholder (default: true)
-      # @option options [Hash]    :html        Rule 5 HTML hook for the active type's own root element
-      # @option options [Hash]    :body_html   Rule 5 HTML hook for the :card type's inner .card-body
+      # @option options [Hash]    :html        HTML attributes for the active type's own root element
+      # @option options [Hash]    :body_html   HTML attributes for the :card type's inner .card-body
       def initialize(options = {})
         @type = (options[:type] || :text).to_sym
         @width = options[:width]
@@ -69,7 +69,7 @@ module TablerUi
         initialize_html_options(options)
       end
 
-      # --- rule 5 attribute hooks ---------------------------------------
+      # --- HTML attributes ------------------------------------------------
       #
       # One method per root/part the template renders. Each is the single
       # place that calls html_for for its element -- see #placeholder_classes

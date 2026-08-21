@@ -19,7 +19,7 @@ module TablerUi
     #     ...
     #   <% end %>
     #
-    # @example Rule 5 hooks -- component-level and per-item
+    # @example HTML attributes -- component-level and per-item
     #   <%= tabler_ui.dropdown(label: "Actions", html: { class: "mb-3" },
     #                          toggle_html: { class: "btn-sm" },
     #                          menu_html: { class: "shadow" }) do |dropdown| %>
@@ -68,9 +68,9 @@ module TablerUi
       # @option options [String] :align_breakpoint Responsive breakpoint (sm/md/lg/xl/xxl)
       #   -- combined with :align to add `dropdown-menu-<bp>-<align>` alongside the base
       #   alignment class. Validated via TablerUi::Breakpoint.
-      # @option options [Hash] :html         Rule 5 HTML hook for the outer wrapper (part :root)
-      # @option options [Hash] :toggle_html  Rule 5 HTML hook for the toggle button (part :toggle)
-      # @option options [Hash] :menu_html    Rule 5 HTML hook for the `.dropdown-menu` (part :menu)
+      # @option options [Hash] :html         HTML attributes for the outer wrapper (part :root)
+      # @option options [Hash] :toggle_html  HTML attributes for the toggle button (part :toggle)
+      # @option options [Hash] :menu_html    HTML attributes for the `.dropdown-menu` (part :menu)
       def initialize(options = {})
         @label = options[:label]
         @color = TablerUi::Color.validate!(options[:color], context: "dropdown") || "primary"
@@ -94,7 +94,7 @@ module TablerUi
       # @option options [Boolean] :active
       # @option options [Boolean] :disabled
       # @option options [String] :icon Optional Tabler icon name, rendered via tabler_ui.icon
-      # @option options [Hash, #call] :html Rule 5 HTML hook for this item's
+      # @option options [Hash, #call] :html HTML attributes for this item's
       #   link/button (part :item) -- a plain Hash, or a callable taking the item
       # @return [String] empty string, to avoid stray output in a capture context
       def item(title, options = {})

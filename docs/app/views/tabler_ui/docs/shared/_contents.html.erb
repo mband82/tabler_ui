@@ -1,0 +1,27 @@
+<%# locals: entries: -- Array<{ label:, href: }>, built by
+    components/show.html.erb (see its own comment on exactly what goes into
+    this list and why, and on section ids being derived from title text,
+    not position). Treats each demo card and each documentation section as
+    a chapter of the current component page, the same way a book's table of
+    contents would.
+
+    Only ever rendered via content_for(:contents) on a component page that
+    has at least one entry -- application.html.erb checks
+    content_for?(:contents) to decide whether to give this its own grid
+    column at all, so `entries` is never empty here.
+
+    Sticky beneath the fixed header, using the same --docs-header-height
+    custom property the header itself sets (application.html.erb) and
+    .docs-sidebar already reads (docs.css) -- so this column and the left
+    sidebar stop scrolling at the same line. Hidden below the lg breakpoint
+    by the column wrapping this partial in the layout, not by anything in
+    here: a narrow viewport has no room for a third nav column, and every
+    one of these sections is already in reading order just above it. %>
+<nav class="docs-contents" aria-label="Contents">
+  <h4 class="text-secondary text-uppercase fs-6 mb-2">Contents</h4>
+  <div class="list-group list-group-transparent">
+    <% entries.each do |entry| %>
+      <%= link_to entry[:label], entry[:href], class: "list-group-item list-group-item-action" %>
+    <% end %>
+  </div>
+</nav>
