@@ -31,7 +31,7 @@ RSpec.describe "TablerUi component regression render", type: :component do
   it "renders dark_mode_toggle" do
     fragment = component_fragment(:dark_mode_toggle)
 
-    expect(fragment.css("a")).not_to be_empty
+    expect(fragment.css("button")).not_to be_empty
     expect(fragment.to_html).not_to be_empty
   end
 

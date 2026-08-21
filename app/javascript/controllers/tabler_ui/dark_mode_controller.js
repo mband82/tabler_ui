@@ -2,13 +2,27 @@
 // chosen theme to localStorage, tracks the OS-level preference while "system"
 // is selected, and toggles data-bs-theme plus the light/dark/system icon
 // targets to match.
+//
+// toggle() re-reads localStorage on every call rather than trusting a cached
+// `this.theme` across the whole controller lifecycle. Turbo Drive intercepts
+// *any* <a href> click -- including one that only changes the URL fragment --
+// and turns it into a real visit (a fetch back to the same page, followed by
+// a full DOM swap), which disconnects and reconnects every controller on the
+// page. The trigger element is a <button> now precisely to avoid that, but
+// this controller no longer assumes it is the only thing that can ever touch
+// the toggle (another instance of it elsewhere on the page, a future
+// reconnect from some other cause) -- localStorage stays the single source
+// of truth and `this.theme` is only ever a same-tick cache of it.
 import {Controller} from "@hotwired/stimulus"
+
+const THEMES = ["light", "dark", "system"]
+const NEXT_THEME = {light: "dark", dark: "system", system: "light"}
 
 export default class extends Controller {
     static targets = ["light", "dark", "system"]
 
     connect() {
-        this.theme = localStorage.getItem("theme") || "system"
+        this.theme = this.readTheme()
         localStorage.setItem("theme", this.theme)
 
         // Listen for system preference changes
@@ -27,13 +41,8 @@ export default class extends Controller {
     }
 
     toggle() {
-        const nextTheme = {
-            light: "dark",
-            dark: "system",
-            system: "light"
-        }
-
-        this.theme = nextTheme[this.theme]
+        // Source of truth is localStorage, not this.theme -- see file header.
+        this.theme = NEXT_THEME[this.readTheme()]
         localStorage.setItem("theme", this.theme)
 
         this.updateTheme()
@@ -41,9 +50,14 @@ export default class extends Controller {
     }
 
     handleSystemChange(event) {
-        if (this.theme === "system") {
+        if (this.readTheme() === "system") {
             this.updateTheme()
         }
+    }
+
+    readTheme() {
+        const stored = localStorage.getItem("theme")
+        return THEMES.includes(stored) ? stored : "system"
     }
 
     updateIcon() {

@@ -14,16 +14,16 @@ module TablerUi
     # @example Small icons, custom title
     #   <%= tabler_ui.dark_mode_toggle size: :sm, title: "Switch theme" %>
     #
-    # @example Rule 5 hooks on the root <div> and the <a>
-    #   <%= tabler_ui.dark_mode_toggle html: { class: "me-2" }, link_html: { data: { testid: "theme-toggle" } } %>
+    # @example Rule 5 hooks on the root <div> and the <button>
+    #   <%= tabler_ui.dark_mode_toggle html: { class: "me-2" }, button_html: { data: { testid: "theme-toggle" } } %>
     class Component
       include TablerUi::Base
 
       # @param options [Hash]
       # @option options [Symbol] :size  :sm / :lg -- drives the SVG icons' pixel dimensions (default: 24)
-      # @option options [String] :title Rendered as title="..." on the <a> (default: "Switch theme")
-      # @option options [Hash]   :html      Rule 5 HTML hook for the outer <div> (part :root)
-      # @option options [Hash]   :link_html Rule 5 HTML hook for the <a> (part :link)
+      # @option options [String] :title Rendered as title="..." on the <button> (default: "Switch theme")
+      # @option options [Hash]   :html        Rule 5 HTML hook for the outer <div> (part :root)
+      # @option options [Hash]   :button_html Rule 5 HTML hook for the <button> (part :button)
       def initialize(options = {})
         @size = options[:size]
         @title = options.fetch(:title, I18n.t("tabler_ui.dark_mode_toggle.title"))
@@ -46,12 +46,21 @@ module TablerUi
         html_for(:root, class: "d-inline-block", data: { controller: "tabler-ui--dark-mode" })
       end
 
-      # @return [Hash] attributes for the <a> (part :link), merged with
-      #   whatever the caller supplied via link_html:.
-      def link_attributes
-        html_for(:link,
+      # @return [Hash] attributes for the <button> (part :button), merged
+      #   with whatever the caller supplied via button_html:.
+      #
+      # A <button type="button">, not an <a href="#">: this toggle has no
+      # destination, and an anchor with a bare "#" href is a real link click
+      # as far as Turbo Drive is concerned -- it gets intercepted and turned
+      # into a full page visit (fetch back to the same URL, DOM swap) on
+      # every click, tearing down and rebuilding every Stimulus controller on
+      # the page for what should be a purely client-side toggle. A <button>
+      # is not a link, so nothing but the click->toggle action fires, and it
+      # is keyboard-accessible (Enter/Space) with no extra work.
+      def button_attributes
+        html_for(:button,
                  class: "nav-link px-0",
-                 href: "#",
+                 type: "button",
                  title: @title,
                  data: { action: "click->tabler-ui--dark-mode#toggle" })
       end
