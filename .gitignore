@@ -9,3 +9,6 @@
 /tmp/
 .rspec_status
 .claude/
+
+# Playwright MCP scratch output
+.playwright-mcp/

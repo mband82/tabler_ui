@@ -2,19 +2,13 @@
 
 module TablerUi
   module Offcanvas
-    # Offcanvas component for Tabler UI. A single `.offcanvas.offcanvas-<edge>`
-    # panel, sliding in from one of the four screen edges, with optional
-    # `.offcanvas-header` / `.offcanvas-body` / `.offcanvas-footer` parts
-    # filled in via slots (or a plain `title:` for a simple header).
+    # A single `.offcanvas.offcanvas-<edge>` panel, sliding in from one of
+    # the four screen edges, with optional `.offcanvas-header` /
+    # `.offcanvas-body` / `.offcanvas-footer` parts filled in via slots (or
+    # a plain `title:` for a simple header).
     #
-    # Unlike Modal, Bootstrap's Offcanvas markup has no dialog/content
-    # wrapper -- `.offcanvas` is both the sizing box and the flex container
-    # for its parts, so this component renders one level flatter than Modal.
-    #
-    # The component renders no trigger -- put `data-bs-toggle="offcanvas"
-    # data-bs-target="#<id>"` on your own button/link, exactly like Modal,
-    # and consistent with how `collapse_controller` attaches to the
-    # collapsible element rather than the toggler.
+    # Renders no trigger -- add `data-bs-toggle="offcanvas"
+    # data-bs-target="#<id>"` to your own button/link.
     #
     # @example Basic usage -- title plus body/footer slots
     #   <button data-bs-toggle="offcanvas" data-bs-target="#my-offcanvas">Open</button>
@@ -50,20 +44,13 @@ module TablerUi
     # ## Accessibility
     #
     # The root `.offcanvas` carries `tabindex="-1"`, `role="dialog"`, and
-    # either `aria-labelledby` (pointing at the id of the rendered
-    # `.offcanvas-title`) when a title is actually showing, or a translated
-    # `aria-label` when it isn't -- no title: given, or a header slot that
-    # overrides it (see config/locales/en.yml, tabler_ui.offcanvas.dialog_label).
-    # This mirrors Modal exactly rather than inventing a second approach.
-    # The close button carries its own translated aria-label
-    # (tabler_ui.offcanvas.close).
+    # either `aria-labelledby` (pointing at the `.offcanvas-title`) when a
+    # title is showing, or a translated `aria-label` when it isn't. The
+    # close button carries its own translated `aria-label`.
     #
-    # Note: unlike Modal, the close button lives *inside* `.offcanvas-header`
-    # here, not as a sibling of it -- Tabler's CSS positions it via
-    # `.offcanvas-header .btn-close` (no equivalent of Modal's
-    # `.modal-content > .btn-close` override exists for offcanvas), so the
-    # header wrapper renders whenever a header slot, title:, or close_button
-    # calls for it -- not only when a header slot or title: is present.
+    # Note: the close button lives inside `.offcanvas-header`, so the header
+    # renders whenever a header slot, `title:`, or `close_button:` calls for
+    # it -- not only when a header slot or `title:` is given.
     #
     # Note: the block yields exactly one argument, the SlotContext --
     # `do |slots|`, not `do |offcanvas, slots|`.
@@ -79,22 +66,16 @@ module TablerUi
       # @option options [String]  :title    Rendered as an `<h5 class="offcanvas-title">`
       #   inside the header when no `header` slot is given.
       # @option options [String, Symbol] :position Edge the panel slides in
-      #   from -- validated against TablerUi::Position's full four-edge set
-      #   (:start, :end, :top, :bottom). Defaults to :start -- Bootstrap's own
-      #   default when no offcanvas-<edge> class is present, made explicit here.
+      #   from -- one of `:start` (default), `:end`, `:top`, `:bottom`.
+      #   Invalid values raise `ArgumentError`.
       # @option options [Boolean] :narrow   `offcanvas-narrow` (fixed 20rem width, default: false)
-      # @option options [String, Symbol] :expand Breakpoint (sm/md/lg/xl/xxl,
-      #   validated via TablerUi::Breakpoint) at and above which the panel
-      #   becomes a permanently visible, non-modal sidebar instead of a
-      #   slide-in overlay. Replaces the bare `offcanvas` class with
-      #   `offcanvas-#{expand}` -- the `offcanvas-#{position}` edge class is
-      #   unaffected. Bootstrap's own CSS then force-hides `.offcanvas-header`
-      #   at and above that breakpoint, so the close button (which lives
-      #   inside the header) disappears too -- intended "always-open sidebar"
-      #   behaviour, not a bug. Omitted by default (always a slide-in overlay).
-      #   Purely CSS-driven -- no `data-bs-*` attribute changes.
+      # @option options [String, Symbol] :expand Breakpoint (`sm`/`md`/`lg`/`xl`/`xxl`) at and
+      #   above which the panel becomes a permanently visible sidebar instead of a slide-in
+      #   overlay. Bootstrap hides `.offcanvas-header` at that breakpoint, so the close button
+      #   disappears too -- expected sidebar behaviour, not a bug. Omitted by default (always
+      #   a slide-in overlay).
       # @option options [Boolean, Symbol, String] :backdrop Bootstrap's `data-bs-backdrop`
-      #   option -- omitted (Bootstrap default: true), false, or :static.
+      #   option -- omitted (Bootstrap default: true), `false`, or `:static`.
       # @option options [Boolean] :scroll   Bootstrap's `data-bs-scroll` option -- allow
       #   body scrolling while the offcanvas is open (default: false)
       # @option options [Boolean] :close_button Whether to render the `.btn-close` (default: true)
@@ -153,7 +134,14 @@ module TablerUi
         html_for(:root, defaults)
       end
 
-      # @return [Hash] attributes for the `.offcanvas-header` (part :header)
+      # @return [Hash] attributes for the `.offcanvas-header` (part :header).
+      #   Unlike Modal, Bootstrap's Offcanvas markup has no dialog/content
+      #   wrapper -- `.offcanvas` is both the sizing box and the flex
+      #   container for its parts, so this renders one level flatter than
+      #   Modal, and the close button lives inside this header rather than as
+      #   a sibling of it (Tabler's CSS positions it via
+      #   `.offcanvas-header .btn-close`; there's no equivalent of Modal's
+      #   `.modal-content > .btn-close` override for offcanvas).
       def header_attributes
         html_for(:header, class: "offcanvas-header")
       end

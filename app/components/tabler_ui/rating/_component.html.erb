@@ -1,5 +1,7 @@
 <% choices_array = rating.choices.map { |opt| [opt[:label], opt[:value]] } %>
-<%= select_tag rating.name,
-    options_for_select(choices_array, rating.value),
-    **rating.root_attributes
-%>
+<%= tag.span(**rating.wrapper_attributes) do %>
+  <%= select_tag rating.name,
+      options_for_select(choices_array, rating.value),
+      **rating.root_attributes
+  %>
+<% end %>

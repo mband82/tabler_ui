@@ -7,14 +7,10 @@ module TablerUi
     # and a `<tbody>` built by invoking each column's `:value` callable
     # against every row in `data:`.
     #
-    # Also wires up two adjacent pieces of table chrome -- sortable column
-    # headers and a filter/search toolbar -- without ever touching an ORM,
-    # `params`, or a query. Exactly like `pagination` (see its class docs),
-    # this component's entire input for those pieces is the caller's current
-    # state (which column/direction is sorted, what the filter fields'
-    # current values are) plus a way to build a URL. Kaminari, Ransack,
-    # hand-rolled `params.permit`, whatever the host app uses upstream is
-    # none of this component's business -- it only renders links and a form.
+    # Also wires up sortable column headers and a filter/search toolbar,
+    # without touching an ORM, `params`, or a query -- you supply the
+    # current state (sorted column/direction, current filter values) and a
+    # URL builder, and this component only renders links and a form.
     #
     # @example Basic usage
     #   <%= tabler_ui.table columns: [{ label: "Name", value: ->(row) { row[:name] } }],
@@ -116,19 +112,17 @@ module TablerUi
       # @option options [Boolean] :card    Wrap the table in a `.card` /
       #   `.table-responsive` shell (default: true). Set to false to nest the
       #   table inside an existing card without double-wrapping. Also
-      #   controls the filter toolbar's own shell -- see "Filtering" below.
+      #   affects the filter toolbar's own shell -- see "Filtering" below.
       # @option options [Boolean, String] :responsive Controls the horizontal-
-      #   scroll wrapper. `true` (default) emits plain `table-responsive`
-      #   (scrolls at every width). A breakpoint string ("sm"/"md"/"lg"/"xl"/
-      #   "xxl") emits `table-responsive-<bp>` instead (scrolls only below
-      #   that breakpoint). `false` emits neither class -- see
-      #   #responsive_class for what that means when `card: false`.
+      #   scroll wrapper. `true` (default) emits `table-responsive` (scrolls
+      #   at every width). A breakpoint string ("sm"/"md"/"lg"/"xl"/"xxl")
+      #   emits `table-responsive-<bp>` instead (scrolls only below that
+      #   breakpoint). `false` emits neither class.
       # @option options [Boolean, String] :mobile Stacks the table into a
       #   card-like list below a breakpoint via `table-mobile` (`true`, all
-      #   widths) or `table-mobile-<bp>` (a breakpoint string) on the
-      #   `<table>` element. When set, every `<td>` also gets a `data-label`
-      #   attribute (its column's `:label`), which the CSS reads to draw the
-      #   heading in the stacked layout.
+      #   widths) or `table-mobile-<bp>` (a breakpoint string). Adds a
+      #   `data-label` attribute (the column's `:label`) to every `<td>`,
+      #   which the CSS reads to draw the heading in the stacked layout.
       # @option options [Hash] :sort Current sort state, `{ key:, dir: }`.
       #   `dir:` accepts :asc/:desc (or their string forms) and defaults to
       #   :asc when `key:` is given without it; an unrecognised `dir:` raises
@@ -182,217 +176,76 @@ module TablerUi
       #   `<turbo-frame>` element (part :frame), only rendered when `frame:`
       #   is given.
       # @option options [Hash] :footer_html Rule 5 HTML hook for the footer
-      #   slot's wrapper (part :footer), only rendered when the caller sets
+      #   slot's wrapper (part :footer), rendered only when the caller sets
       #   `slots.footer { ... }` -- see "Footer" below. There is no `footer:`
-      #   options hash to go with it (unlike `filter:`) -- the footer is a
-      #   slot only, on/off purely by whether the block set it.
+      #   options hash; the footer is slot-only, on/off by whether the block
+      #   set it.
       #
       # ## Sorting
       #
-      # A column becomes sortable by giving it a `:sort` key (any sort key
-      # value -- typically the column/attribute name the caller's query
-      # understands). Its `<th>` then renders as
-      # `<a class="table-sort">Label</a>` instead of plain text, linking to
-      # `sort_url.call(key, dir)` where `dir` is whichever direction that
-      # click *would* apply next:
+      # Give a column a `:sort` key to make it sortable. Its `<th>` renders
+      # as `<a class="table-sort">`, linking to `sort_url.call(key, dir)`
+      # where `dir` is whichever direction that click would apply next:
       #
-      # * not currently sorted on this column -> :asc
-      # * currently sorted :asc on this column -> :desc
-      # * currently sorted :desc on this column -> :asc, or with
-      #   `sort_reset: true` -> nil (`sort_url.call(key, nil)`, so the caller
-      #   can build a link back to the unsorted state)
+      # * unsorted -> :asc
+      # * sorted :asc -> :desc
+      # * sorted :desc -> :asc, or with `sort_reset: true` -> nil (unsorted)
       #
-      # The currently sorted column's `<th>` carries `aria-sort="ascending"`
-      # or `"descending"`, and its `<a>` carries a matching `asc`/`desc`
-      # class (read by the `.table-sort` CSS to draw the direction arrow).
-      # Every other sortable header is plain `class="table-sort"`, and
-      # non-sortable columns are untouched -- exactly the plain `<th>` this
-      # component always rendered.
+      # The active column's `<th>` carries `aria-sort`; its `<a>` carries a
+      # matching `asc`/`desc` class. Other columns are unaffected.
       #
       # ## Filtering
       #
-      # `filter:` is a nested options hash that turns on a search/filter
-      # toolbar rendered above the table (inside the `.card` when `card:
-      # true`, as a sibling before it otherwise). It has two ways in:
-      #
-      # 1. **Declarative** -- `fields:`, an array of field hashes (`:name`,
-      #    `:type`, `:label`, `:placeholder`, `:value`, `:options`,
-      #    `:include_blank`, `:col`, `:html`, `:id`). The component renders
-      #    the inputs.
-      # 2. **Slot** -- a block that sets `slots.filter { ... }`, supplying
-      #    the form's contents directly. `fields:` and a filter slot are
-      #    mutually exclusive (raises ArgumentError, mirroring pagination's
-      #    computed-vs-builder guard) -- see #guard_filter_slot!.
-      #
-      # Either way the surrounding form shell, hidden fields, and buttons
-      # are still built by the component:
-      #
-      # * `:url` -- form `action` (optional; omitted entirely when absent).
-      # * `:method` -- :get (default) or :post; anything else raises
-      #   ArgumentError. This never fakes Rails' CSRF token or a `_method`
-      #   override field -- it is plain HTML `method="get"`/`"post"`. A
-      #   caller needing CSRF protection on :post supplies it themselves via
-      #   `hidden:`.
-      # * `:auto` -- whether the form self-submits on input/change, via the
-      #   `tabler-ui--filter` Stimulus controller (already shipped and
-      #   registered by this gem -- see
-      #   app/javascript/controllers/tabler_ui/filter_controller.js).
-      #   Defaults to true only when the form is :get AND the table has a
-      #   `frame:` -- the one combination where an auto-submit lands
-      #   somewhere sensible, a Turbo Frame swap rather than a full page
-      #   navigation. Every other combination (a :post form; a :get form
-      #   with no `frame:`) defaults to false. An explicit value always wins
-      #   in either direction. When true, an Apply button is not rendered.
-      #
-      #   An explicit `auto: true` on a table with no `frame:` is not
-      #   forbidden -- a host driving the response with Turbo Streams or its
-      #   own JavaScript may have good reason to. But left at that setting
-      #   without such a setup (or with the pre-fix default this replaces),
-      #   every keystroke's debounced submit is a full navigation -- a Turbo
-      #   Drive visit, or a plain page reload with no Turbo at all -- so the
-      #   body gets replaced, the search input loses focus, and the page
-      #   scrolls back to the top mid-typing.
-      # * `:hidden` -- `name => value` pairs rendered as hidden inputs (e.g.
-      #   to preserve the current sort state across a GET filter submit).
-      #   Entries whose value is nil/blank are skipped.
-      # * `:reset` -- a URL; when present, renders a "Reset" link.
-      # * `:submit` -- Apply button label (default: a translated "Apply"),
-      #   only rendered when `auto:` is false.
-      # * `:debounce` -- milliseconds, forwarded to the Stimulus controller.
-      # * `:min_chars` -- a positive Integer (anything else raises
-      #   ArgumentError). Applies to the FIRST `:search`/`:text` field in
-      #   `fields:` -- absent such a field, ArgumentError ("needs a search or
-      #   text field to apply to"). These two checks are the only ones that
-      #   raise -- `min_chars:` is otherwise always *accepted*.
-      #
-      #   Whether it actually does anything is a separate, silent question
-      #   (see #filter_min_chars_active?): it only takes effect when the
-      #   form BOTH auto-submits (`auto:` resolves to true) AND the table
-      #   has a `frame:` -- exactly the combination `auto:` now defaults to
-      #   true under (see `:auto` above), so in the common case (a GET
-      #   filter on a framed table, `auto:` left at its default) this
-      #   condition is already satisfied without saying anything explicitly.
-      #   Missing either, `min_chars:` is a no-op -- the
-      #   rendered output is byte-identical to the same call without it: no
-      #   `data-tabler-ui--filter-min-chars-value` on the form, no
-      #   `data-tabler-ui--filter-target="input"` on the field, no hint
-      #   element at all. This is deliberate, not a bug to "fix": without a
-      #   frame, a below-threshold submit is a full page reload, and the
-      #   server echoes back the blanked search value -- wiping the user's
-      #   typed text out of the input. The feature only behaves well when
-      #   the form's response swaps in over Turbo instead of replacing the
-      #   whole page, so outside that setup it does nothing rather than
-      #   half-working.
-      #
-      #   When active, the tabler-ui--filter Stimulus controller still
-      #   submits the form below the threshold (so the URL/query params
-      #   stay in sync) but blanks the field's own value first, so the
-      #   table falls back to unfiltered results instead of filtering on a
-      #   too-short fragment; the hint text appears and the field is marked
-      #   `is-invalid` while below the threshold. Clearing the field
-      #   entirely (0 characters) always submits normally -- a user can
-      #   never get stuck in a filtered state with no way back out. See
-      #   app/javascript/controllers/tabler_ui/filter_controller.js for the
-      #   submit-time logic; this component only emits the
-      #   `data-tabler-ui--filter-min-chars-value` and
-      #   `data-tabler-ui--filter-target="input"`/`"hint"` markup it reads.
-      # * `:min_chars_hint` -- overrides the hint text shown below the
-      #   `min_chars:` field (default: a translated "Enter at least %{count}
-      #   characters to search.").
-      #
-      # Field hashes: `:name` is mandatory (raises ArgumentError when
-      # missing/blank). `:type` is one of :search (default), :text, :select,
-      # :date (anything else raises ArgumentError) -- :search/:text/:date
-      # render `<input type="...">`, :select renders `<select>`. `:value` is
-      # always supplied by the caller (this component never remembers
-      # state). `:options` (select only) accepts `[label, value]` pairs or
-      # plain strings (label == value); `:include_blank` adds an empty
-      # option (`true` for a blank label, a String for a labelled one).
-      # `:col` overrides the field's column-wrapper class outright (not
-      # merged). `:html` merges onto the input/select itself, same
-      # merge-not-replace contract as every rule 5 hook. `:id` overrides the
-      # field's `id=` attribute outright (not merged). Generated ids are
-      # deterministic -- derived from the field's `:name` -- so rendered
-      # output stays cache-stable across identical requests; pass `:id`
-      # explicitly when the same field `name:` appears in more than one
-      # filtered table on the same page, to avoid duplicate DOM ids.
-      # `:button` -- a String label (search/text fields only; ArgumentError
-      # on :select/:date, since there is nothing sensible for the button to
-      # attach to). Wraps the input in a Bootstrap input group with a
-      # `type="submit"` button glued to its trailing edge -- works whether
-      # or not the form auto-submits; with `auto: true` it simply submits
-      # immediately rather than waiting for the debounce.
+      # `filter:` renders a search toolbar via `fields:` (an array of field
+      # hashes) or a `slots.filter { ... }` block -- mutually exclusive,
+      # raises ArgumentError if both are given.
+      # * `:url`, `:method` (:get/:post, default :get)
+      # * `:auto` -- self-submits on input/change; true only for a :get
+      #   form with `frame:` set. Without `frame:`, auto-submitting makes
+      #   every keystroke a full navigation -- the input loses focus, the
+      #   page jumps to the top.
+      # * `:min_chars` -- positive Integer, needs a :search/:text field.
+      #   Active only when BOTH `auto:` and `frame:` are set (deliberate,
+      #   not a bug); below threshold the field submits blank.
+      # * `:hidden`, `:reset`, `:submit`, `:debounce` -- hidden fields,
+      #   Reset link, Apply label (hidden when `auto:` true), Stimulus
+      #   debounce (ms).
+      # Field hashes: `:name` (mandatory), `:type` (:search default/:text/
+      # :select/:date), `:value`, `:label`, `:placeholder`, `:options`,
+      # `:col`, `:html`, `:id`, `:button` (search/text only).
       #
       # ## Footer
       #
       # `slots.footer { ... }` renders a `.card-footer` (or `mt-3` when
-      # `card: false`, which has no card shell for it to sit inside -- the
-      # same card:-aware switch the filter toolbar uses, see
-      # #filter_wrapper_class/#footer_wrapper_class) after the table, holding
-      # whatever the block gives it -- typically a pager
-      # (`tabler_ui.pagination`), a row count, a "Showing 1-10 of 50"
-      # summary. There is no `footer:` options hash to turn it on the way
-      # `filter:` has one -- the footer is a slot only, on/off purely by
-      # whether the block set it. Leave it unset and the table's output is
-      # byte-identical to before this slot existed.
+      # `card: false`) after the table -- typically a pager, a row count, a
+      # "Showing 1-10 of 50" summary. No `footer:` options hash; it's a slot
+      # only, on/off by whether the block set it.
       #
-      # Unlike the filter toolbar, the footer slot renders *inside* `frame:`
-      # when one is given -- see "Turbo Frames" below for why the two differ.
+      # Unlike the filter toolbar, the footer renders *inside* `frame:` --
+      # see "Turbo Frames" below.
       #
       # ## Turbo Frames
       #
-      # `frame:` wraps the `.table-responsive` div (the `<table>` and its
-      # scroll wrapper) AND the footer slot, when one is given, together in a
-      # single `<turbo-frame>`, so sorting, filtering and a footer pager all
-      # navigate inside that frame instead of reloading the whole page. This
-      # gem takes no turbo-rails dependency -- the `<turbo-frame>` tag is
-      # plain markup, inert without Turbo's JS loaded in the host app, and
-      # nothing else in this component ever checks whether `frame:` was
-      # given except to decide what to render.
+      # `frame:` wraps the table and the footer slot (if any) in a single
+      # `<turbo-frame>`, so sorting, filtering, and a footer pager all
+      # navigate inside it instead of reloading the page. Plain markup --
+      # no turbo-rails dependency, inert without Turbo's JS.
       #
-      # * `:id` -- the frame's HTML id. Mandatory; a blank/missing value
-      #   raises ArgumentError, since there would be nothing for the filter
-      #   form/Reset link to target.
-      # * `:advance` -- when true (the default), the frame carries
-      #   `data-turbo-action="advance"`, so a sort/filter navigation updates
-      #   the URL bar and the back button works. false omits the attribute
-      #   entirely (Turbo's own default -- a frame navigation, but no
-      #   history entry).
-      # * `:src` -- optional; emitted as the frame's `src` attribute.
-      # * `:loading` -- optional, `:lazy` or `:eager` (string forms
-      #   accepted too; anything else raises ArgumentError). Combined with
-      #   `src:`, gives a lazily-loaded table -- the frame ships empty and
-      #   Turbo fetches `src:` once it scrolls into view.
+      # * `:id` -- mandatory, raises ArgumentError if blank/missing.
+      # * `:advance` -- `data-turbo-action="advance"` when true (default),
+      #   so the URL bar and back button follow along; false omits it.
+      # * `:src`, `:loading` (:lazy/:eager) -- lazily-loaded table: ships
+      #   empty, Turbo fetches `src:` once it scrolls into view.
       #
-      # ### Footer in, filter out -- and why they differ
+      # ### Footer in, filter out
       #
-      # The footer slot and the filter toolbar sit on opposite sides of the
-      # frame boundary, and both placements are deliberate -- getting either
-      # one backwards breaks something, just in opposite ways:
-      #
-      # * The **footer goes INSIDE the frame.** Anything in it reflects
-      #   table state -- a pager, a row count, a "showing 1-10 of 50"
-      #   summary -- and has to swap along with the rows or it goes stale. A
-      #   pager rendered outside the frame would not re-render when the
-      #   frame navigates: clicking page 2 would swap the rows but leave "1"
-      #   highlighted in the pager, because the pager markup was never part
-      #   of the response that replaced the frame. Practical consequence:
-      #   pagination placed in the footer no longer needs its own `frame:`
-      #   option -- a link inside a `<turbo-frame>` navigates that frame
-      #   automatically without being told to. Passing `frame:` to it anyway
-      #   is harmless (Turbo already scopes the navigation correctly) but
-      #   redundant.
-      # * The **filter toolbar stays OUTSIDE the frame.** The filter form
-      #   auto-submits on a debounce (see "Filtering" above); if the frame
-      #   wrapped the toolbar, a replacement response landing mid-typing
-      #   would replace the search input itself and destroy its focus and
-      #   caret position. So instead the filter form and Reset link stay
-      #   outside the frame and target it explicitly via
-      #   `data-turbo-frame="<id>"` (see #filter_form_attributes and
-      #   #filter_reset_attributes). Sortable column headers need no such
-      #   attribute -- their `<a>` links already live *inside* the frame, so
-      #   Turbo intercepts and scopes the navigation to it automatically; do
-      #   not add a redundant `data-turbo-frame` to #sort_attributes.
+      # The footer slot sits *inside* the frame (it reflects table state --
+      # a pager needs to swap with the rows, or its highlight goes stale).
+      # The filter form stays *outside* the frame and targets it via
+      # `data-turbo-frame="<id>"` instead -- if the toolbar sat inside the
+      # frame, a response landing mid-typing would replace the search input
+      # and destroy its focus/caret. Sortable header links already live
+      # inside the frame, so they need no explicit targeting.
       def initialize(options = {})
         @columns = options[:columns] || []
         @data = options[:data] || []
@@ -578,7 +431,26 @@ module TablerUi
       #   changes the rendered output when the form both auto-submits AND
       #   the table has a frame: -- otherwise it is a silent no-op (no
       #   Stimulus value on the form, no target on the field, no hint
-      #   element at all). See the class docs' "Filtering" section for why.
+      #   element at all).
+      #
+      #   This is deliberate, not a bug to "fix": without a frame, a
+      #   below-threshold submit is a full page reload, and the server
+      #   echoes back the blanked search value -- wiping the user's typed
+      #   text out of the input. The feature only behaves well when the
+      #   form's response swaps in over Turbo instead of replacing the
+      #   whole page, so outside that setup it does nothing rather than
+      #   half-working.
+      #
+      #   When active, the tabler-ui--filter Stimulus controller still
+      #   submits the form below the threshold (so the URL/query params
+      #   stay in sync) but blanks the field's own value first, so the
+      #   table falls back to unfiltered results instead of filtering on a
+      #   too-short fragment; the hint text appears and the field is marked
+      #   is-invalid while below the threshold. Clearing the field entirely
+      #   (0 characters) always submits normally -- a user can never get
+      #   stuck in a filtered state with no way back out. See
+      #   app/javascript/controllers/tabler_ui/filter_controller.js for the
+      #   submit-time logic.
       def filter_min_chars_active?
         !!(@filter && @filter[:min_chars] && @filter[:auto] && frame?)
       end
@@ -897,7 +769,14 @@ module TablerUi
         method = validate_filter_method!(filter_options[:method])
         # Default true only for a :get form on a framed table -- the one
         # combination where an auto-submit lands in a Turbo Frame swap
-        # rather than a full navigation. See the :auto class docs above.
+        # rather than a full navigation. Every other combination (a :post
+        # form; a :get form with no frame:) defaults to false, since an
+        # auto-submit there is a full navigation on every keystroke -- the
+        # body gets replaced, the search input loses focus, and the page
+        # scrolls back to the top mid-typing. An explicit auto: always wins
+        # either direction; a host driving the response with Turbo Streams
+        # or its own JS may have good reason to set auto: true without a
+        # frame:, so this is not forbidden, just not the default.
         auto = filter_options.key?(:auto) ? !!filter_options[:auto] : (method == :get && frame?)
         fields = (filter_options[:fields] || []).map { |field| build_filter_field(field) }
         min_chars = validate_min_chars!(filter_options[:min_chars], fields: fields)

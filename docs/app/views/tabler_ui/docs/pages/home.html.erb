@@ -1,0 +1,113 @@
+<%# Getting-started landing page for the docs engine. The sidebar (rendered by the
+    layout on every page -- docs/app/views/tabler_ui/docs/shared/_sidebar.html.erb)
+    already lists every category and every component, so this page's job is not
+    to repeat that list (see the old card-grid this replaced) but to get a reader
+    from an empty Gemfile to one rendered component. Component count is derived
+    from TablerUi::Docs::Navigation.components.size, never hardcoded -- see
+    README.md's stale "33 components" line for why that matters. %>
+<%= tabler_ui.icon icon: "home", class: "me-2" %>
+<%= tabler_ui.page_header title: "Tabler UI", pretitle: "Getting started" %>
+
+<p class="text-secondary docs-section-body">
+  A Rails engine that wraps <a href="https://tabler.io/" target="_blank" rel="noopener">Tabler</a>
+  (Bootstrap 5) as Ruby components -- <code>tabler_ui.button ...</code>,
+  <code>tabler_ui.card ... do |slots| ... end</code> -- plus a <%= link_to "FormBuilder", forms_path %>
+  for Simple-Form-style inputs.
+</p>
+
+<h2>1. Install</h2>
+<pre class="bg-dark-lt rounded p-2"><code>gem "tabler_ui", git: "https://github.com/webbastelbude/tabler_ui.git"</code></pre>
+<p class="text-secondary">
+  Pulls in <code>rails</code> (&gt;= 7.0), <code>stimulus-rails</code>, <code>ostruct</code> and
+  <code>sprockets-rails</code> (~&gt; 3.5) -- the last one is required even on a Propshaft host;
+  the next section explains why.
+</p>
+
+<h2>2. Asset setup</h2>
+<p class="text-secondary docs-section-body">
+  <code>app/assets/stylesheets/tabler_ui.css</code> is a <strong>Sprockets directive manifest</strong>
+  -- six <code>*= require</code> lines, no CSS of its own. Propshaft has no directive processor, so a
+  Propshaft host is served that file's comments byte-for-byte: no error, no styling, nothing to point
+  at in the console. Pick whichever matches the host app.
+</p>
+<div class="row row-cards mb-3">
+  <div class="col-12 col-md-6">
+    <%= tabler_ui.card title: "Sprockets" do |s| %>
+      <% s.body do %>
+        <p class="text-secondary mb-2">Add to <code>app/assets/stylesheets/application.css</code>:</p>
+        <pre class="bg-dark-lt rounded p-2 mb-0"><code>/*
+ *= require tabler_ui
+ */</code></pre>
+      <% end %>
+    <% end %>
+  </div>
+  <div class="col-12 col-md-6">
+    <%= tabler_ui.card title: "Propshaft (Rails 8 default)" do |s| %>
+      <% s.body do %>
+        <p class="text-secondary mb-2">Link the pre-built, directive-free bundle instead:</p>
+        <pre class="bg-dark-lt rounded p-2 mb-0"><code>&lt;%= stylesheet_link_tag "tabler_ui_all" %&gt;</code></pre>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<h2>3. JavaScript</h2>
+<p class="text-secondary docs-section-body">
+  The gem's own <code>config/importmap.rb</code> is auto-loaded by the engine, so
+  <code>tabler_ui</code> and its Stimulus controllers are already pinned. What still matters is
+  order: <code>tabler_ui.js</code> registers its controllers inside <code>if (window.Stimulus)</code>,
+  so the host must start Stimulus and assign <code>window.Stimulus</code> <strong>before</strong>
+  importing <code>"tabler_ui"</code>.
+</p>
+<pre class="bg-dark-lt rounded p-2"><code>// app/javascript/controllers/application.js
+import { Application } from "@hotwired/stimulus"
+const application = Application.start()
+window.Stimulus = application
+export { application }</code></pre>
+<pre class="bg-dark-lt rounded p-2 mb-0"><code>// app/javascript/application.js
+import "controllers/application"
+import "tabler_ui"</code></pre>
+
+<h2>4. Mount the docs engine</h2>
+<p class="text-secondary docs-section-body">
+  Optional, but this page is the proof: mount <code>TablerUi::Docs::Engine</code> anywhere and every
+  component gets a generated reference page plus its live demos.
+</p>
+<pre class="bg-dark-lt rounded p-2 mb-0"><code>mount TablerUi::Docs::Engine, at: "/ui"</code></pre>
+
+<h2>5. A first component</h2>
+<p class="text-secondary docs-section-body">Rendered live, from the exact source printed underneath it:</p>
+<% first_demo = TablerUi::Docs::DemoRegistry.find("button-shape") %>
+<% if first_demo %>
+  <%= render "tabler_ui/docs/demos/demo", demo: first_demo %>
+<% end %>
+
+<h2>Where to go next</h2>
+<div class="row row-cards mb-4">
+  <div class="col-12 col-md-4">
+    <%= link_to component_path("button"), class: "card card-link" do %>
+      <div class="card-body">
+        <div class="card-title mb-1">Component reference</div>
+        <p class="text-secondary mb-0">
+          <%= pluralize(TablerUi::Docs::Navigation.components.size, "component") %>, grouped in the sidebar.
+        </p>
+      </div>
+    <% end %>
+  </div>
+  <div class="col-12 col-md-4">
+    <%= link_to forms_path, class: "card card-link" do %>
+      <div class="card-body">
+        <div class="card-title mb-1">Form builder</div>
+        <p class="text-secondary mb-0"><code>TablerUi::FormBuilder</code> field reference.</p>
+      </div>
+    <% end %>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <div class="card-title mb-1">Search</div>
+        <p class="text-secondary mb-0">Full-text search box in the sidebar.</p>
+      </div>
+    </div>
+  </div>
+</div>

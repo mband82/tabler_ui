@@ -2,12 +2,10 @@
 
 module TablerUi
   module Navbar
-    # Navbar component for Tabler UI. Renders a responsive `header.navbar`
-    # with left/right nav-item groups (plain links, dropdown submenus, a
-    # divider, or the dark mode toggle) and a mobile collapse toggler.
-    # Builder-style: the block yields the component itself, and top-level
-    # items are added through the `#left`/`#right` groups' `#add` and
-    # `#dropdown`.
+    # Renders a responsive `header.navbar` with left/right nav-item groups
+    # (links, dropdown submenus, a divider, or the dark mode toggle) and a
+    # mobile collapse toggler. Builder-style: the block yields the component
+    # itself; add items through `left`/`right`'s `add` and `dropdown`.
     #
     # @example Basic usage
     #   <%= tabler_ui.navbar(brand: link_to("MyApp", root_path)) do |navbar| %>
@@ -17,8 +15,7 @@ module TablerUi
     #     <% end %>
     #   <% end %>
     #
-    # @example Nested dropdown -- same item/divider/header API as the
-    #   standalone TablerUi::Dropdown::Component
+    # @example Nested dropdown
     #   <%= tabler_ui.navbar do |navbar| %>
     #     <% navbar.left do |nav| %>
     #       <% nav.dropdown "Admin", align: :end do |dd| %>
@@ -60,36 +57,30 @@ module TablerUi
       # @param options [Hash]
       # @option options [String]  :brand          Brand/logo markup, rendered as-is inside `.navbar-brand`
       # @option options [Boolean] :brand_autodark Adds `navbar-brand-autodark` to the brand element (default: true)
-      # @option options [String, Symbol] :expand  Breakpoint at/above which the navbar shows its full menu and
-      #   below which it collapses behind the toggler -- one of sm/md/lg/xl/xxl (default: "lg"). Validated via
-      #   TablerUi::Breakpoint.validate!; anything else raises ArgumentError.
-      # @option options [Boolean] :dark        Adds `navbar-dark`, which switches the text/brand/toggler-icon
-      #   colours for a dark background. It sets no background itself -- pair it with a `bg-*` utility (e.g.
-      #   via `html: { class: "bg-dark" }`).
+      # @option options [String, Symbol] :expand  Breakpoint at/above which the navbar shows its full menu;
+      #   below it, collapses behind the toggler. One of `sm`/`md`/`lg`/`xl`/`xxl` (default: `lg`). Invalid
+      #   values raise `ArgumentError`.
+      # @option options [Boolean] :dark        Adds `navbar-dark` (switches text/brand/toggler-icon colours
+      #   for a dark background). Sets no background itself -- pair with a `bg-*` utility.
       # @option options [Boolean] :transparent Adds `navbar-transparent` (transparent background and border).
-      # @option options [Boolean] :overlap     Adds `navbar-overlap`, extending the navbar's background 9rem
-      #   below it via a `:after` pseudo-element.
+      # @option options [Boolean] :overlap     Adds `navbar-overlap`, extending the navbar's background 9rem below it.
       # @option options [Boolean] :nav_scroll  Adds `navbar-nav-scroll` to the collapsible menu, capping it at
-      #   `var(--tblr-scroll-height, 75vh)` with a scrollbar. Above the `expand:` breakpoint scrolling is
-      #   switched off, so this only takes effect in the collapsed state. Set a custom cap via the menu html
-      #   hook, e.g. `menu_html: { style: "--tblr-scroll-height: 300px" }`.
+      #   `var(--tblr-scroll-height, 75vh)` with a scrollbar. Only takes effect while collapsed. Set a custom
+      #   cap via `menu_html: { style: "--tblr-scroll-height: 300px" }`.
       # @option options [Hash] :html         Rule 5 HTML hook for the outer `header.navbar` (part :root)
       # @option options [Hash] :brand_html   Rule 5 HTML hook for `.navbar-brand` (part :brand)
       # @option options [Hash] :toggler_html Rule 5 HTML hook for the mobile toggler button (part :toggler)
       # @option options [Hash] :menu_html    Rule 5 HTML hook for the collapsible menu container (part :menu)
       # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to every plain nav
       #   link's `<a>` (or the `<button>` inside `button_to`'s `<form>` for a non-GET
-      #   `method:`) -- part :link. A plain Hash, or a callable taking the item, following
-      #   `pagination#link_html:`'s precedent. Merged underneath this item's own `link_html:`
-      #   given to `NavigationGroup#add` -- see #link_attributes. Does *not* reach the
+      #   `method:`) -- part :link. A Hash, or a callable taking the item. Merged underneath
+      #   this item's own `link_html:` given to `NavigationGroup#add`. Does *not* reach the
       #   dropdown toggle (`dropdown_toggle_html:`) or dropdown sub-item links (their own
       #   per-item `link_html:` on `DropDownProxy#item`).
       # @option options [Hash, #call] :dropdown_toggle_html Rule 5 HTML hook applied to every
-      #   dropdown's toggle `<a class="dropdown-toggle">` (part :dropdown_toggle) -- a plain
-      #   Hash, or a callable taking the item. The toggle's own `data-bs-toggle="dropdown"`
-      #   and `data-controller="tabler-ui--dropdown-menu"` are baked into the defaults this
-      #   merges *under*, so a caller's own `data:` deep-merges with them instead of
-      #   replacing them -- see #dropdown_toggle_attributes.
+      #   dropdown's toggle `<a class="dropdown-toggle">` (part :dropdown_toggle) -- a Hash,
+      #   or a callable taking the item. A caller's own `data:` deep-merges with the toggle's
+      #   built-in `data-bs-toggle`/`data-controller` rather than replacing them.
       def initialize(options = {})
         @brand = options[:brand]
         @brand_autodark = options.fetch(:brand_autodark, true)

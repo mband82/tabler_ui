@@ -9,7 +9,6 @@ require "rails"
 require "active_model/railtie"
 require "action_controller/railtie"
 require "action_view/railtie"
-require "sprockets/railtie"
 
 Bundler.require(*Rails.groups)
 
@@ -21,10 +20,5 @@ module Showcase
     config.generators.system_tests = nil
 
     config.action_controller.perform_caching = false
-
-    # Sprockets, not Propshaft: tabler_ui.css is a Sprockets directive
-    # manifest (`*= require ...`) shipped by the gem.
-    config.assets.css_compressor = nil
-    config.assets.js_compressor = nil
   end
 end

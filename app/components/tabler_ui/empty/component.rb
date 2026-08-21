@@ -7,10 +7,7 @@ module TablerUi
     # `.empty-header`, `.empty-title`, `.empty-subtitle` and `.empty-action`
     # parts. All parts are siblings in a centred flex column, not nested.
     #
-    # `icon:` and `image:` are rendered through the dispatcher
-    # (`tabler_ui.icon` / `tabler_ui.illustration`) rather than by
-    # instantiating `TablerUi::Icon::Component` / `TablerUi::Illustration::Component`
-    # directly -- see CLAUDE.md's component conventions.
+    # The block yields a single argument, the `SlotContext` -- `do |slots|`, not `do |empty, slots|`.
     #
     # @example Basic usage -- title plus subtitle
     #   <%= tabler_ui.empty title: "No results found",
@@ -36,9 +33,6 @@ module TablerUi
     #   <%= tabler_ui.empty title: "x", html: { class: "mb-4" },
     #                        title_html: { class: "text-danger" },
     #                        subtitle_html: { class: "text-muted" } %>
-    #
-    # Note: the block yields exactly one argument, the SlotContext --
-    # `do |slots|`, not `do |empty, slots|`.
     class Component
       include TablerUi::Base
 

@@ -40,43 +40,25 @@ module TablerUi
     #
     # ## Which slide is active
     #
-    # Unlike `steps` (a single `current:` index, because its CSS only makes
-    # sense with one dimming boundary) this follows `tabs`' precedent: a
-    # per-item `active:` flag, first-item-wins when nothing is marked --
-    #
-    #   is_active = options[:active].nil? ? @items.empty? : options[:active]
-    #
-    # -- so a lone slide, or the first of several with no explicit `active:`
-    # anywhere, comes out active with zero ceremony. `tabs` stops there and
-    # tolerates whatever the caller produces. Carousel cannot: Bootstrap's
-    # `.active` selector picks the *first* match, so zero active items shows
-    # a blank frame and several active items shows several stacked on top of
-    # each other -- both silent. #validate! (called by the dispatcher once
-    # the block has run, see `TablerUi::Ui#render_block`) enforces exactly
-    # one, turning what would be a blank carousel into an ArgumentError at
-    # render time.
+    # Each slide takes its own `active:` flag. If none is marked active, the
+    # first slide added becomes active. Exactly one slide must end up
+    # active -- zero or several raises `ArgumentError` once the block finishes.
     #
     # ## Autoplay
     #
-    # The root always carries `data-bs-ride="carousel"` (Bootstrap's own
-    # opt-in for "start cycling on page load", per its Carousel docs), so a
-    # carousel autoplays with Bootstrap's 5000ms default unless tuned via
-    # `interval:`. Pass `interval: false` to disable autoplay entirely while
-    # keeping manual prev/next/indicator navigation -- Bootstrap's own
-    # documented contract for that value.
+    # Autoplays by default (Bootstrap's 5000ms interval) unless tuned via
+    # `interval:`. Pass `interval: false` to disable autoplay while keeping
+    # manual prev/next/indicator navigation.
     #
     # ## Accessibility
     #
-    # The root carries `role="region"` / `aria-roledescription="carousel"` /
-    # a translated `aria-label`, and each slide carries `role="group"` /
-    # `aria-roledescription="slide"` / a translated "Slide N of M" label --
-    # the WAI-ARIA carousel pattern Bootstrap's own docs point to. Indicator
-    # buttons get a translated "Slide N" `aria-label` plus `aria-current`
-    # on the active one; prev/next controls get translated visually-hidden
-    # text, matching Bootstrap's own example markup.
+    # The root carries `role="region"`, `aria-roledescription="carousel"` and
+    # a translated `aria-label`. Each slide carries `role="group"`,
+    # `aria-roledescription="slide"` and a translated "Slide N of M" label.
+    # Indicator buttons get a translated "Slide N" label plus `aria-current`
+    # on the active one; prev/next controls get translated visually-hidden text.
     #
-    # Note: the block yields the component itself (builder style) --
-    # `do |carousel| carousel.item(...) end`, not a SlotContext.
+    # Note: the block yields the component itself (`do |carousel| ... end`), not a SlotContext.
     class Component
       include TablerUi::Base
       builder_style!
@@ -104,15 +86,12 @@ module TablerUi
       #   slide's `image:`, when present), `:vertical`
       # @option options [Boolean] :controls Prev/next arrow buttons (default: true)
       # @option options [Integer, Boolean] :interval Milliseconds between
-      #   automatic slides, or `false` to disable autoplay -- maps to
-      #   `data-bs-interval`. Omitted entirely (Bootstrap's own 5000ms
-      #   default applies) unless given explicitly.
+      #   automatic slides, or `false` to disable autoplay. Bootstrap's own
+      #   5000ms default applies when omitted.
       # @option options [Boolean] :wrap Whether the carousel cycles
-      #   continuously (default: true) or hard-stops at the first/last slide --
-      #   maps to `data-bs-wrap`. Omitted unless given explicitly.
+      #   continuously (default: true) or hard-stops at the first/last slide.
       # @option options [Boolean] :keyboard Whether the carousel responds to
-      #   arrow keys while focused (default: true) -- maps to `data-bs-keyboard`.
-      #   Omitted unless given explicitly.
+      #   arrow keys while focused (default: true).
       # @option options [Hash] :html Rule 5 HTML hook for the root `.carousel` (part :root)
       # @option options [Hash] :inner_html Rule 5 HTML hook for the `.carousel-inner` (part :inner)
       # @option options [Hash] :indicators_html Rule 5 HTML hook for the `.carousel-indicators` (part :indicators)
@@ -195,6 +174,15 @@ module TablerUi
       # visually broken (several active) carousel with no error of its own.
       # Raising here keeps it an ArgumentError instead of a silently blank
       # carousel in production.
+      #
+      # Unlike `steps` (a single `current:` index, since its CSS only makes
+      # sense with one dimming boundary), this follows `tabs`' precedent of a
+      # per-item `active:` flag with first-item-wins when nothing is marked
+      # (see #item's `is_active` line). `tabs` stops there and tolerates
+      # whatever the caller produces; carousel can't, because Bootstrap's
+      # `.active` selector picks the first match regardless of how many
+      # elements carry the class, so this validation exists to turn that
+      # silent failure mode into a loud one.
       def validate!
         return if @items.empty?
 

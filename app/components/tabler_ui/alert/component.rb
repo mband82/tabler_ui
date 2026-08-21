@@ -62,13 +62,11 @@ module TablerUi
       # @option options [Hash]    :html        Rule 5 HTML hook for the root .alert element (part :root)
       # @option options [Hash]    :title_html  Rule 5 HTML hook for the .alert-heading (part :title),
       #   only applied when a title renders
-      # @option options [Hash]    :icon_html   Rule 5 HTML hook for the icon itself -- the rendered
-      #   icon's root <svg> (part :icon), only applied when an icon renders. There is no wrapper
-      #   element: Tabler's .alert is itself `display: flex; gap: 1rem` (tabler.css), so the icon
-      #   and the content block must be direct children of .alert for that gap to space them.
+      # @option options [Hash]    :icon_html   Rule 5 HTML hook for the icon's root <svg>
+      #   (part :icon) -- there is no wrapper element, so the hook lands directly on the
+      #   svg. Only applied when an icon renders.
       # @option options [Hash]    :link_html   Rule 5 HTML hook for the `.alert-link`/`.alert-action`
-      #   action link (part :link), only applied when :url renders one. A plain Hash is enough here --
-      #   there is only one action link, no per-item variation. See #link_attributes.
+      #   action link (part :link). Only applied when :url renders one.
       # @option options [Hash]    :dismiss_html Rule 5 HTML hook for the `.btn-close` dismiss link
       #   (part :dismiss), only applied when :dismissible renders one. See #dismiss_attributes.
       def initialize(options = {})

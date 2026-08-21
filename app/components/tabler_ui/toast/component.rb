@@ -7,19 +7,12 @@ module TablerUi
     # `.toast-header` / `.toast-body` parts filled in via slots (or a plain
     # `title:` for a simple header).
     #
-    # The component renders no trigger -- if you want click-to-show behaviour
-    # put `data-bs-toggle="toast" data-bs-target="#<id>"` on your own
-    # button/link, exactly like Bootstrap's own docs (give the toast an `id:`
-    # via `html: { id: ... }` to target). `tabler.js` scans the DOM for such
-    # triggers *once*, at script-load time (see
-    # `app/assets/javascripts/tabler_ui/tabler.js`, the "Toasts" block), so
-    # that wiring only reaches triggers present in the initial page load --
-    # a toast/trigger pair inserted later via Turbo needs to be shown some
-    # other way (e.g. calling `.show()` on the adopted instance yourself).
-    # That is an existing `tabler.js` limitation, not something this
-    # component's controller works around -- see
-    # `app/javascript/controllers/tabler_ui/toast_controller.js` for why the
-    # controller deliberately does *not* bind its own trigger click handler.
+    # The component renders no trigger -- put `data-bs-toggle="toast"
+    # data-bs-target="#<id>"` on your own button/link (give the toast an
+    # `id:` via `html: { id: ... }` to target). Trigger wiring is scanned
+    # once at script-load time, so a toast/trigger pair inserted later via
+    # Turbo needs to be shown some other way (e.g. calling `.show()` on the
+    # adopted instance yourself).
     #
     # @example Basic usage -- title plus body slot
     #   <%= tabler_ui.toast title: "Success", color: "success" do |slots| %>
@@ -52,13 +45,9 @@ module TablerUi
     # ## Accessibility
     #
     # The root `.toast` carries `role="alert"`, `aria-live="assertive"` and
-    # `aria-atomic="true"` -- Bootstrap's own default recommendation for
-    # toasts, since they are meant to interrupt. A caller that wants the
-    # gentler `role="status" aria-live="polite"` pairing (e.g. a low-priority
-    # background notification) can override both via the `html:` hook, since
-    # rule 5 hooks overwrite non-class attributes rather than only appending.
-    # The close button carries its own translated aria-label
-    # (tabler_ui.toast.close), matching modal's approach.
+    # `aria-atomic="true"` by default. For a lower-priority notification,
+    # override with `role="status" aria-live="polite"` via the `html:` hook.
+    # The close button carries its own translated aria-label.
     class Component
       include TablerUi::Base
 
@@ -85,20 +74,18 @@ module TablerUi
       # @param options [Hash]
       # @option options [String]  :title        Rendered as a `<strong class="me-auto">`
       #   inside the header when no `header` slot is given.
-      # @option options [String]  :color        Colour for the toast -- validated against
-      #   TablerUi::Color (both the Tabler palette and the semantic names are
-      #   supported for toast, unlike `steps`), rendered as `toast-<color>`.
-      # @option options [Boolean] :autohide     Maps to `data-bs-autohide` -- Bootstrap
-      #   defaults this to true itself, so it's only rendered when given explicitly.
-      # @option options [Integer] :delay        Milliseconds before autohide fires --
-      #   maps to `data-bs-delay`. Bootstrap defaults this to 5000 itself, so it's only
-      #   rendered when given explicitly.
+      # @option options [String]  :color        Colour for the toast, validated against
+      #   TablerUi::Color, rendered as `toast-<color>`.
+      # @option options [Boolean] :autohide     Maps to `data-bs-autohide`. Only rendered
+      #   when given explicitly (Bootstrap defaults it to true itself).
+      # @option options [Integer] :delay        Milliseconds before autohide fires, maps to
+      #   `data-bs-delay`. Only rendered when given explicitly (Bootstrap defaults it to 5000).
       # @option options [Boolean] :close_button Whether to render the `.btn-close` (default: true)
       # @option options [String]  :position     Fixed placement -- wraps the toast in a
-      #   `.toast-container.position-fixed` (see #position for the full vocabulary and
-      #   why a container is opt-in). Stacking several toasts in one container is left to
-      #   the caller (render one `tabler_ui.toast` per notification, no `position:`, inside
-      #   your own `.toast-container`).
+      #   `.toast-container.position-fixed`. One of `top-left`, `top-center`, `top-right`,
+      #   `middle-left`, `middle-center`, `middle-right`, `bottom-left`, `bottom-center`,
+      #   `bottom-right`. To stack several toasts in one corner, render each with no
+      #   `position:` inside your own `.toast-container`.
       # @option options [Hash]    :html           Rule 5 HTML hook for the root `.toast` (part :root)
       # @option options [Hash]    :header_html    Rule 5 HTML hook for the `.toast-header` (part :header)
       # @option options [Hash]    :body_html      Rule 5 HTML hook for the `.toast-body` (part :body)

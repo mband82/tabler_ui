@@ -1,0 +1,36 @@
+<%# Forms harness -- ported from showcase/app/views/showcase/forms.html.erb.
+    This wrapping tabler_form_with is the harness itself, not a demo (see
+    docs/DEMOS.md's "Stateful demos: locals:" and the header comment of
+    docs/lib/tabler_ui/docs/demos/form_builder_demos.rb): it stays
+    hand-written here so f.error_notification / inline field errors are
+    driven by one real, request-bound TablerUi::Docs::PersonForm. Each
+    field-level example below is a single-sourced Demo, rendered through
+    _form_demo (not the generic _demo partial), which merges this f: into
+    the demo's own locals. %>
+<%= tabler_ui.page_header title: "Forms", pretitle: "TablerUi::FormBuilder" %>
+
+<p class="text-secondary">
+  Backed by a plain <code>ActiveModel::Model</code> double
+  (<code>TablerUi::Docs::PersonForm</code>,
+  <code>docs/app/models/tabler_ui/docs/person_form.rb</code>) -- no database.
+  Append <code>?with_errors=1</code> to the URL to see
+  <code>f.error_notification</code> and inline field errors.
+</p>
+
+<% if params[:with_errors] %>
+  <%= tabler_ui.alert color: "info", text: "Forced an email error via ?with_errors=1 -- see the error notification and the email field below." %>
+<% else %>
+  <%= link_to "Show validation errors", forms_path(with_errors: 1), class: "btn btn-outline-secondary mb-3" %>
+<% end %>
+
+<%= tabler_form_with model: @person, url: forms_path, method: :get, scope: :person, local: true do |f| %>
+  <%= f.error_notification %>
+
+  <% TablerUi::Docs::DemoRegistry.for(:form_builder).each do |demo| %>
+    <%= render "tabler_ui/docs/demos/form_demo", demo: demo, f: f %>
+  <% end %>
+
+  <div class="mt-3">
+    <%= tabler_ui.button text: "Save (demo only, method: :get)", color: "primary", method: :get %>
+  </div>
+<% end %>

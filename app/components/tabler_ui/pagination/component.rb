@@ -3,21 +3,14 @@
 module TablerUi
   module Pagination
     # Pagination component for Tabler UI. Builder-style: the block yields the
-    # component itself, and entries are added via #item / #gap / #prev / #next.
+    # component itself, entries added via #item / #gap / #prev / #next.
     #
-    # Unlike every other item-list component in this gem (breadcrumb, steps,
-    # tabs, ...) pagination has a second, much more common way in: hand it
-    # `current:`/`total:` and it works out the item list itself. That computed
-    # mode is built *on top of* the very same builder primitives described
-    # below -- see "Computed mode" -- so there is exactly one rendering path
-    # to get right.
+    # A second, more common way in: pass `current:`/`total:` and it works
+    # out the item list itself -- see "Computed mode" below.
     #
     # This component never touches a collection, an ORM, or `params`. Its
     # entire input is two integers and a way to build a URL (`url:`, a
-    # callable taking a page number). How the caller arrives at those --
-    # Kaminari, Pagy, a hand-rolled `offset`, a plain array -- is none of its
-    # business, exactly as `table` and `datagrid` only ever see the rows they
-    # are handed.
+    # callable taking a page number).
     #
     # @example Builder mode -- full manual control
     #   <%= tabler_ui.pagination do |p| %>
@@ -52,133 +45,75 @@ module TablerUi
     #
     # ## Computed mode
     #
-    # `current:` (1-based) and `total:` (page count) together turn on computed
-    # mode: the component works out the page range itself (see
-    # #compute_pages) and calls the very same #add_page / #add_gap / #add_prev
-    # / #add_next primitives the public builder methods (#item / #gap / #prev
-    # / #next) call, just without the "no block allowed" guard those carry.
-    # `window:` (default 2) controls how many pages either side of `current`
-    # are shown; `url:` is a callable taking a page number, invoked once per
-    # link actually rendered (never for a gap, never for a disabled prev/next).
+    # `current:` (1-based) and `total:` (page count) turn on computed mode:
+    # the page range is worked out automatically. `window:` (default 2)
+    # controls how many pages either side of `current` are shown; `url:` is
+    # called once per link actually rendered (never for a gap or a disabled
+    # prev/next).
     #
-    # `current:`/`total:` and a block are mutually exclusive -- computed mode
-    # already builds a full item list, so a block that goes on to call #item
-    # (etc) itself would silently mix the two. Rather than pick one winner
-    # quietly, calling any builder method while computed options were given
-    # raises ArgumentError immediately (see #guard_against_computed!).
-    # Passing a block that never calls a builder method (or no block at all)
-    # is fine either way.
+    # `current:`/`total:` and a block are mutually exclusive -- calling any
+    # builder method (#item/#gap/#prev/#next) while computed options were
+    # given raises ArgumentError immediately. A block that never calls a
+    # builder method (or no block at all) is fine either way.
     #
-    # `current:` given without `total:` also raises -- there is no page range
-    # to compute without knowing how many pages there are.
+    # `current:` given without `total:` also raises.
     #
     # ### Degenerate totals
     #
-    # `total: 0` renders an empty `<ul class="pagination">` -- there is
-    # nothing to paginate, so this is treated the same way `table`/`datagrid`
-    # treat zero rows: no error, just nothing. `current:` is not range-checked
-    # in this case (any value is accepted and ignored).
+    # `total: 0` renders an empty `<ul class="pagination">` -- nothing to
+    # paginate, no error. `current:` is ignored in this case.
     #
     # `total: 1` renders a single active page 1 with both prev and next
-    # disabled, rather than nothing -- there *is* a page, it just has nowhere
-    # to go. This keeps the markup shape (prev, pages, next) uniform instead
-    # of special-casing the single-page case away.
+    # disabled, rather than nothing, keeping the markup shape uniform.
     #
-    # For any other total, `current:` outside `1..total` raises ArgumentError
-    # via #validate! (see also `lib/tabler_ui/ui.rb#render_block`, which calls
-    # #validate! automatically once a builder block has run -- computed mode
-    # calls it itself from #initialize, since it doesn't need to wait for a
-    # block to know its total).
+    # Any other `current:` outside `1..total` raises ArgumentError.
     #
     # ## The range algorithm
     #
-    # #compute_pages always shows page 1 and the last page, plus a window of
-    # `window:` pages either side of `current`, clamped to `1..total`. Where
-    # that leaves a run of hidden pages between two shown ones, a single
-    # hidden page is shown outright instead of a gap (a gap standing in for
-    # exactly one page is worse than just showing that page); two or more
-    # hidden pages collapse to one `:gap` marker.
+    # Always shows page 1 and the last page, plus a window of `window:`
+    # pages either side of `current`, clamped to `1..total`. A single
+    # hidden page between two shown ones is shown outright instead of a
+    # gap; two or more hidden pages collapse to one `:gap` marker.
     #
     # ## Turbo Frames
     #
-    # `table` also has a `frame:` option (same key, different job -- do not
-    # conflate the two). There, `frame:` makes the component *emit* a
-    # `<turbo-frame id="...">` wrapping the table. Here, `frame:` makes every
-    # link this component renders *target* a frame by id, via
-    # `data-turbo-frame="<id>"` -- pagination never emits a `<turbo-frame>`
-    # of its own.
-    #
-    # That split matches how the two components are normally laid out on the
-    # page: pagination controls typically sit *below* a framed table, i.e.
-    # outside the frame they page through. If pagination also emitted a
-    # frame, the caller would have two nested/adjacent frames to keep in
-    # sync for no benefit -- one frame (owned by `table`) is enough, and
-    # pagination just needs to point at it by id:
+    # `table`'s `frame:` *emits* a `<turbo-frame>`; pagination's `frame:`
+    # (same key, different job) makes every rendered link *target* one by
+    # id, via `data-turbo-frame="<id>"` -- pagination never emits a
+    # `<turbo-frame>` of its own:
     #
     #   <%= tabler_ui.table columns: columns, data: rows, frame: "users-table" %>
     #   <%= tabler_ui.pagination current: page, total: total,
     #                            url: ->(n) { users_path(page: n) },
     #                            frame: "users-table" %>
     #
-    # Only `id:` is accepted -- `advance:`/`src:`/`loading:` are
-    # frame-*emitting* concerns and belong to `table`'s `frame:` alone; if a
-    # caller passes them here they are silently ignored rather than raising,
-    # since a matching `table frame:` hash is a plausible (if unnecessary)
-    # thing to copy-paste into both calls.
-    #
-    # The gem takes no `turbo-rails` dependency -- `data-turbo-frame` is
-    # inert markup without Turbo loaded in the host app, exactly like every
-    # other `data-*` attribute this gem emits.
+    # Only `id:` is accepted; `advance:`/`src:`/`loading:` belong to
+    # `table`'s `frame:` and are silently ignored here. No `turbo-rails`
+    # dependency -- `data-turbo-frame` is inert markup without Turbo loaded
+    # in the host app.
     #
     # ## page-prev / page-next
     #
-    # Tabler's stylesheet defines `.page-item.page-prev`/`.page-item.page-next`
-    # for a completely different widget than this component's usual output:
-    # the article-style "‹ PREVIOUS / *Article title*" pager, where prev and
-    # next are the *only* two items in the row. To make that work, Tabler
-    # gives each of them `flex: 0 0 50%` -- prev claims the left half of the
-    # row, next (`margin-left: auto`, right-aligned text) claims the right
-    # half. `.pagination` is a plain, non-wrapping flex row, so that 50/50
-    # split is only correct when prev and next really are the only two
-    # items. The moment page-number items sit between them, prev + next
-    # alone already total 100% of the row's flex basis, and the numbers
-    # push `page-next` straight out past the container's right edge --
-    # confirmed in a browser: Previous stays put, the numbers center
-    # themselves, and Next renders outside the card footer entirely.
-    #
-    # So these two classes are applied conditionally, via #pure_prev_next?:
-    # only when @items contains no `:page` item, i.e. only for a pager built
-    # from #prev/#next alone. The instant a single #item is present -- which
-    # is every computed-mode render, since that always shows page numbers --
-    # prev and next fall back to plain `page-item` (plus `disabled` as
-    # normal), which is standard Bootstrap pagination and exactly what
-    # Tabler's own table card-footers use for their prev/next controls.
-    # #pure_prev_next? is evaluated at render time (via #item_classes, called
-    # from #item_attributes), not cached in #initialize, because builder mode
-    # doesn't know its final item list until the caller's block has run --
-    # see #item_attributes' docs.
-    #
-    # Do not reinstate these classes unconditionally "to match Tabler's
-    # markup" -- that markup is for the article pager, not this one, and
-    # combining them with page numbers is precisely the overflow bug this
-    # section documents.
+    # Tabler's `.page-prev`/`.page-next` classes are `flex: 0 0 50%` each
+    # (built for a two-item "‹ Previous / Next ›" pager) -- combining them
+    # with page-number items overflows the container, so they're applied
+    # only when this is a pure prev/next pager with no `:page` items. Any
+    # pager with page numbers -- every computed-mode render included --
+    # falls back to plain `page-item`.
     #
     # ## CSS surface
     #
     #   ul.pagination[.pagination-sm|.pagination-lg][.pagination-circle][.pagination-outline]
     #     li.page-item[.active][.disabled][.page-prev|.page-next -- prev/next-only pagers, see above]
     #       a.page-link (linkable items) or span.page-link (gaps, disabled prev/next)
-    #       -- both built by #link_attributes (part :link, hook link_html:)
     #
     # ## Accessibility
     #
     # The `<ul class="pagination">` is wrapped in a `<nav>` landmark with a
-    # translated `aria-label` (mirrors `breadcrumb`). The active page's `<li>`
-    # gets `aria-current="page"` (mirrors `breadcrumb`'s current item). An
-    # item only renders as `<a>` when it has a URL *and* isn't disabled --
-    # disabled prev/next and gaps render as `<span class="page-link">`
-    # instead, so they are never focusable links (mirrors `placeholder`'s
-    # disabled-button pattern of not shipping a dead link).
+    # translated `aria-label`. The active page's `<li>` gets
+    # `aria-current="page"`. An item only renders as `<a>` when it has a URL
+    # *and* isn't disabled -- disabled prev/next and gaps render as
+    # `<span class="page-link">` instead, so they are never focusable.
     class Component
       include TablerUi::Base
       builder_style!
@@ -222,14 +157,12 @@ module TablerUi
       # @option options [Hash] :html Rule 5 HTML hook for the `<ul class="pagination">` (part :root)
       # @option options [Hash, #call] :item_html Rule 5 HTML hook applied to
       #   every `<li class="page-item">` (part :item) -- a plain Hash, or a
-      #   callable taking the item, following `table#row_html:`'s precedent
-      #   for parts a component itself generates in bulk. Merged underneath
-      #   any per-item `html:` given to #item/#prev/#next directly -- see
-      #   #item_attributes.
+      #   callable taking the item. Merged underneath any per-item `html:`
+      #   given to #item/#prev/#next directly.
       # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to
       #   every `<a class="page-link">`/`<span class="page-link">` (part
       #   :link) -- a plain Hash, or a callable taking the item, same
-      #   contract as :item_html. See #link_attributes.
+      #   contract as :item_html.
       def initialize(options = {})
         @computed = options.key?(:total) || options.key?(:current)
         @size = validate_size!(options[:size])
@@ -568,6 +501,27 @@ module TablerUi
       #   until the caller's block has finished running, and #item_classes
       #   (via #item_attributes) is only ever invoked at render time, after
       #   that block, so this always sees the final list.
+      #
+      #   Why this guard exists: Tabler's stylesheet defines
+      #   `.page-item.page-prev`/`.page-item.page-next` for a completely
+      #   different widget than this component's usual output -- the
+      #   article-style "‹ PREVIOUS / *Article title*" pager, where prev and
+      #   next are the *only* two items in the row. To make that work,
+      #   Tabler gives each of them `flex: 0 0 50%` -- prev claims the left
+      #   half of the row, next (`margin-left: auto`, right-aligned text)
+      #   claims the right half. `.pagination` is a plain, non-wrapping flex
+      #   row, so that 50/50 split is only correct when prev and next
+      #   really are the only two items. The moment page-number items sit
+      #   between them, prev + next alone already total 100% of the row's
+      #   flex basis, and the numbers push `page-next` straight out past
+      #   the container's right edge -- confirmed in a browser: Previous
+      #   stays put, the numbers center themselves, and Next renders
+      #   outside the card footer entirely.
+      #
+      #   Do not reinstate these classes unconditionally "to match Tabler's
+      #   markup" -- that markup is for the article pager, not this one, and
+      #   combining them with page numbers is precisely the overflow bug
+      #   described above.
       def pure_prev_next?
         @items.none? { |i| i.kind == :page }
       end

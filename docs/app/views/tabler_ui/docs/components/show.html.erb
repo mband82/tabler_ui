@@ -1,0 +1,101 @@
+<%# Per-component documentation page. Combines @parsed (a
+    TablerUi::Docs::ParsedComponent, from DocParser -- description, options,
+    @example blocks, ## prose sections) with @demos (an Array<Demo>, from
+    DemoRegistry) for one component. Reading order: description, live
+    demos, options table, @example blocks, then any remaining prose
+    sections in the order/level they were written.
+
+    Neither collection can ever raise here (DocParser.parse_file rescues
+    broadly, DemoRegistry.for returns [] for an unknown component) -- every
+    branch below has an explicit "nothing here yet" fallback instead of
+    assuming content exists.
+
+    Description, section bodies and option descriptions all go through
+    TablerUi::Docs::MarkdownHelper.render (docs/app/helpers/tabler_ui/docs/
+    markdown_helper.rb) -- a small, safe markdown subset (code spans,
+    bullet/numbered lists, bold, paragraph breaks), escaped-first so it's
+    safe even though today's only input is this gem's own trusted doc
+    comments. @example blocks are explicitly NOT run through it -- see the
+    comment further down where they're rendered; they stay verbatim,
+    escaped code inside <pre><code>, never markdown, never `render inline:`.
+
+    The breadcrumb is captured into content_for(:breadcrumb) instead of
+    rendered inline -- the layout wraps whatever lands there in a sticky
+    bar (docs/app/views/layouts/tabler_ui/docs/application.html.erb). %>
+<% content_for :breadcrumb do %>
+  <%= tabler_ui.breadcrumb do |breadcrumb| %>
+    <% breadcrumb.item "Overview", url: root_path %>
+    <% breadcrumb.item @category if @category %>
+    <% breadcrumb.item TablerUi::Docs::Navigation.title_for(@name) %>
+  <% end %>
+<% end %>
+
+<%= tabler_ui.page_header title: TablerUi::Docs::Navigation.title_for(@name),
+                           pretitle: @category || "Components" %>
+
+<% if @parsed.description.present? %>
+  <div class="text-secondary docs-section-body mb-3"><%= TablerUi::Docs::MarkdownHelper.render(@parsed.description) %></div>
+<% else %>
+  <p class="text-secondary">No description parsed for <code><%= @name %></code> yet.</p>
+<% end %>
+
+<h2>Demos</h2>
+<% if @demos.any? %>
+  <% @demos.each do |demo| %>
+    <%= render "tabler_ui/docs/demos/demo", demo: demo %>
+  <% end %>
+<% else %>
+  <%# dark_mode_toggle is the current example -- see
+      TablerUi::Docs::Navigation::UNDEMOED_BY_SHOWCASE. A plain note instead
+      of an empty section, so the page doesn't look broken. %>
+  <p class="text-secondary">No demos registered for <code><%= @name %></code> yet.</p>
+<% end %>
+
+<h2>Options</h2>
+<% if @parsed.options.any? %>
+  <% option_columns = [
+       { label: "Name", value: ->(opt) { tag.code(opt.name) } },
+       { label: "Type", value: ->(opt) { tabler_ui.badge text: opt.type, color: "blue", light: true } },
+       { label: "Description", value: ->(opt) { opt.description.present? ? TablerUi::Docs::MarkdownHelper.render(opt.description) : "—" } }
+     ] %>
+  <%= tabler_ui.table columns: option_columns, data: @parsed.options, hover: true,
+                      html: { class: "mb-4" }, table_html: { id: "component-options" } %>
+<% else %>
+  <p class="text-secondary">No documented options for <code><%= @name %></code> yet.</p>
+<% end %>
+
+<%# @example blocks are ILLUSTRATIVE ONLY -- lifted verbatim off real
+    component doc comments, referencing objects like User.all, users_path,
+    @pagy.page that do not exist anywhere in this app (see
+    TablerUi::Docs::ParsedComponent's class docs and
+    docs/lib/tabler_ui/docs/doc_parser.rb). They are printed below as inert,
+    escaped code -- an ordinary ERB output tag around example.code,
+    auto-escaping it; nothing here ever calls `render inline:` on them --
+    and must stay that way -- the live demos rendered above are a wholly
+    separate, curated corpus (TablerUi::Docs::DemoRegistry) that IS meant
+    to be executed. That split is the entire reason both exist.
+
+    NOTE: this comment itself was, until this pass, a second live instance
+    of the exact bug docs/app/views/tabler_ui/docs/shared/_search.html.erb
+    had (see that file's header comment) -- it used to spell out the
+    literal output tag around `example.code`, whose own closing sequence
+    closed *this* comment early and leaked the rest of this paragraph as
+    visible text on every component page. Never spell out that two-
+    character closing sequence inside a comment, however it's wrapped
+    (escaped as a literal pair of percent/angle characters or not) --
+    ERB's scanner has no nesting awareness and stops at the first one it
+    finds, full stop. %>
+<% if @parsed.examples.any? %>
+  <h2>Examples</h2>
+  <% @parsed.examples.each do |example| %>
+    <% if example.title.present? %>
+      <h4><%= example.title %></h4>
+    <% end %>
+    <pre class="bg-dark-lt rounded p-2 mb-3"><code><%= example.code %></code></pre>
+  <% end %>
+<% end %>
+
+<% @parsed.sections.each do |section| %>
+  <%= content_tag("h#{section.level}", section.title) %>
+  <div class="docs-section-body mb-3"><%= TablerUi::Docs::MarkdownHelper.render(section.body) %></div>
+<% end %>

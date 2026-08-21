@@ -45,14 +45,11 @@ module TablerUi
 
       # @param options [Hash]
       # @option options [Numeric] :percent Clamped to 0..100 (default: 0). Mutually
-      #   exclusive with `indeterminate:` -- raises ArgumentError if both are given,
-      #   since a caller-supplied percent would be silently discarded otherwise.
+      #   exclusive with `indeterminate:` (raises ArgumentError if both given).
       # @option options [String] :color Tabler palette / Bootstrap semantic colour
-      #   name, validated via TablerUi::Color (raises ArgumentError if unknown).
-      #   The magic value "auto" is also accepted -- it is not a real colour
-      #   name, so it bypasses validation and instead resolves to
-      #   success/warning/danger from AUTO_THRESHOLDS based on `percent`.
-      #   Defaults to "primary" when omitted.
+      #   name (validated via TablerUi::Color, raises ArgumentError if unknown), or
+      #   `"auto"` to resolve success/warning/danger from `percent`. Defaults to
+      #   "primary".
       # @option options [String] :height CSS height for the outer bar, e.g. "8px"
       # @option options [String] :label Text shown in a label row above the bar
       # @option options [Boolean] :show_percent Show the rounded percentage --
@@ -61,17 +58,12 @@ module TablerUi
       # @option options [String, Symbol] :size :sm / :lg -- progress-<size>
       # @option options [Boolean] :striped .progress-bar-striped
       # @option options [Boolean] :animated .progress-bar-animated
-      # @option options [Boolean] :indeterminate Adds .progress-bar-indeterminate to the
-      #   bar and switches it to Tabler's built-in :before/:after sweep animation. Because
-      #   the value is unknown in this state, the inline `width` style and `aria-valuenow`
-      #   are both suppressed (role and aria-valuemin/aria-valuemax are kept). Raises
-      #   ArgumentError if combined with `percent:` -- see :percent above.
-      # @option options [Boolean] :separated Adds .progress-separated to the outer
-      #   .progress track. This only has a visible effect once multiple .progress-bar
-      #   elements share one track (Tabler's "stacked" progress bars); this component
-      #   renders a single bar, so with the current markup the class is emitted but has
-      #   no visible effect. It is safe to set now -- it will start working the moment
-      #   stacked-bar support lands.
+      # @option options [Boolean] :indeterminate Switches to `.progress-bar-indeterminate`'s
+      #   sweep animation. Omits `width` and `aria-valuenow` (value is unknown). Mutually
+      #   exclusive with `percent:` (raises ArgumentError).
+      # @option options [Boolean] :separated Adds `.progress-separated` to the track. No
+      #   visible effect with a single bar -- only matters for stacked progress bars,
+      #   which this component does not yet render.
       # @option options [Hash] :html Rule 5 HTML hook for the outer .progress <div> (part :root)
       # @option options [Hash] :bar_html Rule 5 HTML hook for the inner .progress-bar <div> (part :bar)
       # @option options [Hash] :label_html Rule 5 HTML hook for the label row <div> (part :label),

@@ -39,12 +39,9 @@ module TablerUi
     #
     # ## Accessibility
     #
-    # The `<ol class="breadcrumb">` is wrapped in a `<nav>` landmark with a
-    # translated `aria-label` (see config/locales/en.yml,
-    # tabler_ui.breadcrumb.aria_label), matching the standard breadcrumb
-    # pattern. Whichever item is "current" (see #current? below) renders as
-    # plain text rather than a link, carries the `active` class, and gets
-    # `aria-current="page"` -- mirroring Bootstrap's own reference markup:
+    # The `<ol class="breadcrumb">` sits inside a `<nav>` landmark with a
+    # translated `aria-label`. The current item (see `#current?`) renders as
+    # plain text, not a link, with the `active` class and `aria-current="page"`:
     #
     #   <nav aria-label="breadcrumb">
     #     <ol class="breadcrumb">
@@ -55,33 +52,20 @@ module TablerUi
     #
     # ## Current item resolution
     #
-    # Breadcrumbs almost always end at the current page, so when no item is
-    # explicitly marked `active: true`, the *last* item added is treated as
-    # current automatically -- no link, `active` class, `aria-current="page"`
-    # -- even if it was given a `url:`. This matches how breadcrumbs are used
-    # in practice (the trailing crumb is the page you're on, and callers
-    # rarely bother passing `active: true` on it explicitly).
+    # If no item is marked `active: true`, the *last* item added is treated
+    # as current automatically -- no link, `active` class, `aria-current="page"`
+    # -- even if it has a `url:`. As soon as any item is given `active: true`,
+    # the automatic last-item behaviour turns off entirely: only the
+    # explicitly marked item(s) are current, and every other item, including
+    # the last, renders normally based on its own `url:`.
     #
-    # As soon as any item is given `active: true` explicitly, the automatic
-    # last-item behaviour is switched off entirely: only the explicitly
-    # marked item(s) are current, and every other item -- including the last
-    # one -- renders as a normal link/text node based on its own `url:`.
-    # This keeps the rule explicit rather than magical: either you opt in to
-    # marking the current item yourself, or the component makes the one
-    # obvious default choice for you.
+    # ## The `link_html:` hook and non-linked items
     #
-    # ## The `<a>` hook and the non-linked case
-    #
-    # `link_html:` (part :link, see #link_attributes) reaches the `<a>`
-    # element -- and *only* the `<a>` element. An item with no `url:`, or the
-    # current item (see #current? above, which never links even with a
-    # `url:`), renders as bare text directly inside its `<li>` -- there is no
-    # element for `link_html:` to reach, so it is simply not applied in that
-    # case, exactly as documented for `table#row_html:`-style hooks that only
-    # fire when the element they target actually renders (compare `alert`'s
-    # `title_html:`, applied "only when a title renders"). Target the `<li>`
-    # instead via the item's own `html:` (part :item) when you need to reach
-    # a non-linked item.
+    # `link_html:` only reaches the `<a>` element. An item with no `url:`, or
+    # the current item (which never links, even with a `url:`), renders as
+    # bare text with no `<a>` to apply it to -- `link_html:` is silently
+    # skipped in that case. Target the `<li>` instead via the item's own
+    # `html:` (part :item) when you need to reach a non-linked item.
     class Component
       include TablerUi::Base
       builder_style!
@@ -95,18 +79,16 @@ module TablerUi
       attr_reader :style, :muted, :items, :aria_label
 
       # @param options [Hash]
-      # @option options [Symbol, String] :style One of :dots, :arrows, :bullets --
-      #   selects the `--tblr-breadcrumb-divider` glyph via a class on the
-      #   `<ol>`. nil (the default) renders the plain "/" divider. Anything
-      #   else raises ArgumentError naming the component and the valid values.
-      # @option options [Boolean] :muted Renders links in a muted (secondary) colour
-      #   via `breadcrumb-muted`.
+      # @option options [Symbol, String] :style One of `:dots`, `:arrows`,
+      #   `:bullets` -- selects the divider glyph. `nil` (the default) renders
+      #   the plain "/" divider. Anything else raises `ArgumentError`.
+      # @option options [Boolean] :muted Renders links in a muted (secondary)
+      #   colour via `breadcrumb-muted`.
       # @option options [Hash] :html Rule 5 HTML hook for the `<ol class="breadcrumb">` (part :root)
-      # @option options [Hash, #call] :link_html Rule 5 HTML hook applied to
-      #   every item's `<a>` (part :link) -- a plain Hash, or a callable
-      #   taking the item, same contract as a per-item `html:`. Only applied
-      #   when the item actually renders as a link -- see "The `<a>` hook and
-      #   the non-linked case" above. See #link_attributes.
+      # @option options [Hash, #call] :link_html Rule 5 HTML hook for every
+      #   item's `<a>` (part :link) -- a Hash, or a callable taking the item.
+      #   Only applied when the item renders as a link -- see "The
+      #   `link_html:` hook and non-linked items" above.
       def initialize(options = {})
         @style = validate_style(options[:style])
         @muted = options[:muted]

@@ -1,12 +1,16 @@
 /*
- * Showcase application stylesheet.
+ * Showcase application stylesheet -- Propshaft, not Sprockets. The gem's
+ * CSS is no longer pulled in here via a `*= require` directive (Propshaft
+ * has no directive processor and would have served that byte-for-byte as
+ * comments, with no error and no styling). It's linked directly instead,
+ * from the mounted docs engine's own layout
+ * (docs/app/views/layouts/tabler_ui/docs/application.html.erb):
  *
- * Sprockets directive manifest -- tabler_ui.css (shipped by the gem) is
- * itself a directive manifest with no CSS of its own, so it must be pulled
- * in through `require`, not a stylesheet_link_tag pointed at Propshaft.
+ *   stylesheet_link_tag "tabler_ui_all"
  *
- *= require tabler_ui
- *= require_self
+ * -- app/assets/stylesheets/tabler_ui_all.css, the gem's pre-built,
+ * directive-free bundle (see lib/tabler_ui/css_bundle.rb and the README's
+ * "Asset setup" section). This file only holds host-only rules.
  */
 
 .showcase-example {

@@ -1,0 +1,62 @@
+<%# locals: current: -- the current component name (String, e.g. "table"),
+    TablerUi::Docs::Navigation::FORM_BUILDER ("form_builder"), or nil on a
+    page with no single current entry (the index). Rendered on every docs
+    page (see docs/app/views/layouts/tabler_ui/docs/application.html.erb),
+    so the full component tree is always one click away.
+
+    Grouped exactly like TablerUi::Docs::Navigation::CATEGORIES, plus
+    form_builder's own top-level entry underneath -- see navigation.rb's
+    comment on FORM_BUILDER for why it has no category of its own (it isn't
+    an app/components/tabler_ui directory, so Navigation.components/
+    CATEGORIES correctly omit it).
+
+    Each category is a Bootstrap collapse pane (data-bs-toggle="collapse" /
+    data-controller="tabler-ui--collapse" on the pane itself) -- the exact
+    same machinery app/components/tabler_ui/accordion/_component.html.erb
+    drives (checked before writing this), reused rather than reinvented per
+    rule 6. Only the category `current` belongs to starts open. The
+    trigger's own "collapsed" class is set server-side to match that
+    starting state (mirrors Accordion::Component#button_classes) so the
+    chevron renders in the right rotation before Bootstrap's JS has run at
+    all -- Bootstrap's Collapse then keeps that class in sync on every
+    toggle afterwards, same as it does for the trigger array of any other
+    collapse it manages. %>
+<nav class="docs-sidebar" aria-label="Components">
+  <div class="list-group list-group-transparent mb-3">
+    <%= link_to "Overview", root_path,
+                 class: ["list-group-item", "list-group-item-action", ("active" if current.nil?)].compact.join(" ") %>
+  </div>
+
+  <% TablerUi::Docs::Navigation.category_names.each do |category| %>
+    <% category_components = TablerUi::Docs::Navigation.components_in(category) %>
+    <% category_open = category_components.include?(current) %>
+    <% category_id = "docs-sidebar-#{category.parameterize}" %>
+    <div class="mb-3">
+      <button type="button"
+              class="docs-sidebar-toggle btn btn-link w-100 d-flex align-items-center justify-content-between px-0 py-1 text-secondary text-uppercase fs-6 text-decoration-none<%= ' collapsed' unless category_open %>"
+              data-bs-toggle="collapse"
+              data-bs-target="#<%= category_id %>"
+              aria-expanded="<%= category_open %>"
+              aria-controls="<%= category_id %>">
+        <%= category %>
+        <%= tabler_ui.icon icon: "chevron-down", size: "sm", html: { class: "docs-sidebar-toggle-icon" } %>
+      </button>
+      <div id="<%= category_id %>" class="collapse<%= ' show' if category_open %>" data-controller="tabler-ui--collapse">
+        <div class="list-group list-group-transparent">
+          <% category_components.each do |name| %>
+            <%= link_to TablerUi::Docs::Navigation.title_for(name), component_path(name),
+                         class: ["list-group-item", "list-group-item-action",
+                                 ("active" if current == name)].compact.join(" ") %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <h4 class="text-secondary text-uppercase fs-6 mt-4 mb-2">Forms</h4>
+  <div class="list-group list-group-transparent mb-3">
+    <%= link_to "Form builder", forms_path,
+                 class: ["list-group-item", "list-group-item-action",
+                         ("active" if current == TablerUi::Docs::Navigation::FORM_BUILDER)].compact.join(" ") %>
+  </div>
+</nav>

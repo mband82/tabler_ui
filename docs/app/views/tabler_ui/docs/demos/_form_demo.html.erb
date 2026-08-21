@@ -1,0 +1,27 @@
+<%# locals: demo: -- one TablerUi::Docs::Demo whose source references a bare
+    `f` local (a TablerUi::FormBuilder). f: -- the live FormBuilder yielded
+    by the wrapping tabler_form_with in
+    docs/app/views/tabler_ui/docs/forms/show.html.erb.
+
+    Same rendering contract as docs/app/views/tabler_ui/docs/demos/_demo.html.erb
+    (render inline: demo.source live, print demo.source.strip escaped
+    underneath -- both from demo.source alone, per docs/DEMOS.md). Not that
+    partial itself, because it has no way to accept an extra f: local on top
+    of demo.resolved_locals. This one merges f: on top of resolved_locals so
+    the live, request-bound FormBuilder (real @person, real validation
+    errors) wins over the throwaway fallback f each form_builder demo's own
+    `locals:` proc builds for itself -- see
+    docs/lib/tabler_ui/docs/demos/form_builder_demos.rb. That fallback is
+    what spec/lib/tabler_ui/docs/demo_registry_spec.rb's "every registered
+    demo renders" example exercises: it calls
+    `view.render(inline: demo.source, locals: demo.resolved_locals)` with no
+    f: override at all, so each form_builder demo has to be renderable
+    standalone regardless of this partial. %>
+<%= tabler_ui.card title: demo.title, html: { class: "mb-4", id: demo.slug } do |s| %>
+  <% s.body do %>
+    <div class="docs-demo-example">
+      <%= render inline: demo.source, locals: demo.resolved_locals.merge(f: f) %>
+    </div>
+    <pre class="bg-dark-lt rounded p-2 mb-0"><code><%= demo.source.strip %></code></pre>
+  <% end %>
+<% end %>

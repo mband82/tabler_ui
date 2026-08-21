@@ -4,14 +4,12 @@ module TablerUi
   module Modal
     # Modal component for Tabler UI. Renders the three-level
     # `.modal > .modal-dialog > .modal-content` structure Bootstrap's Modal
-    # JS requires (it does `SelectorEngine.findOne('.modal-dialog', el)`),
-    # with optional `.modal-header` / `.modal-body` / `.modal-footer` parts
-    # filled in via slots (or a plain `title:` for a simple header).
+    # JS requires, with optional `.modal-header` / `.modal-body` /
+    # `.modal-footer` parts filled in via slots (or a plain `title:` for a
+    # simple header).
     #
     # The component renders no trigger -- put `data-bs-toggle="modal"
-    # data-bs-target="#<id>"` on your own button/link, exactly like
-    # Bootstrap's own docs, and consistent with how `collapse_controller`
-    # attaches to the collapsible element rather than the toggler.
+    # data-bs-target="#<id>"` on your own button/link.
     #
     # @example Basic usage -- title plus body/footer slots
     #   <button data-bs-toggle="modal" data-bs-target="#my-modal">Open</button>
@@ -46,13 +44,11 @@ module TablerUi
     # ## Accessibility
     #
     # The root `.modal` carries `tabindex="-1"`, `role="dialog"`, and either
-    # `aria-labelledby` (pointing at the id of the rendered `.modal-title`)
-    # when a title is actually showing, or a translated `aria-label` when it
-    # isn't -- no title: given, or a header slot that overrides it (see
-    # config/locales/en.yml, tabler_ui.modal.dialog_label). The close button
-    # carries its own translated aria-label (tabler_ui.modal.close).
+    # `aria-labelledby` (pointing at the rendered `.modal-title`) when a
+    # title is showing, or a translated `aria-label` otherwise. The close
+    # button carries its own translated aria-label.
     #
-    # Note: the block yields exactly one argument, the SlotContext --
+    # The block yields exactly one argument, the SlotContext --
     # `do |slots|`, not `do |modal, slots|`.
     class Component
       include TablerUi::Base
@@ -65,17 +61,14 @@ module TablerUi
 
       attr_reader :id, :title, :size, :full_width, :centered, :scrollable, :blur, :status, :close_button
 
-      # @param id [String] Mandatory DOM id for the `.modal` root -- the
-      #   anchor a caller's own toggler points at via
-      #   `data-bs-toggle="modal" data-bs-target="##{id}"`.
+      # @param id [String] DOM id for the `.modal` root -- what a toggler's
+      #   `data-bs-target="##{id}"` points at.
       # @param options [Hash]
       # @option options [String]  :title        Rendered as an `<h5 class="modal-title">`
       #   inside the header when no `header` slot is given.
-      # @option options [String, Symbol] :size  Dialog size -- "sm", "lg", "xl",
-      #   "fullscreen" (renders `modal-fullscreen`, not `modal-modal-fullscreen`),
-      #   or "fullscreen-sm-down" / "-md-down" / "-lg-down" / "-xl-down" /
-      #   "-xxl-down" (renders `modal-fullscreen-<bp>-down`). Mutually
-      #   exclusive with :full_width -- both control the dialog's width.
+      # @option options [String, Symbol] :size  Dialog size: `sm`, `lg`, `xl`, `fullscreen`,
+      #   or `fullscreen-sm-down` / `-md-down` / `-lg-down` / `-xl-down` / `-xxl-down`.
+      #   Mutually exclusive with `:full_width` -- both control the dialog's width.
       # @option options [Boolean] :full_width   modal-full-width -- dialog spans the
       #   viewport with a small margin instead of a fixed max-width (default: false)
       # @option options [Boolean] :centered     modal-dialog-centered (default: false)

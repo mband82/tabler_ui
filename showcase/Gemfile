@@ -5,7 +5,7 @@ source "https://rubygems.org"
 gem "rails"
 gem "tabler_ui", path: ".."
 
-gem "sprockets-rails"
+gem "propshaft"
 gem "importmap-rails"
 gem "stimulus-rails"
 gem "turbo-rails"

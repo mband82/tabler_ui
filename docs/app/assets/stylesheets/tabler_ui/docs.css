@@ -1,0 +1,57 @@
+/* TablerUi::Docs engine styles. Deliberately minimal -- the layout, sidebar
+   and per-component page are built almost entirely from Tabler's own
+   classes (list-group, row-cards, card, sticky-top, page-wrapper,
+   page-body, btn-link, etc). Never touches `body` or any other page-wide
+   selector: this engine may be mounted inside a host app that owns its own
+   global styles, so everything here is scoped to classes this engine's own
+   markup applies. */
+
+/* Sticks below the sticky breadcrumb bar (component pages only -- see
+   application.html.erb's content_for(:breadcrumb)) with a small gap; on
+   pages with no breadcrumb bar (index, forms) this just leaves a bit of
+   extra headroom above the sidebar rather than branching the CSS over
+   whether that bar is present. Capped at the viewport height and scrolls
+   on its own once the (now collapsible) component list is taller than
+   that, instead of driving the whole page's height. */
+.docs-sidebar {
+  position: sticky;
+  top: 4rem;
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;
+}
+
+/* The search box sits inside the navbar's .navbar-brand (an inline-flex
+   row sized to fit its children) -- without an explicit width here it
+   would collapse toward its own min-content instead of reading as a real
+   search field. max-width keeps it from overflowing a narrow viewport. */
+.docs-search {
+  position: relative;
+  width: 20rem;
+  max-width: 100%;
+}
+
+/* Overlays the results below the input instead of pushing the navbar
+   taller while a search is open. */
+.docs-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1030;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Rotates the sidebar category chevron to match its collapse state.
+   Bootstrap's Collapse plugin toggles the "collapsed" class on this
+   button automatically on every show/hide (same convention as the
+   .accordion-button chevron elsewhere in this gem, just without a
+   dedicated Tabler class of its own to key off since this is a plain
+   btn-link, not a real .accordion-button). */
+.docs-sidebar-toggle-icon {
+  transition: transform 0.15s ease-in-out;
+}
+
+.docs-sidebar-toggle:not(.collapsed) .docs-sidebar-toggle-icon {
+  transform: rotate(180deg);
+}

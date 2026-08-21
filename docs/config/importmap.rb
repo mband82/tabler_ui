@@ -1,0 +1,13 @@
+# frozen_string_literal: true
+
+# Tabler UI Docs engine importmap. Pin names are namespaced under
+# "tabler_ui/docs" so they cannot collide with the main engine's pins
+# (tabler_ui, tabler_ui/tabler, controllers/tabler_ui/*) -- see
+# spec/lib/tabler_ui/docs/engine_spec.rb for the overlap check.
+pin "tabler_ui/docs", to: "tabler_ui/docs.js"
+
+# The docs engine's own Stimulus controllers. "controllers/tabler_ui/docs/*"
+# rather than "controllers/tabler_ui/*" so it can never collide with the
+# main engine's own controller pins (controllers/tabler_ui/alert_controller,
+# etc.) -- see spec/lib/tabler_ui/docs/engine_spec.rb's overlap check.
+pin "controllers/tabler_ui/docs/search_controller", to: "controllers/tabler_ui/docs/search_controller.js"

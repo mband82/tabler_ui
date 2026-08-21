@@ -1,0 +1,13 @@
+<%# locals: demo: -- one TablerUi::Docs::Demo. Renders its ERB source live via
+    `render inline:` and prints that same source, escaped, underneath. This is
+    the ONE mechanism both consumers go through -- see docs/DEMOS.md.
+    Framed in a tabler_ui.card titled with the demo's title, mirroring
+    showcase/app/views/showcase/_example.html.erb's shape. %>
+<%= tabler_ui.card title: demo.title, html: { class: "mb-4", id: demo.slug } do |s| %>
+  <% s.body do %>
+    <div class="docs-demo-example">
+      <%= render inline: demo.source, locals: demo.resolved_locals %>
+    </div>
+    <pre class="bg-dark-lt rounded p-2 mb-0"><code><%= demo.source.strip %></code></pre>
+  <% end %>
+<% end %>

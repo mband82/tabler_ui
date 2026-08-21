@@ -40,9 +40,8 @@ module TablerUi
       # @option options [Symbol]  :type        Placeholder type (:text, :avatar, :image, :button, :card, :list) (default: :text)
       # @option options [Integer] :width       Column width for text/button placeholders (1-12)
       # @option options [String]  :size        Size variant (xs, sm, lg) for the :text/fallback
-      #   placeholder. An unrecognized value raises ArgumentError -- Tabler defines no
-      #   .placeholder-xl, so that value used to be silently dropped. Not validated against
-      #   this set for the :avatar type, which has its own, larger .avatar-* size scale.
+      #   placeholder (raises ArgumentError if unrecognized). Not validated for the :avatar
+      #   type, which uses its own, larger .avatar-* size scale.
       # @option options [Symbol]  :animation   Animation type (:glow, :wave)
       # @option options [String]  :ratio       Aspect ratio for images (1x1, 4x3, 16x9, 21x9)
       # @option options [String]  :color       Tabler color name, validated via TablerUi::Color and

@@ -6,6 +6,8 @@ module TablerUi
     # `.card-header`, `.card-body`, `.card-footer` parts, filled in via slots
     # (or a plain `title:` for a simple header).
     #
+    # The block yields a single argument, the `SlotContext` -- `do |slots|`, not `do |card, slots|`.
+    #
     # @example Basic usage -- title plus a body slot
     #   <%= tabler_ui.card title: "Card title" do |slots| %>
     #     <% slots.body do %>Card content<% end %>
@@ -33,9 +35,6 @@ module TablerUi
     #                       footer_html: { class: "text-end" } do |slots| %>
     #     <% slots.body do %>Content<% end %>
     #   <% end %>
-    #
-    # Note: the block yields exactly one argument, the SlotContext --
-    # `do |slots|`, not `do |card, slots|`.
     class Component
       include TablerUi::Base
 

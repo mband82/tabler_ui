@@ -2,15 +2,14 @@
 
 module TablerUi
   module Dimmer
-    # Loading overlay for Tabler UI. Renders a `.dimmer` wrapper around a
-    # `.dimmer-content` part; toggling `active:` on adds the `.dimmer.active`
-    # class, which is what Tabler's CSS uses to show the `.loader` spinner and
-    # drop the content's opacity to 0.1.
+    # Loading overlay for Tabler UI. Renders a `.dimmer` wrapper around
+    # `.dimmer-content`. `active: true` adds `.dimmer.active`, which shows
+    # the `.loader` spinner and dims the content to 10% opacity.
     #
-    # This is a plain server-side toggle, not a Stimulus controller: the
-    # caller flips `active:` and re-renders (e.g. after a Turbo Stream update
-    # once a background job finishes) rather than the component managing its
-    # own state client-side.
+    # - Server-side toggle only: re-render with a different `active:` to
+    #   change state (e.g. after a Turbo Stream update).
+    # - The block yields exactly one argument, the SlotContext:
+    #   `do |slots|`, not `do |dimmer, slots|`.
     #
     # @example Basic usage
     #   <%= tabler_ui.dimmer active: @loading do |slots| %>
@@ -23,18 +22,13 @@ module TablerUi
     #                         content_html: { class: "p-3" } do |slots| %>
     #     <% slots.content do %>Content<% end %>
     #   <% end %>
-    #
-    # Note: the block yields exactly one argument, the SlotContext --
-    # `do |slots|`, not `do |dimmer, slots|`.
     class Component
       include TablerUi::Base
 
       attr_reader :active
 
       # @param options [Hash]
-      # @option options [Boolean] :active Adds `.active`, which shows the
-      #   `.loader` and dims `.dimmer-content` down to 10% opacity
-      #   (default: false).
+      # @option options [Boolean] :active Adds `.active` (default: false)
       # @option options [Hash] :html         Rule 5 HTML hook for the outer `.dimmer` (part :root)
       # @option options [Hash] :loader_html  Rule 5 HTML hook for the `.loader` (part :loader)
       # @option options [Hash] :content_html Rule 5 HTML hook for the `.dimmer-content` (part :content)

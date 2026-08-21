@@ -1,11 +1,28 @@
 // Stimulus controller for Star Rating component
 // Uses star-rating.js library to transform select inputs into star ratings
+//
+// IMPORTANT: this controller must stay on a wrapper <span> around the
+// <select>, never on the <select> itself. star-rating.js reparents the
+// <select> it's given (see buildWidget/destroy in
+// app/assets/javascripts/star-rating.js) -- it moves it into a wrapper span
+// it creates, and moves it back out again on destroy(). If the Stimulus
+// controller lived on the <select>, Stimulus's DOM observer would see each
+// of those moves as "element removed, then a different element added" and
+// fire disconnect()/connect() for it -- disconnect() tears the widget down
+// (another reparent), which triggers another connect() that rebuilds it
+// (another reparent), forever. That connect/mutate/disconnect/mutate loop
+// has no thrown error, so it just pegs the main thread and hangs the tab.
+// See TablerUi::Rating::Component#wrapper_attributes for the full writeup.
+// Because of this, the library is also pointed at the <select> via the
+// `select` target below, not a `document.querySelectorAll` id selector --
+// querying by selector would still find and move the same element either way.
 
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
+  static targets = ["select"]
+
   static values = {
-    id: String,
     tooltip: { type: Boolean, default: true },
     clearable: { type: Boolean, default: true },
     color: String,
@@ -14,7 +31,12 @@ export default class extends Controller {
 
   connect() {
     import("star-rating.js").then((module) => {
-      this.StarRating = module.default || module
+      if (typeof module.default !== "function") {
+        console.error("star-rating.js loaded but its default export is not a constructor -- the vendored file may be missing its `export default StarRating` line")
+        return
+      }
+
+      this.StarRating = module.default
       this.initRating()
     }).catch((error) => {
       console.error("Failed to load star-rating.js:", error)
@@ -24,6 +46,11 @@ export default class extends Controller {
   initRating() {
     if (!this.StarRating) {
       console.warn("StarRating library not loaded")
+      return
+    }
+
+    if (!this.hasSelectTarget) {
+      console.warn("tabler-ui--rating: no select target found")
       return
     }
 
@@ -41,7 +68,7 @@ export default class extends Controller {
       options.size = this.sizeValue
     }
 
-    this.rating = new this.StarRating(`#${this.idValue}`, options)
+    this.rating = new this.StarRating(this.selectTarget, options)
   }
 
   getStarsFunction() {

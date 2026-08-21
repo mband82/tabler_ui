@@ -45,18 +45,14 @@ module TablerUi
       # @param options [Hash]
       # @option options [String] :title    Page title, rendered in an
       #   `h2.page-title` (part :title)
-      # @option options [String] :pretitle Small label rendered above the
-      #   title in `.page-pretitle` (part :pretitle), only when present.
-      #   Matches Tabler's own `page-pretitle` CSS class and the element's
-      #   position above the title -- not a subtitle.
-      # @option options [String] :subtitle Small label rendered below the
-      #   title in `.page-subtitle` (part :subtitle), only when present.
-      #   Independent of `pretitle:` -- both can be given at once.
+      # @option options [String] :pretitle Small label above the title (part
+      #   :pretitle), only when present. Distinct from :subtitle.
+      # @option options [String] :subtitle Small label below the title (part
+      #   :subtitle), only when present. Can be combined with :pretitle.
       # @option options [Boolean] :border  Appends `page-header-border` to
       #   the root element (part :root) when true.
-      # @option options [String] :title_size One of {TITLE_SIZES}. Appends
-      #   `page-title-<size>` alongside `page-title` on the `h2` (part
-      #   :title). Raises ArgumentError for any other value.
+      # @option options [String] :title_size "lg" adds `page-title-lg` (part
+      #   :title). Any other value raises ArgumentError.
       # @option options [Hash] :html          Rule 5 HTML hook for the
       #   outermost `.page-header` element (part :root)
       # @option options [Hash] :title_html    Rule 5 HTML hook for the

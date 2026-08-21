@@ -28,6 +28,9 @@ RSpec.describe "TablerUi::Rating", type: :component do
   it_behaves_like "an element with an html hook", :rating, {},
     hook: :html, selector: "select.form-select"
 
+  it_behaves_like "an element with an html hook", :rating, {},
+    hook: :wrapper_html, selector: "span.tabler-ui-rating"
+
   it "appends a caller class to the select's own class, not replacing it" do
     fragment = component_fragment(:rating, html: { class: "hook-extra-class" })
     classes = fragment.css("select").first["class"].split(/\s+/)
@@ -67,35 +70,57 @@ RSpec.describe "TablerUi::Rating", type: :component do
     it "sets the Stimulus color-value data attribute from color:" do
       fragment = component_fragment(:rating, color: "red")
 
-      expect(fragment.css("select").first["data-tabler-ui--rating-color-value"]).to eq("red")
+      expect(fragment.css("span.tabler-ui-rating").first["data-tabler-ui--rating-color-value"]).to eq("red")
     end
   end
 
   it "no longer reads variant: -- it's ignored, not an error" do
     fragment = component_fragment(:rating, variant: "red")
 
-    expect(fragment.css("select").first["data-tabler-ui--rating-color-value"]).to be_nil
+    expect(fragment.css("span.tabler-ui-rating").first["data-tabler-ui--rating-color-value"]).to be_nil
+  end
+
+  # Regression: the Stimulus controller used to live on the <select> itself.
+  # star-rating.js reparents whatever element it's given (see
+  # app/assets/javascripts/star-rating.js#buildWidget/#destroy), so with the
+  # controller on the <select>, Stimulus saw each reparent as the
+  # controller's element being removed/re-added and disconnected/reconnected
+  # it -- disconnect tore the widget down (another reparent), which
+  # reconnected and rebuilt it (another reparent), forever: an infinite
+  # connect/mutate/disconnect/mutate loop that hung the browser tab with no
+  # console error. The controller now lives on a stable wrapper <span> that
+  # star-rating.js never moves; the <select> is only a Stimulus target.
+  it "puts the Stimulus controller on the wrapper span, not the select" do
+    fragment = component_fragment(:rating)
+
+    expect(fragment.css("select").first["data-controller"]).to be_nil
+    expect(fragment.css("span.tabler-ui-rating").first["data-controller"]).to eq("tabler-ui--rating")
+  end
+
+  it "marks the select as the rating Stimulus target" do
+    fragment = component_fragment(:rating)
+
+    expect(fragment.css("select").first["data-tabler-ui--rating-target"]).to eq("select")
   end
 
   it "carries all the Stimulus data attributes rating_controller.js expects" do
-    fragment = component_fragment(:rating, id: "my-rating", size: "sm", color: "green",
+    fragment = component_fragment(:rating, size: "sm", color: "green",
                                              tooltip: false, clearable: false)
-    select = fragment.css("select").first
+    wrapper = fragment.css("span.tabler-ui-rating").first
 
-    expect(select["data-controller"]).to eq("tabler-ui--rating")
-    expect(select["data-tabler-ui--rating-id-value"]).to eq("my-rating")
-    expect(select["data-tabler-ui--rating-tooltip-value"]).to eq("false")
-    expect(select["data-tabler-ui--rating-clearable-value"]).to eq("false")
-    expect(select["data-tabler-ui--rating-color-value"]).to eq("green")
-    expect(select["data-tabler-ui--rating-size-value"]).to eq("sm")
+    expect(wrapper["data-controller"]).to eq("tabler-ui--rating")
+    expect(wrapper["data-tabler-ui--rating-tooltip-value"]).to eq("false")
+    expect(wrapper["data-tabler-ui--rating-clearable-value"]).to eq("false")
+    expect(wrapper["data-tabler-ui--rating-color-value"]).to eq("green")
+    expect(wrapper["data-tabler-ui--rating-size-value"]).to eq("sm")
   end
 
   it "defaults tooltip and clearable to true" do
     fragment = component_fragment(:rating)
-    select = fragment.css("select").first
+    wrapper = fragment.css("span.tabler-ui-rating").first
 
-    expect(select["data-tabler-ui--rating-tooltip-value"]).to eq("true")
-    expect(select["data-tabler-ui--rating-clearable-value"]).to eq("true")
+    expect(wrapper["data-tabler-ui--rating-tooltip-value"]).to eq("true")
+    expect(wrapper["data-tabler-ui--rating-clearable-value"]).to eq("true")
   end
 
   it "defaults name to 'rating' and generates a deterministic id from it" do

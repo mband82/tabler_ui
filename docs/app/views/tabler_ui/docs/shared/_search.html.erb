@@ -1,0 +1,42 @@
+<%# locals: none.
+
+    Full-text search box for the docs engine, backed by
+    TablerUi::Docs::SearchIndex (docs/lib/tabler_ui/docs/search_index.rb),
+    served as JSON from `search_path` (GET /ui/search) and filtered
+    entirely client-side by the tabler-ui--docs-search Stimulus controller
+    -- see docs/app/javascript/controllers/tabler_ui/docs/search_controller.js.
+
+    NOT rendered by the layout on its own -- this partial only exists so
+    it can be dropped in wherever the docs layout wants it, e.g.:
+
+      render "tabler_ui/docs/shared/search"
+
+    `results` is a sibling of `input`, never a wrapper around it: the
+    Stimulus controller only ever writes into `results`, so the input's
+    own DOM node -- and therefore the caret/focus/scroll position inside
+    it -- is never disturbed while the user is typing. See the
+    controller's own header comment for the full rationale (rule 6's
+    "never re-render the element being typed into").
+
+    Rendered inside the navbar's `.navbar-brand` (see
+    docs/app/views/layouts/tabler_ui/docs/application.html.erb) -- .docs-search
+    and .docs-search-results get their sizing/overlay positioning from
+    docs.css, scoped to those two classes specifically for that placement. %>
+<div class="docs-search" data-controller="tabler-ui--docs-search"
+     data-tabler-ui--docs-search-url-value="<%= search_path %>">
+  <div class="input-icon">
+    <span class="input-icon-addon">
+      <%= tabler_ui.icon icon: "search" %>
+    </span>
+    <input type="search"
+           class="form-control"
+           placeholder="Search docs..."
+           autocomplete="off"
+           aria-label="Search docs"
+           data-tabler-ui--docs-search-target="input"
+           data-action="input->tabler-ui--docs-search#search">
+  </div>
+  <div class="docs-search-results list-group list-group-flush shadow-sm"
+       data-tabler-ui--docs-search-target="results"
+       hidden></div>
+</div>

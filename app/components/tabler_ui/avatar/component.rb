@@ -4,36 +4,15 @@ require "zlib"
 
 module TablerUi
   module Avatar
-    # Avatar component for Tabler UI. Renders one of three things, in order
-    # of precedence:
+    # Avatar component for Tabler UI. Renders one of three things, by precedence:
     #
-    #   1. image:    a <span class="avatar"> with a CSS background-image
-    #   2. initials: a <span class="avatar"> with the initials text and an
-    #                HSL background colour derived from the initials' bytes
-    #   3. otherwise: a deterministic generated identicon <svg>, seeded from
-    #                Zlib.crc32(name) -- see #identicon_shapes for the RNG
-    #                scoping that fixes a global-state bug this component
-    #                used to have.
+    # 1. `image:` -- a `<span class="avatar">` with a CSS background-image
+    # 2. `initials:` -- a `<span class="avatar">` with the initials text and a colour derived from them
+    # 3. otherwise -- a deterministic identicon `<svg>`, seeded from `name`
     #
-    # An `overlay` slot lets a caller nest a status dot or an avatar-brand
-    # chip inside the root element (`.avatar` has `position: relative`, and
-    # both overlays are `position: absolute`). Only supported on the image:
-    # and initials: render modes -- an <svg> can't host an HTML overlay
-    # without <foreignObject>, so passing an overlay to a generated
-    # identicon raises ArgumentError.
+    # An `overlay` slot nests a status dot or brand chip inside the root element. Image/initials modes only -- an `<svg>` can't host an HTML overlay, so passing `overlay` to a generated identicon raises `ArgumentError`.
     #
-    #   <%= tabler_ui.avatar initials: "JD" do |slots| %>
-    #     <% slots.overlay { tag.span(class: "badge bg-success") } %>
-    #   <% end %>
-    #
-    # Status-dot trap: the per-size CSS that positions and sizes the dot
-    # (`.avatar-{size} .badge:empty { ... }`) only matches a badge with *no*
-    # child nodes -- including whitespace text nodes. Render it with
-    # `tag.span(class: "badge bg-success")` and no block; a `do...end` block
-    # (even an empty-looking one) leaves a newline inside the tag and the
-    # badge silently falls back to a flat, unsized 10px dot. `badge-dot`
-    # does not help either -- it's hardcoded to 10px and ignores
-    # `--tblr-avatar-status-size`.
+    # Render a status-dot overlay with `tag.span(class: "badge bg-success")` and **no block**. A `do...end` block leaves whitespace inside the tag, which breaks the CSS rule that sizes and positions the dot (it requires a badge with no child nodes at all, not even whitespace) -- the dot silently falls back to a flat, unsized 10px circle. `badge-dot` does not fix this either; it is hardcoded to 10px.
     #
     # @example Initials
     #   <%= tabler_ui.avatar initials: "JD", size: "md" %>
@@ -43,6 +22,11 @@ module TablerUi
     #
     # @example Generated identicon, seeded from name
     #   <%= tabler_ui.avatar name: "Ada Lovelace" %>
+    #
+    # @example Overlay slot
+    #   <%= tabler_ui.avatar initials: "JD" do |slots| %>
+    #     <% slots.overlay { tag.span(class: "badge bg-success") } %>
+    #   <% end %>
     #
     # @example With details
     #   <%= tabler_ui.avatar initials: "JD", show_details: true, title: "Jane Doe", subtitle: "Admin" %>

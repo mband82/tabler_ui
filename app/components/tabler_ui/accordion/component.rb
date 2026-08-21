@@ -51,10 +51,9 @@ module TablerUi
 
       attr_reader :id, :flush, :inverted, :style, :toggle_style, :multiple, :items
 
-      # @param id [String] Unique ID for the accordion container. Mandatory --
-      #   it becomes the root element's own id, referenced by every item's
-      #   `data-bs-parent="##{id}"` in single-open mode (see #multiple), so
-      #   Bootstrap's Collapse can find and close the other open panes.
+      # @param id [String] Unique id for the accordion container. Becomes the
+      #   root element's own id, referenced by every item's
+      #   `data-bs-parent="##{id}"` in single-open mode.
       # @param options [Hash]
       # @option options [Boolean] :flush    Removes the default borders/rounded corners (.accordion-flush)
       # @option options [Boolean] :inverted Moves the toggle icon before the title (.accordion-inverted)

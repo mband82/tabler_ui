@@ -60,13 +60,12 @@ module TablerUi
       # @option options [Boolean] :notification Empty notification dot (default: false)
       # @option options [Boolean] :blink        Blinking animation for notification dots (default: false)
       # @option options [Boolean] :outline      Outline variant, i.e. "badge-outline" (default: false)
-      # @option options [Boolean] :dot          Fixed 10px dot ("badge-dot"). `.badge` clips overflow
-      #   and the dot ignores badge-sm/badge-lg, so it cannot carry text/icon/content -- combining
-      #   raises ArgumentError (default: false)
+      # @option options [Boolean] :dot          Fixed 10px dot ("badge-dot"); ignores badge-sm/badge-lg.
+      #   Cannot combine with text:, icon: or content: (raises ArgumentError) (default: false)
       # @option options [String]  :icon         Tabler icon name
       # @option options [Boolean] :icon_only    Icon-only style, zeroes horizontal padding
       #   ("badge-icononly"). Only meaningful with an icon and no text/content -- combining with
-      #   text/content raises ArgumentError, since the padding would be wrong for text (default: false)
+      #   text/content raises ArgumentError (default: false)
       # @option options [String]  :url          URL to make the badge a link (renders <a> instead of <span>)
       # @option options [String, Symbol] :size  Badge size (:sm or :lg)
       # @option options [String, ActiveSupport::SafeBuffer] :content

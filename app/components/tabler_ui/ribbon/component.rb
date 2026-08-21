@@ -31,28 +31,16 @@ module TablerUi
       attr_reader :text, :color, :position, :align, :bookmark, :icon
 
       # @param options [Hash]
-      # @option options [String] :text Ribbon label. Optional -- a ribbon can also be
-      #   a bare coloured corner, or carry only an :icon. A block, if given, replaces
-      #   this for rich content (see the :body slot in the example above).
-      # @option options [String] :color Colour -- validated against TablerUi::Color,
-      #   rendered as the plain "bg-<color>" utility (the same mechanism Card's
-      #   status: option uses).
-      # @option options [String, Symbol] :position Vertical edge, :top (default) or
-      #   :bottom -- validated against TablerUi::Position with
-      #   TablerUi::Position::VERTICAL, so a horizontal edge (:start/:end) raises.
-      #   The base .ribbon CSS rule already positions near the top, so :top (default
-      #   or explicit) renders no extra class; :bottom renders "ribbon-bottom".
-      # @option options [String, Symbol] :align Horizontal edge, :start or :end --
-      #   validated against TablerUi::Align. The CSS only defines a "ribbon-start"
-      #   class: the base .ribbon rule already positions on the right, i.e. :end,
-      #   so :end is this component's default and renders no extra class; :start
-      #   renders "ribbon-start" (the "ribbon-left" class in the CSS is the legacy
-      #   name and is never emitted here).
-      # @option options [Boolean] :bookmark Bookmark shape, i.e. "ribbon-bookmark"
-      #   (default: false)
-      # @option options [String] :icon Tabler icon name, rendered through the
-      #   tabler_ui.icon dispatcher (never by instantiating TablerUi::Icon::Component
-      #   directly)
+      # @option options [String] :text Ribbon label. Optional -- omit for a bare
+      #   colour corner or an icon-only ribbon. A block, if given, overrides this.
+      # @option options [String] :color Colour, validated against TablerUi::Color.
+      #   Rendered as `bg-<color>`.
+      # @option options [String, Symbol] :position Vertical edge: `:top` (default)
+      #   or `:bottom`. Raises ArgumentError for anything else.
+      # @option options [String, Symbol] :align Horizontal edge: `:start` or
+      #   `:end` (default).
+      # @option options [Boolean] :bookmark Bookmark shape (default: false)
+      # @option options [String] :icon Tabler icon name
       # @option options [Hash] :html Rule 5 HTML hook for the root element (part :root)
       def initialize(options = {})
         @text = options[:text]
@@ -84,6 +72,10 @@ module TablerUi
 
       private
 
+      # The base .ribbon CSS rule already positions near the top and on the
+      # right, so :top/:end (both defaults) render no extra class. The CSS
+      # only defines a "ribbon-start" class -- "ribbon-left" is the legacy
+      # name and is never emitted here.
       def ribbon_classes
         classes = ["ribbon"]
         classes << "ribbon-bottom" if @position == :bottom

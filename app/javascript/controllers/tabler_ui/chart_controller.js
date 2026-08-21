@@ -12,7 +12,12 @@ export default class extends Controller {
 
   connect() {
     import("apexcharts").then((module) => {
-      this.ApexCharts = module.default || module
+      if (typeof module.default !== "function") {
+        console.error("apexcharts loaded but its default export is not a constructor -- the vendored file may be missing its `export default globalThis.ApexCharts` line")
+        return
+      }
+
+      this.ApexCharts = module.default
       this.initChart()
     }).catch((error) => {
       console.error("Failed to load ApexCharts:", error)

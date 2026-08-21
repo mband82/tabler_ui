@@ -20,13 +20,11 @@ bundle install
 
 ### Asset setup
 
-**Requires Sprockets — Propshaft is not supported.** `app/assets/stylesheets/tabler_ui.css`
-is a Sprockets directive manifest (`*= require`), which Propshaft cannot process; the gem
-declares `sprockets-rails ~> 3.5` as a dependency for this reason. Rails 8's default new-app
-pipeline is Propshaft, so an app generated with `rails new` needs Sprockets added
-(`bundle add sprockets-rails` is usually enough) before this gem's assets will compile.
+The CSS ships two ways, depending on the host app's asset pipeline.
 
-Add the stylesheet to `app/assets/stylesheets/application.css`:
+**Sprockets.** `app/assets/stylesheets/tabler_ui.css` is a Sprockets directive
+manifest (`*= require`); the gem declares `sprockets-rails ~> 3.5` as a dependency
+for this reason. Add it to `app/assets/stylesheets/application.css`:
 
 ```css
 /*
@@ -34,10 +32,30 @@ Add the stylesheet to `app/assets/stylesheets/application.css`:
  */
 ```
 
+**Propshaft.** Propshaft has no directive processor, so it cannot resolve
+`tabler_ui.css`'s `*= require` lines — it would serve that file's comments
+byte-for-byte with no CSS in it. Rails 8's default new-app pipeline is Propshaft,
+so link the pre-built bundle instead:
+
+```erb
+<%= stylesheet_link_tag "tabler_ui_all" %>
+```
+
+`app/assets/stylesheets/tabler_ui_all.css` is a generated, committed file — the
+same six stylesheets `tabler_ui.css` requires, concatenated in the same order, with
+no directives left in it. It's regenerated with `rake tabler_ui:css_bundle`
+(`lib/tabler_ui/css_bundle.rb`) whenever one of those six files changes; nothing
+needs to run at install time in a host app.
+
+The two optional stylesheets below (country flags, ApexCharts) are already plain
+CSS, not manifests, so both pipelines link them the same way — no Propshaft-specific
+step needed for those.
+
 The gem's own `config/importmap.rb` is auto-loaded by the engine, so
 `tabler_ui`, its Stimulus controllers, and its bundled dependencies —
-`vanillajs-datepicker`, `star-rating.js`, `apexcharts` — are already pinned.
-Just import it:
+`vanillajs-datepicker`, `star-rating.js`, `apexcharts` — are already pinned. This
+part was already pipeline-independent (importmap doesn't go through Sprockets or
+Propshaft) and needs no change either way. Just import it:
 
 ```javascript
 // app/javascript/application.js

@@ -52,11 +52,8 @@ module TablerUi
       attr_reader :items, :simple
 
       # @param options [Hash]
-      # @option options [Boolean] :simple Whole-timeline modifier -- hides the
-      #   icon column entirely and drops the card's left margin
-      #   ("timeline-simple", default: false). Confirmed against the CSS as
-      #   the only timeline-wide modifier; everything else (:color) is
-      #   per-item.
+      # @option options [Boolean] :simple Hides the icon column entirely and drops the
+      #   card's left margin (`timeline-simple`, default: false).
       # @option options [Hash]       :html      Rule 5 HTML hook for the outer `ul.timeline` (part :root)
       # @option options [Hash, Proc] :item_html Rule 5 HTML hook for each `li.timeline-event` (part :item).
       #   Either a plain Hash (applied to every item) or a callable taking the

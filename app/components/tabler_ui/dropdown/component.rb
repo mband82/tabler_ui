@@ -56,9 +56,8 @@ module TablerUi
       # @param options [Hash]
       # @option options [String] :label Button text
       # @option options [String] :color Tabler colour name for the toggle button (default: "primary")
-      # @option options [Symbol, String] :align Menu alignment -- :start (default) or :end.
-      #   The strings "start"/"end" are also accepted; anything else (including
-      #   the old "right"/"left") raises ArgumentError.
+      # @option options [Symbol, String] :align Menu alignment -- :start (default) or :end
+      #   (also accepted as strings). Other values, including "left"/"right", raise ArgumentError.
       # @option options [String] :direction Drop direction -- "down" (default), "up", "end",
       #   "start", "up-center" or "down-center". Replaces the wrapper's base "dropdown"
       #   class; anything else raises ArgumentError.

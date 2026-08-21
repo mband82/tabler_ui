@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tabler UI Docs</title>
+    <%= stylesheet_link_tag "tabler_ui_all" %>
+    <%= stylesheet_link_tag "tabler_ui/docs" %>
+    <%# importmap-rails is not a dependency of this gem (see
+        TablerUi::Engine's own 'tabler_ui.importmap' initializer, guarded
+        the same way) -- this layout is the only layout left once a host
+        mounts this engine (see docs/lib/tabler_ui/docs/engine.rb's own
+        header comment), so it has to be the one place that boots JS,
+        but only for a host that actually has importmap-rails installed.
+        A host that doesn't (e.g. this gem's own Combustion spec harness)
+        simply gets no script tags, same as before. %>
+    <% if respond_to?(:javascript_importmap_tags) %>
+      <%= javascript_importmap_tags %>
+    <% end %>
+  </head>
+  <body>
+    <%# Not a full Tabler .page shell with its own <body>-level chrome --
+        this engine may be mounted inside a host app that already owns
+        page-wide layout/CSS (see this task's own notes on not assuming
+        body/global CSS ownership). The navbar + sticky breadcrumb bar +
+        page-wrapper/sidebar/content grid below are self-contained Tabler
+        markup that renders correctly whether this <body> is the whole
+        page or not.
+
+        The breadcrumb bar is a content_for(:breadcrumb) slot, not
+        rendered unconditionally here -- only components/show.html.erb
+        currently fills it (see its own comment), so the index and forms
+        harness pages render with no breadcrumb bar at all rather than an
+        empty sticky strip. content_for(:breadcrumb) is guaranteed
+        populated by the time this layout runs (Rails renders the child
+        template -- which sets it -- before wrapping it in the layout). %>
+    <% search_and_brand = capture do %>
+      <%= link_to "Tabler UI Docs", root_path %>
+      <%= render "tabler_ui/docs/shared/search" %>
+    <% end %>
+
+    <%= tabler_ui.navbar(brand: search_and_brand) do |navbar| %>
+      <% navbar.right do |nav| %>
+        <% nav.dark_mode_toggle %>
+      <% end %>
+    <% end %>
+
+    <% if content_for?(:breadcrumb) %>
+      <div class="docs-breadcrumb-bar sticky-top bg-body border-bottom">
+        <div class="container-xl py-2">
+          <%= yield :breadcrumb %>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="page-wrapper">
+      <div class="page-body">
+        <div class="container-xl">
+          <div class="row">
+            <div class="col-12 col-lg-2 mb-4">
+              <%= render "tabler_ui/docs/shared/sidebar", current: @nav_current %>
+            </div>
+            <div class="col-12 col-lg-10">
+              <%= yield %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

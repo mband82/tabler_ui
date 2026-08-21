@@ -1,0 +1,9 @@
+<%= tabler_ui.page_header title: @component.to_s.titleize, pretitle: "Components" %>
+
+<% if @demos.empty? %>
+  <p>No demos registered for <code><%= @component %></code>.</p>
+<% else %>
+  <% @demos.each do |demo| %>
+    <%= render "tabler_ui/docs/demos/demo", demo: demo %>
+  <% end %>
+<% end %>

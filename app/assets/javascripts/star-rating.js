@@ -485,3 +485,16 @@ var StarRating = (function () {
   return StarRating;
 
 }());
+
+// tabler_ui: hand-appended, not part of pryley/star-rating.js's own build.
+// This file is their UMD-style bundle: `var StarRating = (function () {...
+// }())` declares StarRating as a module-scoped `var` and nothing else --
+// no `export`, and (unlike a classic <script>) that `var` never reaches
+// `window`/`globalThis` when loaded as an ES module. rating_controller.js
+// loads this file via a dynamic `import()`, which needs a real export to
+// resolve; without one, `module.default` is undefined and `import()`
+// otherwise returns an empty module namespace object. `StarRating` is a
+// valid module-scope identifier here, so it can be exported directly.
+// Guarded by spec/lib/tabler_ui/vendored_js_spec.rb -- re-vendoring this
+// file from a fresh upstream build must keep this line, or re-add it.
+export default StarRating;

@@ -33,30 +33,16 @@ module TablerUi
     #
     # ## Turbo
     #
-    # As with `table`/`pagination`'s `frame:`, the gem takes no `turbo-rails`
-    # dependency here -- it only emits Turbo-flavoured markup. Both `confirm:`
-    # and `turbo:` are inert without Turbo loaded in the host app.
+    # No `turbo-rails` dependency -- only markup is emitted. `confirm:` and
+    # `turbo:` are inert without Turbo loaded in the host app.
     #
-    # `confirm:` renders `data-turbo-confirm="<string>"` on whichever element
-    # this component renders (the `<a>` in the `method: :get` branch, or the
-    # `<button>` inside the `button_to`-generated form otherwise). This is
-    # read by Turbo, NOT by the old rails-ujs `data-confirm` -- the gem never
-    # emits `data-confirm`. Without Turbo loaded, `data-turbo-confirm` does
-    # nothing at all; the action fires unconfirmed.
-    #
-    # `turbo:` (default `false`) only changes anything when the method is
-    # non-GET. `button_to` wraps its `<button>` in a `<form>` -- a `<form>`
-    # nested inside another `<form>` (an edit form with a delete button, for
-    # example) is invalid HTML that browsers silently mangle. `turbo: true`
-    # sidesteps that: instead of a form, it renders a plain
-    # `<a href="...">` carrying `data-turbo-method="<verb>"`, exactly like
-    # Turbo's own idiomatic non-GET link. No `<form>` is emitted. This needs
-    # Turbo loaded to actually perform the non-GET request -- without it, the
-    # link just GETs the URL like any other `<a href>`.
-    #
-    # `turbo: true` combined with `method: :get` (the default) is a no-op --
-    # the method is already rendered as a plain `<a>`, so there is nothing
-    # non-GET to convert. It does not raise.
+    # - `confirm:` renders `data-turbo-confirm="..."` on the rendered element
+    #   (read by Turbo, not the old rails-ujs `data-confirm`).
+    # - `turbo: true` renders a non-GET action as `<a data-turbo-method="...">`
+    #   instead of `button_to`'s `<form>`. `button_to` nests a `<form>` inside
+    #   the page's own form (e.g. a delete button on an edit form), which is
+    #   invalid HTML that browsers silently mangle -- `turbo: true` avoids
+    #   that. No-op when `method:` is `:get` (the default); does not raise.
     class Component
       include TablerUi::Base
 
@@ -68,41 +54,37 @@ module TablerUi
 
       # @param options [Hash]
       # @option options [String]  :text        Button label
-      # @option options [String]  :color       Color variant -- validated against
-      #   TablerUi::Color (Tabler palette + Bootstrap semantic names), plus the brand
-      #   and muted colours ("github", "x", "muted", ...), which only buttons accept.
-      #   Defaults to "primary".
-      # @option options [Boolean] :outline     Outline variant, i.e. "btn-outline-<color>" (default: false)
-      # @option options [String, Symbol] :size Button size, rendered as "btn-<size>"
-      # @option options [String]  :shape       "pill" (btn-pill) or "square" (btn-square)
-      # @option options [Boolean] :icon_only   Icon-only style, i.e. "btn-icon" (default: false)
+      # @option options [String]  :color       Color variant -- a Tabler/Bootstrap colour name, plus
+      #   the brand and muted variants ("github", "x", "muted", ...) that only buttons accept.
+      #   Default: "primary". Invalid values raise `ArgumentError`.
+      # @option options [Boolean] :outline     Outline variant, i.e. `btn-outline-<color>` (default: false)
+      # @option options [String, Symbol] :size Button size, rendered as `btn-<size>`
+      # @option options [String]  :shape       `pill` (btn-pill) or `square` (btn-square)
+      # @option options [Boolean] :icon_only   Icon-only style, i.e. `btn-icon` (default: false)
       # @option options [Boolean] :action      Action button style -- transparent/compact/hover-highlight
-      #   ("btn-action"), replacing the color/outline/shape/icon_only classes (default: false)
-      # @option options [Boolean] :loading     Loading style ("btn-loading"). The CSS only sets
-      #   `pointer-events: none` -- it does not disable the element, so pass `disabled: true` too
-      #   if the button must also be unfocusable/non-activatable (default: false)
-      # @option options [Boolean] :floating    Fixed-position floating style ("btn-floating") (default: false)
+      #   (`btn-action`); replaces the color/outline/shape/icon_only classes (default: false)
+      # @option options [Boolean] :loading     Loading style (`btn-loading`); only sets
+      #   `pointer-events: none`, not `disabled` -- pass `disabled: true` too if the button
+      #   must also be unfocusable (default: false)
+      # @option options [Boolean] :floating    Fixed-position floating style (`btn-floating`) (default: false)
       # @option options [Boolean, String] :animate_icon Animates the icon on hover/focus
-      #   ("btn-animate-icon"). `true` for the base slide animation, or one of
-      #   "rotate", "shake", "tada", "pulse", "move-start" for that modifier
-      #   ("btn-animate-icon-<x>"). Modifiers do not compose -- only one at a time.
-      # @option options [Boolean] :ghost       Ghost style, appends "btn-ghost" alongside
-      #   "btn-<color>" (default: false). Tabler defines no outline+ghost combination, so this
-      #   raises ArgumentError if combined with outline: true.
+      #   (`btn-animate-icon`). `true` for the base slide animation, or one of `rotate`,
+      #   `shake`, `tada`, `pulse`, `move-start` for that modifier. Modifiers do not compose.
+      # @option options [Boolean] :ghost       Ghost style, appends `btn-ghost` alongside
+      #   `btn-<color>` (default: false). Raises `ArgumentError` if combined with `outline: true`
+      #   -- Tabler defines no outline+ghost combination.
       # @option options [String]  :url         URL for the button (default: "#")
-      # @option options [Symbol, String] :method HTTP method. :get (default) renders `link_to`;
+      # @option options [Symbol, String] :method HTTP method. `:get` (default) renders `link_to`;
       #   any other value renders `button_to`.
-      # @option options [String]  :target      Rendered as target="..."
-      # @option options [String]  :title       Rendered as title="..."
-      # @option options [Boolean] :disabled    Rendered as disabled="..."
+      # @option options [String]  :target      Rendered as `target="..."`
+      # @option options [String]  :title       Rendered as `title="..."`
+      # @option options [Boolean] :disabled    Rendered as `disabled="..."`
       # @option options [Hash]    :data        Data attributes, merged with the html: hook's :data
       # @option options [String]  :icon        Tabler icon name, rendered before the text
-      # @option options [String]  :confirm     Confirmation prompt -- renders as
-      #   `data-turbo-confirm="..."`, merged with :data/html:'s :data rather than
-      #   clobbering them. See "Turbo" above for what this needs to actually work.
-      # @option options [Boolean] :turbo       Render a non-GET action as a Turbo link
-      #   (`<a data-turbo-method="...">`) instead of `button_to`'s `<form>`. No-op when
-      #   method: is :get (default: false). See "Turbo" above.
+      # @option options [String]  :confirm     Confirmation prompt; renders as
+      #   `data-turbo-confirm="..."`, merged into `:data`. See "Turbo" above.
+      # @option options [Boolean] :turbo       Render a non-GET action as a Turbo link instead of
+      #   `button_to`'s `<form>`. No-op when `method:` is `:get` (default: false). See "Turbo" above.
       # @option options [Hash]    :html        Rule 5 HTML hook for the root <a>/<button> (part :root)
       def initialize(options = {})
         @action = options[:action]

@@ -1,0 +1,43 @@
+<%# Real routed endpoint backing the table component's :sort_filter_page demo
+    (docs/lib/tabler_ui/docs/demos/table_demos.rb) -- see
+    TableDemoController's class docs for why this exists as a real GET
+    action instead of being expressible purely through Demo#locals.
+
+    Deliberately renders the exact same tabler_ui.table call the demo's
+    `source:` renders (frame:, filter: outside it, slots.footer inside it),
+    just fed from @table_demo_* ivars built from this request's real
+    `params` instead of the demo's locals: default snapshot. Turbo (not a
+    dependency of this gem -- see the table component's "Turbo Frames" docs)
+    only needs a response to contain an element whose id matches the frame
+    it navigated ("table-demo") somewhere in the document, so this full page
+    doubles as both a direct-visit page and a frame-navigation target. %>
+<% table_demo_columns = [
+  { label: "Name", sort: "name", value: ->(row) { row[:name] } },
+  { label: "Status", sort: "status",
+    value: ->(row) { tabler_ui.status(text: row[:status].capitalize,
+                                       color: { "active" => "success", "away" => "warning" }.fetch(row[:status], "secondary"),
+                                       dot: true) } },
+  { label: "Created", sort: "created_at", value: ->(row) { row[:created_at].strftime("%b %-d, %Y") } },
+  { label: "Actions", value: ->(row) { link_to "View", "#" } }
+] %>
+<%= tabler_ui.table columns: table_demo_columns, data: @table_demo_rows, hover: true,
+                    sort: @table_demo_sort,
+                    sort_url: @table_demo_sort_url,
+                    sort_reset: true,
+                    frame: "table-demo",
+                    filter: {
+                      url: TablerUi::Docs::TableDemoController.table_demo_filter_url,
+                      hidden: { sort: @table_demo_sort[:key], dir: @table_demo_sort[:dir] },
+                      min_chars: 3,
+                      fields: [
+                        { name: "q", value: params[:q], button: "Search" },
+                        { name: "status", type: :select, label: "Status", value: params[:status],
+                          include_blank: true, options: %w[active away inactive] }
+                      ],
+                      reset: TablerUi::Docs::TableDemoController.table_demo_reset_url(params)
+                    } do |slots| %>
+  <% slots.footer do %>
+    <%= tabler_ui.pagination current: @table_demo_page, total: @table_demo_total_pages,
+                             url: @table_demo_pagination_url %>
+  <% end %>
+<% end %>

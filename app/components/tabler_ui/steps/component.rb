@@ -33,10 +33,8 @@ module TablerUi
     #     <% steps.item("Profile", html: ->(item) { { class: "text-muted" } if item.title == "Profile" }) %>
     #   <% end %>
     #
-    # The CSS (.step-item.active ~ .step-item dims everything after the
-    # active step) only makes sense with exactly one active step, so there is
-    # no per-item `active:` flag -- the single `current:` index on the
-    # component is the only source of truth for which step is active.
+    # Only one step is active at a time, set via `current:` on the component
+    # -- there is no per-item `active:` flag.
     class Component
       include TablerUi::Base
       builder_style!
@@ -53,22 +51,15 @@ module TablerUi
 
       # @param options [Hash]
       # @option options [Integer] :current  1-based index of the active step
-      #   (default: 1). Items are added after the component is constructed,
-      #   so this can only be checked against the final item count once
-      #   rendering starts -- see #root_attributes. Out of range (< 1 or
-      #   > number of items) raises ArgumentError naming the component.
+      #   (default: 1). Raises ArgumentError if out of range (< 1 or > number
+      #   of items).
       # @option options [Boolean] :vertical Render as a vertical list (steps-vertical)
       # @option options [Boolean] :counter  Number the dots instead of plain dots (steps-counter)
-      # @option options [String]  :color    Tabler palette colour name --
-      #   TablerUi::Color::TABLER (blue, azure, indigo, ...). The stylesheet
-      #   only defines steps-<color>[-lt] for that raw palette, not the
-      #   Bootstrap semantic names (primary, success, ...) that
-      #   TablerUi::Color::ALL also accepts on other components, so an
-      #   unknown or semantic name raises ArgumentError rather than emitting
-      #   a class the stylesheet does not define.
+      # @option options [String]  :color    Tabler palette colour name only --
+      #   TablerUi::Color::TABLER (blue, azure, indigo, ...), not the Bootstrap
+      #   semantic names other components accept. Raises ArgumentError otherwise.
       # @option options [Boolean] :light    Use the light/subtle variant
-      #   (steps-<color>-lt). Only has an effect when :color is also given --
-      #   there is no colourless steps-lt class in the stylesheet.
+      #   (`steps-<color>-lt`). Has no effect without `color:`.
       # @option options [Hash]    :html     Rule 5 HTML hook for the outer list (part :root)
       def initialize(options = {})
         @current = options.fetch(:current, 1)
@@ -159,6 +150,10 @@ module TablerUi
         classes.join(" ")
       end
 
+      # The stylesheet's `.step-item.active ~ .step-item` selector dims
+      # everything after the active step, which only makes sense with
+      # exactly one active class in the list -- hence no per-item `active:`
+      # flag, just this lookup against the single `current:` index.
       def item_classes(item)
         classes = ["step-item"]
         classes << "active" if active?(item)
