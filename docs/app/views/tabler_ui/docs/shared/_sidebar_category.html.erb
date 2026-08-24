@@ -1,0 +1,29 @@
+<%# locals: label: -- heading text next to the chevron (String)
+    id_slug: -- builds the collapse pane's DOM id as "docs-sidebar-#{id_slug}"
+    open: -- whether this pane starts expanded (Boolean)
+    entries: -- Array<{ text:, href:, active: }> for the links inside the pane
+
+    Shared by the category loop and the Forms entry in _sidebar.html.erb so
+    both render byte-identical collapse markup -- see that file's header
+    comment for the collapse machinery itself (same as accordion's). %>
+<% pane_id = "docs-sidebar-#{id_slug}" %>
+<div class="mb-3">
+  <button type="button"
+          class="docs-sidebar-toggle btn btn-link w-100 d-flex align-items-center justify-content-between px-0 py-1 text-secondary text-uppercase fs-6 text-decoration-none<%= ' collapsed' unless open %>"
+          data-bs-toggle="collapse"
+          data-bs-target="#<%= pane_id %>"
+          aria-expanded="<%= open %>"
+          aria-controls="<%= pane_id %>">
+    <%= label %>
+    <%= tabler_ui.icon icon: "chevron-down", size: "sm", html: { class: "docs-sidebar-toggle-icon" } %>
+  </button>
+  <div id="<%= pane_id %>" class="collapse<%= ' show' if open %>" data-controller="tabler-ui--collapse">
+    <div class="list-group list-group-transparent">
+      <% entries.each do |entry| %>
+        <%= link_to entry[:text], entry[:href],
+                     class: ["list-group-item", "list-group-item-action",
+                             ("active" if entry[:active])].compact.join(" ") %>
+      <% end %>
+    </div>
+  </div>
+</div>

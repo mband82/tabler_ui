@@ -115,12 +115,12 @@ RSpec.describe "TablerUi::Docs sidebar", type: :request do
       sidebar.at_css("##{target_id}")
     end
 
-    it "wraps every category in a real Bootstrap collapse pane driven by the collapse controller" do
+    it "wraps every category, and Forms, in a real Bootstrap collapse pane driven by the collapse controller" do
       get "/ui/components/badge"
 
       sidebar = Nokogiri::HTML5.fragment(response.body).at_css("nav.docs-sidebar")
 
-      TablerUi::Docs::Navigation.category_names.each do |category|
+      (TablerUi::Docs::Navigation.category_names + ["Forms"]).each do |category|
         toggle = toggle_for(sidebar, category)
         expect(toggle).not_to be_nil, "expected a collapse toggle button for #{category}"
 
@@ -128,6 +128,37 @@ RSpec.describe "TablerUi::Docs sidebar", type: :request do
         expect(pane).not_to be_nil
         expect(pane["class"]).to include("collapse")
         expect(pane["data-controller"]).to eq("tabler-ui--collapse")
+      end
+    end
+
+    it "keeps Forms' pane closed by default when it isn't the current page" do
+      get "/ui/components/badge"
+
+      sidebar = Nokogiri::HTML5.fragment(response.body).at_css("nav.docs-sidebar")
+      toggle = toggle_for(sidebar, "Forms")
+      pane = pane_for(sidebar, toggle)
+
+      expect(pane["class"]).not_to include("show")
+      expect(toggle["aria-expanded"]).to eq("false")
+    end
+
+    it "opens Forms' pane, and no category pane, on the forms harness page" do
+      get "/ui/forms"
+
+      sidebar = Nokogiri::HTML5.fragment(response.body).at_css("nav.docs-sidebar")
+
+      forms_toggle = toggle_for(sidebar, "Forms")
+      forms_pane = pane_for(sidebar, forms_toggle)
+      expect(forms_pane["class"]).to include("show")
+      expect(forms_toggle["aria-expanded"]).to eq("true")
+      expect(forms_toggle["class"]).not_to include("collapsed")
+
+      TablerUi::Docs::Navigation.category_names.each do |category|
+        toggle = toggle_for(sidebar, category)
+        pane = pane_for(sidebar, toggle)
+
+        expect(pane["class"]).not_to include("show")
+        expect(toggle["aria-expanded"]).to eq("false")
       end
     end
 

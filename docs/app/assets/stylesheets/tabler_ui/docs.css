@@ -25,25 +25,24 @@
    application.html.erb's content_for(:breadcrumb)) with a small gap; on
    pages with no breadcrumb bar (index, forms) --docs-header-height is
    simply the shorter of its two values, so this still lines up right below
-   it rather than branching the CSS over whether that bar is present.
-   Capped at the viewport height and scrolls on its own once the (now
-   collapsible) component list is taller than that, instead of driving the
-   whole page's height. */
+   it rather than branching the CSS over whether that bar is present. No
+   max-height/overflow here -- the category list is collapsible (only the
+   current category starts open), so its natural height rarely approaches
+   the viewport; when it does, it simply scrolls away with the page like
+   any other sticky element instead of trapping scroll in its own inner
+   scrollbar. */
 .docs-sidebar {
   position: sticky;
   top: var(--docs-header-height);
-  max-height: calc(100vh - var(--docs-header-height) - 1rem);
-  overflow-y: auto;
 }
 
 /* The Contents column (shared/_contents.html.erb) -- same sticky-below-the-
-   header treatment as .docs-sidebar, so both side columns stop scrolling on
-   the same line. */
+   header treatment as .docs-sidebar, for the same reason: no inner scroll
+   region, just a sticky column that scrolls away with the page once it
+   runs long. */
 .docs-contents {
   position: sticky;
   top: var(--docs-header-height);
-  max-height: calc(100vh - var(--docs-header-height) - 1rem);
-  overflow-y: auto;
 }
 
 /* Every element the Contents column links to (a demo's card, a section

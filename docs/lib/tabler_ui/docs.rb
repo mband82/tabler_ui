@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "tabler_ui/docs/engine"
+require "tabler_ui/docs/toc_label"
 require "tabler_ui/docs/demo"
 require "tabler_ui/docs/demo_registry"
 

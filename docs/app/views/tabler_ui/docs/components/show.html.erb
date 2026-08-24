@@ -133,6 +133,14 @@
     when the page only shows their "nothing documented yet" fallback text,
     which carries no id worth linking to).
 
+    Labels go through TocLabel.shorten (docs/lib/tabler_ui/docs/toc_label.rb)
+    -- demo titles and section titles are written as full descriptive
+    one-liners for the demo card heading / section <hN> text (both still use
+    the untouched `title` below), which reused verbatim make this nav column
+    hard to scan. `full_label:` carries the untouched text, but only when
+    shortening actually changed it, so _contents.html.erb can add a native
+    tooltip precisely where the label was cut.
+
     content_for(:contents) is only called -- at all -- when there's
     something in this list; the layout (application.html.erb) checks
     content_for?(:contents) to decide whether to render the column's own
@@ -140,10 +148,17 @@
     examples and no prose sections gets no empty "Contents" box linking to
     nothing (see spec/lib/tabler_ui/docs/contents_spec.rb). %>
 <% contents_entries =
-     @demos.map { |demo| { label: demo.title, href: "##{demo.slug}" } } +
+     @demos.map do |demo|
+       { label: demo.toc_label, href: "##{demo.slug}",
+         full_label: (demo.title unless demo.toc_label == demo.title) }
+     end +
      (@parsed.options.any? ? [{ label: "Options", href: "#options" }] : []) +
      (@parsed.examples.any? ? [{ label: "Examples", href: "#examples" }] : []) +
-     section_entries.map { |entry| { label: entry[:section].title, href: "##{entry[:id]}" } } %>
+     section_entries.map do |entry|
+       title = entry[:section].title
+       label = TablerUi::Docs::TocLabel.shorten(title)
+       { label: label, href: "##{entry[:id]}", full_label: (title unless label == title) }
+     end %>
 <% if contents_entries.any? %>
   <% content_for :contents do %>
     <%= render "tabler_ui/docs/shared/contents", entries: contents_entries %>

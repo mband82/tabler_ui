@@ -1,9 +1,13 @@
-<%# locals: entries: -- Array<{ label:, href: }>, built by
+<%# locals: entries: -- Array<{ label:, href:, full_label: }>, built by
     components/show.html.erb (see its own comment on exactly what goes into
     this list and why, and on section ids being derived from title text,
     not position). Treats each demo card and each documentation section as
     a chapter of the current component page, the same way a book's table of
     contents would.
+
+    label: is already TocLabel-shortened; full_label: is only present when
+    shortening changed it, and becomes the link's title: attribute so a
+    shortened entry still exposes its full text as a native tooltip.
 
     Only ever rendered via content_for(:contents) on a component page that
     has at least one entry -- application.html.erb checks
@@ -21,7 +25,7 @@
   <h4 class="text-secondary text-uppercase fs-6 mb-2">Contents</h4>
   <div class="list-group list-group-transparent">
     <% entries.each do |entry| %>
-      <%= link_to entry[:label], entry[:href], class: "list-group-item list-group-item-action" %>
+      <%= link_to entry[:label], entry[:href], class: "list-group-item list-group-item-action", title: entry[:full_label] %>
     <% end %>
   </div>
 </nav>

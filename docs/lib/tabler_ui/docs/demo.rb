@@ -35,6 +35,13 @@ module TablerUi
         "#{component}-#{id}"
       end
 
+      # Shortened `title`, for the Contents column
+      # (docs/app/views/tabler_ui/docs/components/show.html.erb) -- the demo
+      # card heading (_demo.html.erb) still uses `title` itself, unshortened.
+      def toc_label
+        TocLabel.shorten(title)
+      end
+
       # The Hash `source` is rendered with. `locals` is only ever called here,
       # lazily, once per render -- never at registration time -- so a Proc
       # that builds fresh objects (e.g. an ActiveRecord-less struct standing

@@ -40,10 +40,27 @@ RSpec.describe "TablerUi::Docs Contents column", type: :request do
       demos.each do |demo|
         link = contents.at_css(%(a[href="##{demo.slug}"]))
         expect(link).not_to be_nil, "expected a Contents entry linking to ##{demo.slug}"
-        expect(link.text.strip).to eq(demo.title)
+        expect(link.text.strip).to eq(demo.toc_label)
 
         expect(fragment.at_css("##{demo.slug}")).not_to be_nil, "##{demo.slug} isn't actually on the page"
       end
+    end
+
+    it "gives a shortened entry's link a title: attribute with the full text, and no title: when unchanged" do
+      fragment = Nokogiri::HTML5.fragment(response.body)
+      contents = fragment.at_css("nav.docs-contents")
+      demos = TablerUi::Docs::DemoRegistry.for(:table)
+
+      shortened_demo = demos.find { |demo| demo.toc_label != demo.title }
+      unchanged_demo = demos.find { |demo| demo.toc_label == demo.title }
+      expect(shortened_demo).not_to be_nil # guards the premise: table has a long-titled demo
+      expect(unchanged_demo).not_to be_nil # guards the premise: table has a short-titled demo too
+
+      shortened_link = contents.at_css(%(a[href="##{shortened_demo.slug}"]))
+      expect(shortened_link["title"]).to eq(shortened_demo.title)
+
+      unchanged_link = contents.at_css(%(a[href="##{unchanged_demo.slug}"]))
+      expect(unchanged_link["title"]).to be_nil
     end
 
     it "links 'Options' and 'Examples' to their own headings" do
