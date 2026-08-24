@@ -34,7 +34,7 @@ module TablerUi
       # Alignment vocabulary lives in TablerUi::Align, shared with Navbar.
       # :html holds the caller's *raw* per-item hook (Hash or Proc taking the
       # item), not resolved attributes -- see #item_attributes.
-      Item = Struct.new(:type, :title, :url, :method, :active, :disabled, :icon, :html, keyword_init: true)
+      Item = Struct.new(:type, :title, :url, :method, :active, :disabled, :icon, :html, :auth, keyword_init: true)
 
       # Maps :direction values onto the wrapper class that replaces the plain
       # "dropdown" class. These are alternatives, not additions -- Tabler
@@ -96,8 +96,15 @@ module TablerUi
       # @option options [String] :icon Optional Tabler icon name, rendered via tabler_ui.icon
       # @option options [Hash, #call] :html HTML attributes for this item's
       #   link/button (part :item) -- a plain Hash, or a callable taking the item
-      # @return [String] empty string, to avoid stray output in a capture context
+      # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+      #   -- checked against the globally configured auth_method. Defaults to the
+      #   dropdown's own :auth when omitted. An unauthorized item is not appended.
+      # @return [String, nil] empty string, to avoid stray output in a capture
+      #   context; nil (no-op) if :auth denied it
       def item(title, options = {})
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :item)
 
         @items << Item.new(
@@ -108,26 +115,41 @@ module TablerUi
           active: options[:active],
           disabled: options[:disabled],
           icon: options[:icon],
-          html: options[:html]
+          html: options[:html],
+          auth: effective_auth
         )
 
         ""
       end
 
       # Adds a divider.
-      # @return [String] empty string, to avoid stray output in a capture context
-      def divider
-        @items << Item.new(type: :divider)
+      # @param options [Hash]
+      # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+      #   -- defaults to the dropdown's own :auth when omitted.
+      # @return [String, nil] empty string, to avoid stray output in a capture
+      #   context; nil (no-op) if :auth denied it
+      def divider(options = {})
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
+        @items << Item.new(type: :divider, auth: effective_auth)
         ""
       end
 
       # Adds a header.
       # @param title [String] Header text
-      # @return [String] empty string, to avoid stray output in a capture context
-      def header(title)
+      # @param options [Hash]
+      # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+      #   -- defaults to the dropdown's own :auth when omitted.
+      # @return [String, nil] empty string, to avoid stray output in a capture
+      #   context; nil (no-op) if :auth denied it
+      def header(title, options = {})
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :header)
 
-        @items << Item.new(type: :header, title: title)
+        @items << Item.new(type: :header, title: title, auth: effective_auth)
         ""
       end
 

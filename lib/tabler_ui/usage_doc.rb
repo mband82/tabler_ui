@@ -184,10 +184,43 @@ module TablerUi
       it instead.
     MD
 
+    AUTHORIZATION_SECTION = <<~MD
+      ## Authorization
+
+      Every component and subcomponent accepts an `auth:` option. Configure
+      the check once, globally -- it defaults to always-true, so nothing
+      changes for a host that never calls it:
+
+      ```ruby
+      tabler_ui.set_auth_method { |permission| current_user.can?(permission) }
+      ```
+
+      The configured method is invoked on every `tabler_ui.*` call, whether
+      or not `auth:` was passed explicitly (an omitted `auth:` is just `nil`
+      as the argument). A falsy return means that component is not rendered
+      at all, and its block never runs:
+
+      ```ruby
+      tabler_ui.card title: "Admin settings", auth: :manage_settings do |slots|
+        slots.body { "Only rendered when the auth_method authorizes :manage_settings" }
+      end
+      ```
+
+      A subcomponent that doesn't set its own `auth:` inherits its parent
+      component's `auth:` value as the default (not `nil`) -- this is being
+      built out per-subcomponent in a later wave, so as of this writing only
+      top-level components are gated.
+
+      This is unrelated to Navbar's own pre-existing `action:`/`subject:` +
+      `can?` check -- a separate, older, Navbar-only mechanism; both apply
+      independently.
+    MD
+
     module_function
 
     def generate
-      parts = [HEADER, install_section, html_attributes_section, components_section, form_builder_section]
+      parts = [HEADER, install_section, html_attributes_section, authorization_section,
+               components_section, form_builder_section]
       "#{parts.join("\n")}\n"
     end
 
@@ -197,6 +230,10 @@ module TablerUi
 
     def html_attributes_section
       HTML_ATTRIBUTES_SECTION
+    end
+
+    def authorization_section
+      AUTHORIZATION_SECTION
     end
 
     def components_section

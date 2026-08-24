@@ -257,4 +257,143 @@ RSpec.describe "TablerUi::Dropdown", type: :component do
     expect(wrapper_classes).to eq(["dropdown"])
     expect(menu_classes).to eq(["dropdown-menu"])
   end
+
+  # CLAUDE.md rule 8: auth: gating on the dropdown's own subitems (item,
+  # divider, header). TablerUi.auth_method is global, process-wide mutable
+  # state -- restore it after every example so a custom auth_method here
+  # never leaks into specs that run afterward (see authorization_spec.rb /
+  # ui_spec.rb's identical around block for the same reasoning).
+  describe "auth: gating on subitems" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "renders exactly as before when default auth_method and no auth: is used anywhere" do
+      fragment = component_fragment(:dropdown, label: "Actions") do |dropdown|
+        dropdown.item("Edit", url: "/edit")
+        dropdown.divider
+        dropdown.header("Danger zone")
+        dropdown.item("Delete", url: "/delete")
+      end
+
+      expect(fragment.css(".dropdown-item").map(&:text).map(&:strip)).to eq(["Edit", "Delete"])
+      expect(fragment.css(".dropdown-divider")).not_to be_empty
+      expect(fragment.css(".dropdown-header").first.text.strip).to eq("Danger zone")
+    end
+
+    it "omits an item whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:dropdown) do |dropdown|
+        dropdown.item("Allowed", auth: :allowed)
+        dropdown.item("Denied", auth: :denied)
+      end
+
+      titles = fragment.css(".dropdown-item").map(&:text).map(&:strip)
+      expect(titles).to include("Allowed")
+      expect(titles).not_to include("Denied")
+    end
+
+    it "includes an item whose own auth: is authorized" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:dropdown) do |dropdown|
+        dropdown.item("Allowed", auth: :allowed)
+      end
+
+      expect(fragment.css(".dropdown-item").map(&:text).map(&:strip)).to include("Allowed")
+    end
+
+    it "omits a divider whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:dropdown) do |dropdown|
+        dropdown.item("Kept", auth: :allowed)
+        dropdown.divider(auth: :denied)
+      end
+
+      expect(fragment.css(".dropdown-divider")).to be_empty
+    end
+
+    it "includes a divider whose own auth: is authorized" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:dropdown) do |dropdown|
+        dropdown.divider(auth: :allowed)
+      end
+
+      expect(fragment.css(".dropdown-divider")).not_to be_empty
+    end
+
+    it "omits a header whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:dropdown) do |dropdown|
+        dropdown.header("Danger zone", auth: :denied)
+      end
+
+      expect(fragment.css(".dropdown-header")).to be_empty
+    end
+
+    it "includes a header whose own auth: is authorized" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:dropdown) do |dropdown|
+        dropdown.header("Danger zone", auth: :allowed)
+      end
+
+      expect(fragment.css(".dropdown-header").first.text.strip).to eq("Danger zone")
+    end
+
+    # These four examples build the component directly rather than going
+    # through the dispatcher (component_fragment/tabler_ui.dropdown): the
+    # dispatcher's own top-level auth: gate (see ui_spec.rb's "auth: gating"
+    # describe block) would deny the *entire* dropdown call -- block never
+    # run -- whenever the dropdown-level auth: is itself denied, which would
+    # make it impossible to exercise #item's inheritance/override branch in
+    # that case. Setting .auth= directly is exactly what the dispatcher does
+    # internally right after construction (see ui.rb's build path), so this
+    # exercises the same inheritance logic without that confound.
+    it "an item with no auth: of its own inherits the dropdown's auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      dropdown = TablerUi::Dropdown::Component.new
+      dropdown.auth = :denied
+
+      dropdown.item("Inherited")
+
+      expect(dropdown.items).to be_empty
+    end
+
+    it "an item with no auth: of its own inherits the dropdown's auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      dropdown = TablerUi::Dropdown::Component.new
+      dropdown.auth = :allowed
+
+      dropdown.item("Inherited")
+
+      expect(dropdown.items.map(&:title)).to include("Inherited")
+    end
+
+    it "an item's own auth: overrides an otherwise-denying dropdown auth:" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      dropdown = TablerUi::Dropdown::Component.new
+      dropdown.auth = :denied
+
+      dropdown.item("Overridden", auth: :allowed)
+
+      expect(dropdown.items.map(&:title)).to include("Overridden")
+    end
+
+    it "an item's own auth: overrides an otherwise-allowing dropdown auth:" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      dropdown = TablerUi::Dropdown::Component.new
+      dropdown.auth = :allowed
+
+      dropdown.item("Overridden", auth: :denied)
+
+      expect(dropdown.items).to be_empty
+    end
+  end
 end

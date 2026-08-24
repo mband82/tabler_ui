@@ -127,4 +127,114 @@ RSpec.describe "TablerUi::SettingsPage", type: :component do
 
     expect(fragment.css(".subheader").text.strip).to eq("Settings")
   end
+
+  # auth: (CLAUDE.md rule 8) -- TablerUi.auth_method is global, process-wide
+  # mutable state, so every example that swaps it in must restore the
+  # original afterward. Same idiom as spec/lib/tabler_ui/authorization_spec.rb
+  # and spec/components/steps_spec.rb.
+  describe "auth:" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "an item with its own auth: denied is not present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:settings_page, "my-settings") do |sp|
+        sp.item("General", auth: :denied) { "General content" }
+        sp.item("Security") { "Security content" }
+      end
+
+      expect(fragment.css(".list-group-item").map(&:text).map(&:strip)).to eq(["Security"])
+    end
+
+    it "an item with its own auth: authorized is present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:settings_page, "my-settings") do |sp|
+        sp.item("General", auth: :allowed) { "General content" }
+        sp.item("Security") { "Security content" }
+      end
+
+      expect(fragment.css(".list-group-item").map(&:text).map(&:strip)).to eq(%w[General Security])
+    end
+
+    # These examples build the component directly rather than going through
+    # the dispatcher (component_fragment/tabler_ui.settings_page): the
+    # dispatcher's own top-level auth: gate would deny the *entire*
+    # settings_page call -- block never run -- whenever settings_page's own
+    # auth: is itself denied, which would make it impossible to exercise
+    # #item's inheritance/override branch in that case. Setting .auth=
+    # directly is exactly what the dispatcher does internally right after
+    # construction (see ui.rb's build path), so this exercises the same
+    # inheritance logic without that confound.
+    it "an item with no auth: of its own inherits settings_page's own auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      sp = TablerUi::SettingsPage::Component.new("my-settings")
+      sp.auth = :denied
+
+      sp.item("General") { "Content" }
+
+      expect(sp.items).to be_empty
+    end
+
+    it "an item with no auth: of its own inherits settings_page's own auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      sp = TablerUi::SettingsPage::Component.new("my-settings")
+      sp.auth = :allowed
+
+      sp.item("General") { "Content" }
+
+      expect(sp.items.map(&:title)).to include("General")
+    end
+
+    it "an item's own explicit auth: overrides an unauthorized settings_page-level auth: (allows it through)" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      sp = TablerUi::SettingsPage::Component.new("my-settings")
+      sp.auth = :denied
+
+      sp.item("General", auth: :allowed) { "Content" }
+
+      expect(sp.items.map(&:title)).to include("General")
+    end
+
+    it "an item's own explicit auth: overrides an authorized settings_page-level auth: (denies it)" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      sp = TablerUi::SettingsPage::Component.new("my-settings")
+      sp.auth = :allowed
+
+      sp.item("General", auth: :denied) { "Content" }
+
+      expect(sp.items).to be_empty
+    end
+
+    it "with item 1 denied, item 2 (not item 1) becomes the active-by-default item" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:settings_page, "my-settings") do |sp|
+        sp.item("General", auth: :denied) { "General content" }
+        sp.item("Security") { "Security content" }
+        sp.item("Other") { "Other content" }
+      end
+
+      list_items = fragment.css(".list-group-item")
+      expect(list_items.map { |i| i.text.strip }).to eq(%w[Security Other])
+      expect(list_items[0]["class"].split(/\s+/)).to include("active")
+      expect(list_items[1]["class"].split(/\s+/)).not_to include("active")
+    end
+
+    it "renders exactly as before under the default auth_method with no auth: anywhere" do
+      fragment = component_fragment(:settings_page, "my-settings") do |sp|
+        sp.item("General") { "General content" }
+        sp.item("Security") { "Security content" }
+      end
+
+      list_items = fragment.css(".list-group-item")
+      expect(list_items.map { |i| i.text.strip }).to eq(%w[General Security])
+      expect(list_items[0]["class"].split(/\s+/)).to include("active")
+      expect(list_items[1]["class"].split(/\s+/)).not_to include("active")
+    end
+  end
 end

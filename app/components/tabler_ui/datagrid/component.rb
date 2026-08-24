@@ -29,8 +29,6 @@ module TablerUi
       include TablerUi::Base
       builder_style!
 
-      attr_reader :items
-
       # @param options [Hash]
       # @option options [Array<Hash>] :items Pre-built items, each a Hash with
       #   `:title` and `:content` (default: [])
@@ -41,7 +39,19 @@ module TablerUi
       # @option options [Hash, Proc]     :title_html   HTML attributes for each `.datagrid-title` (part :title)
       # @option options [Hash, Proc]     :content_html HTML attributes for each `.datagrid-content` (part :content)
       def initialize(options = {})
-        @items = options[:items] || []
+        # Construction-time items can't have their auth: resolved here: a
+        # bare item Hash with no :auth of its own is meant to inherit the
+        # datagrid's own auth: (CLAUDE.md rule 8), but `self.auth` isn't set
+        # yet at this point -- TablerUi::Ui sets it via `.auth=` right after
+        # `.new` returns (see ui.rb's build_modern_component call site), so
+        # it's still nil/unset for the whole body of #initialize. Resolving
+        # inheritance against that unset value here would silently bake in
+        # the wrong answer. So construction-time items are kept raw in
+        # @construction_items and filtered lazily by #items/#has_items?,
+        # which run at render time -- after auth= has been set -- and can
+        # therefore resolve inheritance correctly.
+        @construction_items = options[:items] || []
+        @items = []
 
         initialize_html_options(options)
       end
@@ -51,21 +61,37 @@ module TablerUi
       # @param title [String] mandatory item title
       # @param options [Hash]
       # @option options [String] :content Item content. Ignored if a block is given.
+      # @option options [Object] :auth Per-item authorization value (CLAUDE.md
+      #   rule 8) -- checked against the globally configured auth_method.
+      #   Defaults to the datagrid's own :auth when omitted. An unauthorized
+      #   item is not appended.
       # @param block [Proc] Item content, captured at render time. Takes
       #   precedence over options[:content] when both are given.
+      # @return [nil] if :auth denied the item (no-op)
       def item(title, options = {}, &block)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :item)
 
         @items << {
           title: title,
           content: options[:content],
           block: block,
+          auth: effective_auth,
         }
+      end
+
+      # @return [Array<Hash>] every authorized item -- construction-time
+      #   items (auth: resolved lazily, see #initialize) followed by items
+      #   added via #item (already resolved/filtered when #item ran).
+      def items
+        authorized_construction_items + @items
       end
 
       # @return [Boolean] whether there are any items to render
       def has_items?
-        @items.any?
+        items.any?
       end
 
       # @return [Hash] attributes for the outer element (part :root)
@@ -89,6 +115,24 @@ module TablerUi
       # @return [Hash] attributes for this item's content (part :content)
       def content_attributes(item)
         html_for(:content, { class: "datagrid-content" }, item)
+      end
+
+      private
+
+      # Resolves each construction-time item's effective auth: (its own
+      # :auth key if present, else the datagrid's own auth:) and filters out
+      # the unauthorized ones. Recomputed on every call rather than
+      # memoized -- item lists here are small, and `auth` is set once by the
+      # dispatcher before rendering, so there's no correctness reason to
+      # cache. Returns fresh Hashes (via #merge) rather than mutating the
+      # caller's original item Hashes.
+      def authorized_construction_items
+        @construction_items.filter_map do |item_hash|
+          effective_auth = item_hash.key?(:auth) ? item_hash[:auth] : auth
+          next unless TablerUi::Authorization.authorized?(effective_auth)
+
+          item_hash.merge(auth: effective_auth)
+        end
       end
     end
   end

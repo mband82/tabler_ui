@@ -32,6 +32,14 @@ module TablerUi
       end
     end
 
+    # The `auth:` value this component was constructed with (CLAUDE.md rule
+    # 8). `Ui#method_missing` sets this right after building the component,
+    # so it's available to read back even though `auth:` itself is never a
+    # constructor argument. A builder-style component reads `self.auth` as
+    # the default its subitems inherit when they don't set their own `auth:`
+    # (wired up per-component in a later wave).
+    attr_accessor :auth
+
     # Scans +options+ for rule 5 HTML-hook keys and stores them for later
     # retrieval via #html_for. The key :html maps to the :root part; any key
     # matching /_html\z/ maps to the part named by its prefix (:header_html

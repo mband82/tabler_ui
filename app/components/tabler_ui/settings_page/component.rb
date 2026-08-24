@@ -33,7 +33,7 @@ module TablerUi
 
       attr_reader :id, :title, :items
 
-      Item = Struct.new(:id, :title, :icon, :active, :content, :html, keyword_init: true)
+      Item = Struct.new(:id, :title, :icon, :active, :content, :html, :auth, keyword_init: true)
 
       # @param id [String] Unique ID for the settings container, used to
       #   namespace each item's list-group-item / tab-pane anchor pair.
@@ -62,9 +62,20 @@ module TablerUi
       # @option options [Hash, Proc] :html HTML attributes for this item's own
       #   `a.list-group-item` (part :item). May be a plain Hash, or a callable
       #   taking the item and returning a Hash -- see #item_attributes.
+      # @option options [Object] :auth Per-item authorization value (CLAUDE.md
+      #   rule 8) -- checked against the globally configured auth_method.
+      #   Defaults to settings_page's own :auth when omitted. An unauthorized
+      #   item is not appended, so it is never counted toward "first item is
+      #   active by default" and never consumes an id from the counter --
+      #   both are only advanced/computed for items that actually render.
       # @param block [Proc] Content block for the settings panel (stored as a
       #   Proc, captured in the template)
+      # @return [String, nil] empty string, to avoid stray output in a
+      #   capture context; nil (no-op) if :auth denied it
       def item(title, options = {}, &block)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :item)
 
         @item_counter += 1
@@ -78,7 +89,8 @@ module TablerUi
           icon: options[:icon],
           active: is_active,
           content: block,
-          html: options[:html]
+          html: options[:html],
+          auth: effective_auth
         )
 
         ""

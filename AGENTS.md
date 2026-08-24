@@ -144,6 +144,21 @@ No `<script>` tags in templates, no inline `on*=` handlers, no `javascript:` URL
   and a regression case for any bug the component was fixed for.
 - `bundle exec rspec` must be green before moving on.
 
+## Authorization: the auth: option
+
+- Every component and subcomponent accepts an `auth:` option.
+- Configure the check once, globally: `tabler_ui.set_auth_method { |value| ... }`.
+  Defaults to always-true, so nothing changes for a host that never calls it.
+- The configured method is invoked on every `tabler_ui.*` call, whether or not `auth:`
+  was passed explicitly (an omitted `auth:` is just `nil` as the argument) — a falsy
+  return means the component (or, for a subcomponent added in a later wave, that
+  specific subcomponent) is not rendered at all, and its block never runs.
+- A subcomponent that doesn't set its own `auth:` inherits its parent component's
+  `auth:` value as the default (not `nil`) — this is being built out per-subcomponent
+  in a later wave, so as of this commit only top-level components are gated.
+- Unrelated to Navbar's own pre-existing `action:`/`subject:` + `can?` check — a
+  separate, older, Navbar-only mechanism; both apply independently.
+
 ---
 
 # Architecture brief

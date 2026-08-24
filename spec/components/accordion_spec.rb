@@ -278,4 +278,126 @@ RSpec.describe "TablerUi::Accordion", type: :component do
     expect(bodies[0]["class"].split(/\s+/)).to include("callable-first")
     expect(bodies[1]["class"].split(/\s+/)).not_to include("callable-first")
   end
+
+  # auth: (CLAUDE.md rule 8) -- TablerUi.auth_method is global, process-wide
+  # mutable state, so every example that swaps it in must restore the
+  # original afterward. Same idiom as spec/lib/tabler_ui/authorization_spec.rb
+  # and spec/components/steps_spec.rb.
+  describe "auth:" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "an item with its own auth: denied is not present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:accordion, "my-accordion") do |accordion|
+        accordion.item("First", auth: :denied) { "Content" }
+        accordion.item("Second") { "Content" }
+      end
+
+      buttons = fragment.css(".accordion-button")
+      expect(buttons.map(&:text).map(&:strip)).to eq(["Second"])
+    end
+
+    it "an item with its own auth: authorized is present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:accordion, "my-accordion") do |accordion|
+        accordion.item("First", auth: :allowed) { "Content" }
+        accordion.item("Second") { "Content" }
+      end
+
+      buttons = fragment.css(".accordion-button")
+      expect(buttons.map(&:text).map(&:strip)).to eq(%w[First Second])
+    end
+
+    # These examples build the component directly rather than going through
+    # the dispatcher (component_fragment/tabler_ui.accordion): the
+    # dispatcher's own top-level auth: gate (see ui_spec.rb's "auth: gating"
+    # describe block) would deny the *entire* accordion call -- block never
+    # run -- whenever accordion's own auth: is itself denied, which would
+    # make it impossible to exercise #item's inheritance/override branch in
+    # that case. Setting .auth= directly is exactly what the dispatcher does
+    # internally right after construction (see ui.rb's build path), so this
+    # exercises the same inheritance logic without that confound.
+    it "an item with no auth: of its own inherits accordion's own auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      accordion = TablerUi::Accordion::Component.new("my-accordion")
+      accordion.auth = :denied
+
+      accordion.item("First") { "Content" }
+
+      expect(accordion.items).to be_empty
+    end
+
+    it "an item with no auth: of its own inherits accordion's own auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      accordion = TablerUi::Accordion::Component.new("my-accordion")
+      accordion.auth = :allowed
+
+      accordion.item("First") { "Content" }
+
+      expect(accordion.items.map(&:title)).to include("First")
+    end
+
+    it "an item's own explicit auth: overrides an unauthorized accordion-level auth: (allows it through)" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      accordion = TablerUi::Accordion::Component.new("my-accordion")
+      accordion.auth = :denied
+
+      accordion.item("First", auth: :allowed) { "Content" }
+
+      expect(accordion.items.map(&:title)).to include("First")
+    end
+
+    it "an item's own explicit auth: overrides an authorized accordion-level auth: (denies it)" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      accordion = TablerUi::Accordion::Component.new("my-accordion")
+      accordion.auth = :allowed
+
+      accordion.item("First", auth: :denied) { "Content" }
+
+      expect(accordion.items).to be_empty
+    end
+
+    it "validate! does not raise when only one authorized item ends up open: true, even though two items were marked open: true" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      accordion = TablerUi::Accordion::Component.new("my-accordion")
+
+      accordion.item("First", open: true, auth: :denied) { "Content" }
+      accordion.item("Second", open: true) { "Content" }
+
+      expect(accordion.items.map(&:title)).to eq(["Second"])
+      expect { accordion.validate! }.not_to raise_error
+    end
+
+    it "validate! still raises when two authorized items are both open: true without multiple: true" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      accordion = TablerUi::Accordion::Component.new("my-accordion")
+
+      accordion.item("First", open: true) { "Content" }
+      accordion.item("Second", open: true) { "Content" }
+
+      expect { accordion.validate! }.to raise_error(ArgumentError, /2 items marked open.*multiple: true/)
+    end
+
+    it "renders exactly as before under the default auth_method with no auth: anywhere" do
+      fragment = component_fragment(:accordion, "my-accordion") do |accordion|
+        accordion.item("First", open: true) { "First content" }
+        accordion.item("Second") { "Second content" }
+      end
+
+      buttons = fragment.css(".accordion-button")
+      panels = fragment.css(".accordion-collapse")
+
+      expect(buttons.map(&:text).map(&:strip)).to eq(%w[First Second])
+      expect(buttons[0]["class"].split(/\s+/)).not_to include("collapsed")
+      expect(buttons[1]["class"].split(/\s+/)).to include("collapsed")
+      expect(panels[0]["class"].split(/\s+/)).to include("show")
+      expect(panels[1]["class"].split(/\s+/)).not_to include("show")
+    end
+  end
 end

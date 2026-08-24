@@ -14,26 +14,57 @@ module TablerUi
       @view = view_context
     end
 
+    # Configures the global `auth:` check (CLAUDE.md rule 8). Every
+    # `tabler_ui.<name>` call runs its `auth:` value (nil if omitted) through
+    # this block via TablerUi::Authorization; a falsy return means that call
+    # renders nothing, and its block never runs. Defaults to always-true.
+    #
+    #   tabler_ui.set_auth_method { |permission| current_user.can?(permission) }
+    #
+    # @raise [ArgumentError] if called without a block -- a bare call is
+    #   almost certainly a mistake (it would otherwise silently do nothing).
+    def set_auth_method(&block)
+      raise ArgumentError, "tabler_ui.set_auth_method requires a block" unless block
+
+      TablerUi.auth_method = block
+    end
+
     # Dynamically handles component method calls
     # Converts component_name to TablerUi::ComponentName::Component class
     # Falls back to rendering partials if no component class exists
     #
+    # Before any of that: gates on the `auth:` kwarg (CLAUDE.md rule 8). This
+    # runs first and unconditionally, ahead of even constructing the
+    # component, so an unauthorized call never builds its component and
+    # never captures/evaluates its block -- the block might contain
+    # sensitive queries or side effects, so it must never run.
+    #
     # @param name [Symbol] The component name (e.g., :navbar, :page_header)
     # @param args [Array] Arguments passed to the component
-    # @param kwargs [Hash] Keyword arguments converted to component attributes
+    # @param kwargs [Hash] Keyword arguments converted to component attributes.
+    #   `:auth` is checked against the globally configured auth_method (see
+    #   #set_auth_method) but otherwise left in place -- components already
+    #   ignore option keys they don't read.
     # @param block [Proc] Optional block for content projection and slots
-    # @return [String] Rendered HTML output
+    # @return [String, nil] Rendered HTML output, or nil if `auth:` denied it
     def method_missing(name, *args, **kwargs, &block)
+      auth_value = kwargs[:auth]
+      return nil unless TablerUi::Authorization.authorized?(auth_value)
+
       klass_name = "TablerUi::#{name.to_s.camelize}::Component"
       component_class = klass_name.safe_constantize
 
       component =
         if component_class&.include?(TablerUi::Base)
-          build_modern_component(component_class, name, args, kwargs)
+          build_modern_component(component_class, name, args, kwargs).tap { |c| c.auth = auth_value }
         elsif component_class
           raise ArgumentError,
                 "#{component_class} must `include TablerUi::Base` to be rendered by tabler_ui.#{name}"
         else
+          # No component.auth= to set here: build_open_struct_component wraps
+          # kwargs (which still contains :auth) in an OpenStruct, so
+          # `.auth` is already available via OpenStruct's own dynamic
+          # accessors -- nothing extra to do for this branch.
           build_open_struct_component(args, kwargs)
         end
 

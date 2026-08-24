@@ -367,6 +367,141 @@ RSpec.describe "TablerUi::Carousel", type: :component do
     expect(caption["id"]).to eq("hook-test-id")
   end
 
+  # auth: (CLAUDE.md rule 8) -- TablerUi.auth_method is global, process-wide
+  # mutable state, so every example that swaps it in must restore the
+  # original afterward. Same idiom as spec/lib/tabler_ui/authorization_spec.rb
+  # and spec/components/steps_spec.rb.
+  describe "auth:" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "a slide with its own auth: denied is not present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:carousel, "my-carousel") do |carousel|
+        carousel.item(image: "a.jpg", auth: :denied)
+        carousel.item(image: "b.jpg")
+      end
+
+      images = fragment.css(".carousel-item img").map { |img| img["src"] }
+      expect(images).to eq(["b.jpg"])
+    end
+
+    it "a slide with its own auth: authorized is present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:carousel, "my-carousel") do |carousel|
+        carousel.item(image: "a.jpg", auth: :allowed)
+        carousel.item(image: "b.jpg")
+      end
+
+      images = fragment.css(".carousel-item img").map { |img| img["src"] }
+      expect(images).to eq(%w[a.jpg b.jpg])
+    end
+
+    # These examples build the component directly rather than going through
+    # the dispatcher (component_fragment/tabler_ui.carousel): the
+    # dispatcher's own top-level auth: gate (see ui_spec.rb's "auth: gating"
+    # describe block) would deny the *entire* carousel call -- block never
+    # run -- whenever carousel's own auth: is itself denied, which would
+    # make it impossible to exercise #item's inheritance/override branch in
+    # that case. Setting .auth= directly is exactly what the dispatcher does
+    # internally right after construction (see ui.rb's build path), so this
+    # exercises the same inheritance logic without that confound.
+    it "a slide with no auth: of its own inherits carousel's own auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      carousel = TablerUi::Carousel::Component.new("my-carousel")
+      carousel.auth = :denied
+
+      carousel.item(image: "a.jpg")
+
+      expect(carousel.items).to be_empty
+    end
+
+    it "a slide with no auth: of its own inherits carousel's own auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      carousel = TablerUi::Carousel::Component.new("my-carousel")
+      carousel.auth = :allowed
+
+      carousel.item(image: "a.jpg")
+
+      expect(carousel.items.map(&:image)).to include("a.jpg")
+    end
+
+    it "a slide's own explicit auth: overrides an unauthorized carousel-level auth: (allows it through)" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      carousel = TablerUi::Carousel::Component.new("my-carousel")
+      carousel.auth = :denied
+
+      carousel.item(image: "a.jpg", auth: :allowed)
+
+      expect(carousel.items.map(&:image)).to include("a.jpg")
+    end
+
+    it "a slide's own explicit auth: overrides an authorized carousel-level auth: (denies it)" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      carousel = TablerUi::Carousel::Component.new("my-carousel")
+      carousel.auth = :allowed
+
+      carousel.item(image: "a.jpg", auth: :denied)
+
+      expect(carousel.items).to be_empty
+    end
+
+    it "an unauthorized first slide does not count toward the active-by-default slide, and validate! does not raise" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:carousel, "my-carousel") do |carousel|
+        carousel.item(image: "a.jpg", auth: :denied)
+        carousel.item(image: "b.jpg")
+        carousel.item(image: "c.jpg")
+      end
+
+      items = fragment.css(".carousel-item")
+      expect(items.size).to eq(2)
+      expect(items[0]["class"].split(/\s+/)).to include("active")
+      expect(items[1]["class"].split(/\s+/)).not_to include("active")
+    end
+
+    it "validate! still raises ArgumentError when zero authorized slides end up active" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      expect do
+        component_fragment(:carousel, "my-carousel") do |carousel|
+          carousel.item(image: "a.jpg", active: false)
+          carousel.item(image: "b.jpg", active: false, auth: :denied)
+        end
+      end.to raise_error(ArgumentError, /my-carousel.*exactly one active/)
+    end
+
+    it "validate! still raises ArgumentError when several authorized slides end up active" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      expect do
+        component_fragment(:carousel, "my-carousel") do |carousel|
+          carousel.item(image: "a.jpg", active: true)
+          carousel.item(image: "b.jpg", active: true)
+          carousel.item(image: "c.jpg", active: true, auth: :denied)
+        end
+      end.to raise_error(ArgumentError, /my-carousel.*exactly one active/)
+    end
+
+    it "renders exactly as before under the default auth_method with no auth: anywhere" do
+      fragment = component_fragment(:carousel, "my-carousel") do |carousel|
+        carousel.item(image: "a.jpg")
+        carousel.item(image: "b.jpg")
+        carousel.item(image: "c.jpg")
+      end
+
+      items = fragment.css(".carousel-item")
+      expect(items.map { |i| i["class"].split(/\s+/).include?("active") }).to eq([true, false, false])
+      expect(fragment.css(".carousel-indicators button").size).to eq(3)
+    end
+  end
+
   describe "accessibility" do
     it "sets role and aria-roledescription on the root" do
       fragment = component_fragment(:carousel, "my-carousel")

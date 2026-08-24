@@ -44,8 +44,10 @@ module TablerUi
       # 0-based and set by #item in call order, so #active? can compare it
       # against `current:` without relying on Struct value-equality (two
       # items with the same title/url/html would otherwise look identical to
-      # Array#index).
-      Item = Struct.new(:title, :url, :html, :index, keyword_init: true)
+      # Array#index). :auth is the item's resolved (post-inheritance)
+      # `auth:` value (CLAUDE.md rule 8) -- stored for completeness, though
+      # only authorized items ever make it into @items in the first place.
+      Item = Struct.new(:title, :url, :html, :index, :auth, keyword_init: true)
 
       attr_reader :items, :current
 
@@ -80,11 +82,23 @@ module TablerUi
       #   a plain <li> (no link) otherwise
       # @option options [Hash, #call] :html HTML attributes for this step's
       #   element (part :item) -- a plain Hash, or a callable taking the item
-      # @return [String] empty string, to avoid stray output in a capture context
+      # @option options [Object] :auth Per-item authorization value (CLAUDE.md
+      #   rule 8) -- checked against the globally configured auth_method.
+      #   Defaults to steps' own :auth when omitted. An unauthorized item is
+      #   not appended, so it is never indexed or counted -- :index is
+      #   assigned from @items.length *after* exclusion, keeping authorized
+      #   items densely indexed (0, 1, 2, ...) and #validate!'s bounds check
+      #   against `current:` consistent with what actually renders.
+      # @return [String, nil] empty string, to avoid stray output in a
+      #   capture context; nil (no-op) if :auth denied it
       def item(title, options = {})
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :item)
 
-        @items << Item.new(title: title, url: options[:url], html: options[:html], index: @items.length)
+        @items << Item.new(title: title, url: options[:url], html: options[:html], index: @items.length,
+                            auth: effective_auth)
 
         ""
       end

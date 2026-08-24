@@ -65,8 +65,13 @@ module TablerUi
 
       # :html / :caption_html hold the caller's *raw* per-item hooks (Hash or
       # Proc taking the item), not resolved attributes -- see #item_attributes
-      # / #caption_attributes. :index is 0-based, set by #item in call order.
-      Item = Struct.new(:image, :caption, :caption_background, :active, :content, :html, :caption_html, :index,
+      # / #caption_attributes. :index is 0-based, set by #item in call order,
+      # after excluding unauthorized slides -- so authorized slides stay
+      # densely indexed and #slide_label's "N of M" is consistent with what
+      # actually renders. :auth is the slide's resolved (post-inheritance)
+      # `auth:` value (CLAUDE.md rule 8) -- stored for completeness, though
+      # only authorized slides ever make it into @items in the first place.
+      Item = Struct.new(:image, :caption, :caption_background, :active, :content, :html, :caption_html, :index, :auth,
                          keyword_init: true)
 
       INDICATOR_VARIANTS = %i[dot thumb vertical].freeze
@@ -133,10 +138,21 @@ module TablerUi
       # @option options [Hash, #call] :caption_html HTML attributes for this
       #   slide's `.carousel-caption` (part :caption) -- a plain Hash, or a
       #   callable taking the item
+      # @option options [Object] :auth Per-slide authorization value (CLAUDE.md
+      #   rule 8) -- checked against the globally configured auth_method.
+      #   Defaults to carousel's own :auth when omitted. An unauthorized slide
+      #   is not appended, so it never factors into the first-slide-active
+      #   default nor into #validate!'s exactly-one-active check -- :index is
+      #   assigned from @items.length *after* exclusion, keeping authorized
+      #   slides densely indexed (0, 1, 2, ...).
       # @param block [Proc] Slide content, captured in the template --
       #   replaces :image entirely when given
-      # @return [String] empty string, to avoid stray output in a capture context
+      # @return [String, nil] empty string, to avoid stray output in a
+      #   capture context; nil (no-op) if :auth denied it
       def item(options = {}, &block)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         is_active = options[:active].nil? ? @items.empty? : options[:active]
 
         @items << Item.new(
@@ -147,7 +163,8 @@ module TablerUi
           content: block,
           html: options[:html],
           caption_html: options[:caption_html],
-          index: @items.length
+          index: @items.length,
+          auth: effective_auth
         )
 
         ""

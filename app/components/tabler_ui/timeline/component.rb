@@ -47,7 +47,7 @@ module TablerUi
       # :icon_html / :card_html hold the caller's *raw* per-item hook (Hash or
       # Proc taking the item), not resolved attributes -- see #icon_attributes
       # / #card_attributes, which mirror Tabs#tab_attributes.
-      Item = Struct.new(:icon, :color, :icon_html, :card_html, :content, keyword_init: true)
+      Item = Struct.new(:icon, :color, :icon_html, :card_html, :content, :auth, keyword_init: true)
 
       attr_reader :items, :simple
 
@@ -91,20 +91,30 @@ module TablerUi
       # @option options [Hash, #call] :card_html HTML attributes for this
       #   item's `.timeline-event-card` (part :card) -- a plain Hash, or a
       #   callable taking the item
+      # @option options [Object] :auth Per-item auth check (CLAUDE.md rule 8).
+      #   Defaults to the timeline's own `auth:` value when omitted -- an
+      #   item that doesn't set its own `auth:` inherits its parent's. An
+      #   unauthorized item is never appended to `@items`, and its block
+      #   never runs.
       # @param block [Proc] Event content, captured at render time and
       #   rendered as-is inside `.timeline-event-card`. Deliberately left
       #   unstructured -- `.timeline-event-card` is generic in the CSS
       #   (nothing enforces a `.card` inside it), so a caller who wants a
       #   card nests `tabler_ui.card` themselves rather than this component
       #   baking card structure in.
-      # @return [String] empty string, to avoid stray output in a capture context
+      # @return [nil, String] nil if `auth:` denied it, otherwise an empty
+      #   string, to avoid stray output in a capture context
       def item(options = {}, &block)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         @items << Item.new(
           icon: options[:icon],
           color: TablerUi::Color.validate!(options[:color], context: "timeline"),
           icon_html: options[:icon_html],
           card_html: options[:card_html],
-          content: block
+          content: block,
+          auth: effective_auth
         )
 
         ""

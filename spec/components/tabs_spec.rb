@@ -259,4 +259,114 @@ RSpec.describe "TablerUi::Tabs", type: :component do
     expect { component_fragment(:tabs, "my-tabs", style: :tabs, vertical: true) }
       .to raise_error(ArgumentError, /vertical/)
   end
+
+  # auth: (CLAUDE.md rule 8) -- TablerUi.auth_method is global, process-wide
+  # mutable state, so every example that swaps it in must restore the
+  # original afterward. Same idiom as spec/lib/tabler_ui/authorization_spec.rb
+  # and spec/components/steps_spec.rb.
+  describe "auth:" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "a tab with its own auth: denied is not present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:tabs, "my-tabs") do |tabs|
+        tabs.tab("Account", auth: :denied) { "Account content" }
+        tabs.tab("Profile") { "Profile content" }
+      end
+
+      expect(fragment.css(".nav-link").map(&:text).map(&:strip)).to eq(["Profile"])
+    end
+
+    it "a tab with its own auth: authorized is present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:tabs, "my-tabs") do |tabs|
+        tabs.tab("Account", auth: :allowed) { "Account content" }
+        tabs.tab("Profile") { "Profile content" }
+      end
+
+      expect(fragment.css(".nav-link").map(&:text).map(&:strip)).to eq(%w[Account Profile])
+    end
+
+    # These examples build the component directly rather than going through
+    # the dispatcher (component_fragment/tabler_ui.tabs): the dispatcher's
+    # own top-level auth: gate (see ui_spec.rb's "auth: gating" describe
+    # block) would deny the *entire* tabs call -- block never run -- whenever
+    # tabs' own auth: is itself denied, which would make it impossible to
+    # exercise #tab's inheritance/override branch in that case. Setting
+    # .auth= directly is exactly what the dispatcher does internally right
+    # after construction (see ui.rb's build path), so this exercises the
+    # same inheritance logic without that confound.
+    it "a tab with no auth: of its own inherits tabs' own auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      tabs = TablerUi::Tabs::Component.new("my-tabs")
+      tabs.auth = :denied
+
+      tabs.tab("Account")
+
+      expect(tabs.tabs).to be_empty
+    end
+
+    it "a tab with no auth: of its own inherits tabs' own auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      tabs = TablerUi::Tabs::Component.new("my-tabs")
+      tabs.auth = :allowed
+
+      tabs.tab("Account")
+
+      expect(tabs.tabs.map(&:title)).to include("Account")
+    end
+
+    it "a tab's own explicit auth: overrides an unauthorized tabs-level auth: (allows it through)" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      tabs = TablerUi::Tabs::Component.new("my-tabs")
+      tabs.auth = :denied
+
+      tabs.tab("Account", auth: :allowed)
+
+      expect(tabs.tabs.map(&:title)).to include("Account")
+    end
+
+    it "a tab's own explicit auth: overrides an authorized tabs-level auth: (denies it)" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      tabs = TablerUi::Tabs::Component.new("my-tabs")
+      tabs.auth = :allowed
+
+      tabs.tab("Account", auth: :denied)
+
+      expect(tabs.tabs).to be_empty
+    end
+
+    it "denying the first tab makes the next authorized tab active by default, not the denied one" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:tabs, "my-tabs") do |tabs|
+        tabs.tab("Account", auth: :denied) { "Account content" }
+        tabs.tab("Profile") { "Profile content" }
+        tabs.tab("Confirm") { "Confirm content" }
+      end
+
+      links = fragment.css(".nav-link")
+      expect(links.map { |l| l.text.strip }).to eq(%w[Profile Confirm])
+      expect(links[0]["class"].split(/\s+/)).to include("active")
+      expect(links[1]["class"].split(/\s+/)).not_to include("active")
+    end
+
+    it "renders exactly as before under the default auth_method with no auth: anywhere" do
+      fragment = component_fragment(:tabs, "my-tabs") do |tabs|
+        tabs.tab("First") { "First content" }
+        tabs.tab("Second") { "Second content" }
+      end
+
+      links = fragment.css(".nav-link")
+      expect(links.map { |l| l.text.strip }).to eq(%w[First Second])
+      expect(links[0]["class"].split(/\s+/)).to include("active")
+      expect(links[1]["class"].split(/\s+/)).not_to include("active")
+    end
+  end
 end

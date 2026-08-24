@@ -208,4 +208,119 @@ RSpec.describe "TablerUi::Steps", type: :component do
     expect(items[1]["class"].split(/\s+/)).to include("callable-class-second")
     expect(items[1]["class"].split(/\s+/)).not_to include("callable-class-first")
   end
+
+  # auth: (CLAUDE.md rule 8) -- TablerUi.auth_method is global, process-wide
+  # mutable state, so every example that swaps it in must restore the
+  # original afterward. Same idiom as spec/lib/tabler_ui/authorization_spec.rb
+  # and spec/lib/tabler_ui/ui_spec.rb.
+  describe "auth:" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "an item with its own auth: denied is not present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:steps) do |steps|
+        steps.item("Account", auth: :denied)
+        steps.item("Profile")
+      end
+
+      expect(fragment.css(".step-item").map(&:text).map(&:strip)).to eq(["Profile"])
+    end
+
+    it "an item with its own auth: authorized is present in the rendered output" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:steps) do |steps|
+        steps.item("Account", auth: :allowed)
+        steps.item("Profile")
+      end
+
+      expect(fragment.css(".step-item").map(&:text).map(&:strip)).to eq(%w[Account Profile])
+    end
+
+    # These four examples build the component directly rather than going
+    # through the dispatcher (component_fragment/tabler_ui.steps): the
+    # dispatcher's own top-level auth: gate (see ui_spec.rb's "auth: gating"
+    # describe block) would deny the *entire* steps call -- block never run
+    # -- whenever steps' own auth: is itself denied, which would make it
+    # impossible to exercise #item's inheritance/override branch in that
+    # case. Setting .auth= directly is exactly what the dispatcher does
+    # internally right after construction (see ui.rb's build path), so this
+    # exercises the same inheritance logic without that confound.
+    it "an item with no auth: of its own inherits steps' own auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      steps = TablerUi::Steps::Component.new
+      steps.auth = :denied
+
+      steps.item("Account")
+
+      expect(steps.items).to be_empty
+    end
+
+    it "an item with no auth: of its own inherits steps' own auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      steps = TablerUi::Steps::Component.new
+      steps.auth = :allowed
+
+      steps.item("Account")
+
+      expect(steps.items.map(&:title)).to include("Account")
+    end
+
+    it "an item's own explicit auth: overrides an unauthorized steps-level auth: (allows it through)" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      steps = TablerUi::Steps::Component.new
+      steps.auth = :denied
+
+      steps.item("Account", auth: :allowed)
+
+      expect(steps.items.map(&:title)).to include("Account")
+    end
+
+    it "an item's own explicit auth: overrides an authorized steps-level auth: (denies it)" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      steps = TablerUi::Steps::Component.new
+      steps.auth = :allowed
+
+      steps.item("Account", auth: :denied)
+
+      expect(steps.items).to be_empty
+    end
+
+    it "authorized items are densely indexed after an earlier item is denied, keeping current: pointed at the right rendered step" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      # item 1 ("Account") is denied. Item 2 ("Profile") should get index 0,
+      # item 3 ("Confirm") index 1. current: 1 (1-based) means current_index
+      # 0 -- with dense indexing that's "Profile", the first *rendered* step,
+      # not stale index 1 which would point at "Confirm" or be out of range
+      # if that were the only survivor.
+      fragment = component_fragment(:steps, current: 1) do |steps|
+        steps.item("Account", auth: :denied)
+        steps.item("Profile")
+        steps.item("Confirm")
+      end
+
+      items = fragment.css(".step-item")
+      expect(items.map { |i| i.text.strip }).to eq(%w[Profile Confirm])
+      expect(items[0]["class"].split(/\s+/)).to include("active")
+      expect(items[1]["class"].split(/\s+/)).not_to include("active")
+    end
+
+    it "renders exactly as before under the default auth_method with no auth: anywhere" do
+      fragment = component_fragment(:steps, current: 2) do |steps|
+        steps.item("Account")
+        steps.item("Profile")
+        steps.item("Confirm")
+      end
+
+      items = fragment.css(".step-item")
+      expect(items.map { |i| i.text.strip }).to eq(%w[Account Profile Confirm])
+      expect(items.map { |i| i["class"].split(/\s+/).include?("active") }).to eq([false, true, false])
+    end
+  end
 end

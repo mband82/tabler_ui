@@ -253,6 +253,128 @@ RSpec.describe "TablerUi::Breadcrumb", type: :component do
     end
   end
 
+  describe "auth: gating (CLAUDE.md rule 8)" do
+    # TablerUi.auth_method is global, process-wide mutable state -- restore it
+    # after every example so a custom auth_method here never leaks into specs
+    # that run afterward (see authorization_spec.rb / ui_spec.rb's identical
+    # around block for the same reasoning).
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "omits an item whose own auth: is denied by the configured auth_method" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:breadcrumb) do |breadcrumb|
+        breadcrumb.item("Home", url: "/")
+        breadcrumb.item("Secret", url: "/secret", auth: :denied)
+      end
+
+      titles = fragment.css("li.breadcrumb-item").map(&:text).map(&:strip)
+      expect(titles).to eq(["Home"])
+    end
+
+    it "includes an item whose own auth: is authorized by the configured auth_method" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:breadcrumb) do |breadcrumb|
+        breadcrumb.item("Home", url: "/")
+        breadcrumb.item("Allowed", url: "/allowed", auth: :allowed)
+      end
+
+      titles = fragment.css("li.breadcrumb-item").map(&:text).map(&:strip)
+      expect(titles).to eq(%w[Home Allowed])
+    end
+
+    it "an item with no auth: of its own inherits the breadcrumb's auth: and is denied" do
+      # The breadcrumb's own `auth:` is what #item inherits (self.auth), but
+      # it is also the exact value the top-level dispatcher already gated
+      # tabler_ui.breadcrumb(...) on -- a value-based auth_method that denies
+      # it would already block the whole call (and the block, and every
+      # #item call inside it) before inheritance ever came into play. So this
+      # uses a call-order-based auth_method instead: authorize the very first
+      # call (the top-level breadcrumb gate, letting the block run and
+      # `auth` get set) and deny every call after that (the items, proving
+      # #item re-runs the check on the inherited value rather than reusing
+      # the already-true top-level result).
+      call_count = 0
+      TablerUi.auth_method = lambda do |_value|
+        call_count += 1
+        call_count == 1
+      end
+
+      fragment = component_fragment(:breadcrumb, auth: :whatever) do |breadcrumb|
+        breadcrumb.item("Home")
+        breadcrumb.item("Data")
+      end
+
+      expect(fragment.css("li.breadcrumb-item")).to be_empty
+    end
+
+    it "an item with no auth: of its own inherits the breadcrumb's auth: and is allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:breadcrumb, auth: :allowed) do |breadcrumb|
+        breadcrumb.item("Home")
+        breadcrumb.item("Data")
+      end
+
+      titles = fragment.css("li.breadcrumb-item").map(&:text).map(&:strip)
+      expect(titles).to eq(%w[Home Data])
+    end
+
+    it "an item's own explicit auth: overrides a denying breadcrumb-level auth:" do
+      # Same constraint as the "inherited -- denied" case above: the
+      # breadcrumb-level `auth:` that inheriting items would be denied by is
+      # also what gates the top-level tabler_ui.breadcrumb(...) call itself,
+      # so a plain value-based auth_method can't deny it there and still let
+      # the block run. Authorize the top-level call (call #1) unconditionally,
+      # then decide every item on its own merits.
+      first_call = true
+      TablerUi.auth_method = lambda do |value|
+        if first_call
+          first_call = false
+          true
+        else
+          value == :allowed
+        end
+      end
+
+      fragment = component_fragment(:breadcrumb, auth: :denied) do |breadcrumb|
+        breadcrumb.item("Home") # no own auth: -- inherits :denied, denied
+        breadcrumb.item("Override", auth: :allowed) # own auth: overrides it
+      end
+
+      titles = fragment.css("li.breadcrumb-item").map(&:text).map(&:strip)
+      expect(titles).to eq(["Override"])
+    end
+
+    it "an item's own explicit auth: overrides an allowing breadcrumb-level auth:" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:breadcrumb, auth: :allowed) do |breadcrumb|
+        breadcrumb.item("Home")
+        breadcrumb.item("Override", auth: :denied)
+      end
+
+      titles = fragment.css("li.breadcrumb-item").map(&:text).map(&:strip)
+      expect(titles).to eq(["Home"])
+    end
+
+    it "regression: under the default auth_method and no auth: anywhere, all items render as before" do
+      fragment = component_fragment(:breadcrumb) do |breadcrumb|
+        breadcrumb.item("Home", url: "/")
+        breadcrumb.item("Library", url: "/library")
+        breadcrumb.item("Data")
+      end
+
+      titles = fragment.css("li.breadcrumb-item").map(&:text).map(&:strip)
+      expect(titles).to eq(%w[Home Library Data])
+    end
+  end
+
   describe "accessibility markup" do
     it "wraps the list in a nav landmark with a translated aria-label" do
       fragment = component_fragment(:breadcrumb)

@@ -110,6 +110,117 @@ RSpec.describe "TablerUi::Timeline", type: :component do
 
   it_behaves_like "an element with an html hook", :timeline, {}, hook: :html, selector: "ul.timeline"
 
+  # CLAUDE.md rule 8: the `auth:` option, gated inside Timeline::Component#item.
+  # TablerUi.auth_method is global, process-wide mutable state -- restore it
+  # after every example so a custom auth_method here never leaks into specs
+  # that run afterward (see spec/lib/tabler_ui/authorization_spec.rb's
+  # identical around block for the same reasoning).
+  describe "auth: gating on items" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "renders exactly as before with the default auth_method and no auth: anywhere" do
+      fragment = component_fragment(:timeline) do |t|
+        t.item(icon: "check") { "First" }
+        t.item(icon: "flag") { "Second" }
+      end
+
+      cards = fragment.css(".timeline-event-card")
+      expect(cards.map { |c| c.text.strip }).to eq(["First", "Second"])
+    end
+
+    it "omits an item whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :forbidden }
+
+      fragment = component_fragment(:timeline) do |t|
+        t.item(auth: :forbidden) { "Hidden" }
+        t.item(auth: :allowed) { "Visible" }
+      end
+
+      cards = fragment.css(".timeline-event-card")
+      expect(cards.map { |c| c.text.strip }).to eq(["Visible"])
+    end
+
+    it "includes an item whose own auth: is authorized" do
+      TablerUi.auth_method = ->(value) { value != :forbidden }
+
+      fragment = component_fragment(:timeline) do |t|
+        t.item(auth: :allowed) { "Visible" }
+      end
+
+      cards = fragment.css(".timeline-event-card")
+      expect(cards.map { |c| c.text.strip }).to eq(["Visible"])
+    end
+
+    it "allows an item with no auth: of its own when the timeline's own auth: is allowed" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+
+      fragment = component_fragment(:timeline, auth: :allowed) do |t|
+        t.item { "Visible" }
+      end
+
+      cards = fragment.css(".timeline-event-card")
+      expect(cards.map { |c| c.text.strip }).to eq(["Visible"])
+    end
+
+    it "lets an item's own auth: override an allowing parent auth:" do
+      TablerUi.auth_method = ->(value) { value != :forbidden }
+
+      fragment = component_fragment(:timeline, auth: :allowed) do |t|
+        t.item(auth: :forbidden) { "Hidden" }
+      end
+
+      expect(fragment.css(".timeline-event-card")).to be_empty
+    end
+
+    # The two cases above can't be exercised through the full `tabler_ui.timeline`
+    # dispatch when the *parent's* own auth: is the one being denied: Ui#method_missing
+    # gates the entire top-level call on that same value (lib/tabler_ui/ui.rb) before
+    # the block -- and so `#item` -- ever runs, so a denied parent means nothing
+    # renders at all, item-level auth: never gets a chance to matter either way. (A
+    # sibling spec for another builder component made exactly this mistake -- asserting
+    # an item's own auth: could "rescue" a denied parent through full dispatch -- and it
+    # fails for that reason.) These call Component#item directly, with auth= set the
+    # way Ui#method_missing sets it after a *successful* dispatch, to test the
+    # inheritance/override logic in #item in isolation from that outer gate.
+    describe "inheritance/override logic in #item, exercised directly on the component" do
+      it "an item with no auth: of its own inherits a denied timeline-level auth: and is omitted" do
+        TablerUi.auth_method = ->(value) { value != :forbidden }
+        timeline = TablerUi::Timeline::Component.new
+        timeline.auth = :forbidden
+
+        timeline.item { "Hidden" }
+
+        expect(timeline.items).to be_empty
+      end
+
+      it "an item with no auth: of its own inherits an allowed timeline-level auth: and is kept" do
+        TablerUi.auth_method = ->(value) { value == :allowed }
+        timeline = TablerUi::Timeline::Component.new
+        timeline.auth = :allowed
+
+        timeline.item { "Visible" }
+
+        expect(timeline.items.size).to eq(1)
+        expect(timeline.items.first.auth).to eq(:allowed)
+      end
+
+      it "an item's own auth: overrides a denied timeline-level auth:" do
+        TablerUi.auth_method = ->(value) { value == :allowed }
+        timeline = TablerUi::Timeline::Component.new
+        timeline.auth = :forbidden
+
+        timeline.item(auth: :allowed) { "Visible" }
+
+        expect(timeline.items.size).to eq(1)
+        expect(timeline.items.first.auth).to eq(:allowed)
+      end
+    end
+  end
+
   it "applies item_html: as a plain Hash to every item" do
     fragment = component_fragment(:timeline, item_html: { class: "all-items" }) do |t|
       t.item { "First" }

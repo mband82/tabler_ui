@@ -46,8 +46,12 @@ module TablerUi
       # :html/:header_html/:body_html hold the caller's *raw* per-item hooks
       # (Hash or Proc taking the item), not resolved attributes -- see
       # #item_attributes, #item_header_attributes, #item_body_attributes.
+      # :auth is the item's resolved (post-inheritance) `auth:` value
+      # (CLAUDE.md rule 8) -- stored for completeness, though only authorized
+      # items ever make it into @items in the first place, so #validate!'s
+      # open: true count only ever sees items that will actually render.
       Item = Struct.new(:id, :header_id, :title, :icon, :open, :content,
-                         :html, :header_html, :body_html, keyword_init: true)
+                         :html, :header_html, :body_html, :auth, keyword_init: true)
 
       attr_reader :id, :flush, :inverted, :style, :toggle_style, :multiple, :items
 
@@ -88,9 +92,18 @@ module TablerUi
       #   `.accordion-header` (part :item_header)
       # @option options [Hash, #call] :body_html HTML attributes for this item's
       #   `.accordion-body` (part :item_body)
+      # @option options [Object] :auth Per-item authorization value (CLAUDE.md
+      #   rule 8) -- checked against the globally configured auth_method.
+      #   Defaults to the accordion's own :auth when omitted. An unauthorized
+      #   item is not appended, so it never gets an id from the counter and
+      #   is never counted by #validate!'s open: true check.
       # @param block [Proc] Content block for the item's body, captured in the template
-      # @return [String] empty string, to avoid stray output in a capture context
+      # @return [String, nil] empty string, to avoid stray output in a capture
+      #   context; nil (no-op) if :auth denied it
       def item(title, options = {}, &block)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :item)
 
         @item_counter += 1
@@ -105,7 +118,8 @@ module TablerUi
           content: block,
           html: options[:html],
           header_html: options[:header_html],
-          body_html: options[:body_html]
+          body_html: options[:body_html],
+          auth: effective_auth
         )
 
         ""

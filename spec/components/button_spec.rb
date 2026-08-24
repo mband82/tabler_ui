@@ -11,6 +11,8 @@ RSpec.describe "TablerUi::Button", type: :component do
 
   it_behaves_like "an element with an html hook", :button, {}, hook: :html, selector: ".btn"
 
+  it_behaves_like "an element with an auth option", :button, { text: "x" }
+
   it "appends a caller class to the button's own classes, not replacing them" do
     fragment = component_fragment(:button, text: "Save", color: "blue", html: { class: "hook-extra-class" })
     classes = fragment.css(".btn").first["class"].split(/\s+/)

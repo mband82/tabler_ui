@@ -551,6 +551,266 @@ RSpec.describe "TablerUi::Navbar", type: :component do
     end
   end
 
+  # CLAUDE.md rule 8: auth: gating on navbar's own subitems -- group items
+  # (NavigationGroup#add), dropdown items themselves (NavigationGroup#dropdown),
+  # and the nested items inside a dropdown's block (DropDownProxy#item /
+  # #divider / #header). TablerUi.auth_method is global, process-wide mutable
+  # state -- restore it after every example so a custom auth_method here
+  # never leaks into specs that run afterward (see dropdown_spec.rb / steps_spec.rb's
+  # identical around block for the same reasoning).
+  describe "auth: gating (CLAUDE.md rule 8)" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "REGRESSION: renders exactly as before under the default auth_method with no auth: anywhere" do
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.add "Home", url: "/", active: false
+          nav.dropdown("Admin") do |dd|
+            dd.item("Users", url: "/admin/users", active: false)
+          end
+        end
+      end
+
+      expect(fragment.css(".nav-link").map(&:text).map(&:strip)).to include("Home")
+      expect(fragment.css(".dropdown-item").map(&:text).map(&:strip)).to include("Users")
+    end
+
+    it "omits a group item whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:navbar) do |navbar|
+        navbar.left do |nav|
+          nav.add "Allowed", url: "/allowed", auth: :allowed, active: false
+          nav.add "Denied", url: "/denied", auth: :denied, active: false
+        end
+      end
+
+      titles = fragment.css(".nav-link").map(&:text).map(&:strip)
+      expect(titles).to include("Allowed")
+      expect(titles).not_to include("Denied")
+    end
+
+    # These examples build the component directly rather than going through
+    # the dispatcher (component_fragment/tabler_ui.navbar): the dispatcher's
+    # own top-level auth: gate (see ui_spec.rb's "auth: gating" describe
+    # block) would deny the *entire* navbar call -- block never run -- whenever
+    # the navbar-level auth: is itself denied, which would make it impossible
+    # to exercise the inheritance/override branch in that case. Setting
+    # .auth= directly is exactly what the dispatcher does internally right
+    # after construction (see ui.rb's build path), so this exercises the same
+    # inheritance logic without that confound.
+    it "a group item with no auth: of its own inherits the navbar's own auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :denied
+
+      navbar.left { |nav| nav.add "Inherited", url: "/x" }
+
+      expect(navbar.items_left).to be_empty
+    end
+
+    it "a group item with no auth: of its own inherits the navbar's own auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left { |nav| nav.add "Inherited", url: "/x" }
+
+      expect(navbar.items_left.map(&:title)).to include("Inherited")
+    end
+
+    it "a group item's own auth: overrides an otherwise-denying navbar auth:" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :denied
+
+      navbar.left { |nav| nav.add "Overridden", url: "/x", auth: :allowed }
+
+      expect(navbar.items_left.map(&:title)).to include("Overridden")
+    end
+
+    it "a group item's own auth: overrides an otherwise-allowing navbar auth:" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left { |nav| nav.add "Overridden", url: "/x", auth: :denied }
+
+      expect(navbar.items_left).to be_empty
+    end
+
+    it "a dropdown item itself follows the same auth: rules as a plain item -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left { |nav| nav.dropdown("Admin", auth: :denied) { |dd| dd.item("Users", url: "/x") } }
+
+      expect(navbar.items_left).to be_empty
+    end
+
+    it "a dropdown item itself follows the same auth: rules as a plain item -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left { |nav| nav.dropdown("Admin", auth: :allowed) { |dd| dd.item("Users", url: "/x") } }
+
+      expect(navbar.items_left.map(&:title)).to include("Admin")
+    end
+
+    it "a dropdown item with no auth: of its own inherits the group's own auth:" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :denied
+
+      navbar.left { |nav| nav.dropdown("Admin") { |dd| dd.item("Users", url: "/x") } }
+
+      expect(navbar.items_left).to be_empty
+    end
+
+    it "the two-level chain: a nested item with no auth: of its own inherits the DROPDOWN's " \
+       "effective auth:, not the navbar's -- even when they'd resolve differently" do
+      TablerUi.auth_method = ->(value) { value == :dropdown_level }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :navbar_level # would deny a nested item that inherited this directly
+
+      navbar.left do |nav|
+        nav.dropdown("Admin", auth: :dropdown_level) do |dd|
+          dd.item("Users", url: "/admin/users")
+        end
+      end
+
+      dropdown_item = navbar.items_left.first
+      expect(dropdown_item.submenu.map(&:title)).to include("Users")
+    end
+
+    it "the two-level chain: a nested item with no auth: of its own is denied when the " \
+       "dropdown's effective auth: is denied, even though the navbar's own auth: is allowed" do
+      TablerUi.auth_method = ->(value) { value == :navbar_level }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :navbar_level
+
+      navbar.left do |nav|
+        nav.dropdown("Admin", auth: :dropdown_level) do |dd|
+          dd.item("Users", url: "/admin/users")
+        end
+      end
+
+      expect(navbar.items_left).to be_empty
+    end
+
+    it "a nested item's own explicit auth: overrides the dropdown's effective auth:" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left do |nav|
+        nav.dropdown("Admin", auth: :allowed) do |dd|
+          dd.item("Denied", url: "/x", auth: :denied)
+          dd.item("Kept", url: "/y")
+        end
+      end
+
+      dropdown_item = navbar.items_left.first
+      titles = dropdown_item.submenu.map(&:title)
+      expect(titles).to include("Kept")
+      expect(titles).not_to include("Denied")
+    end
+
+    it "a dropdown's divider and header also inherit and can be overridden the same way" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left do |nav|
+        nav.dropdown("Admin") do |dd|
+          dd.header("Kept header")
+          dd.header("Denied header", auth: :denied)
+          dd.divider
+          dd.divider(auth: :denied)
+        end
+      end
+
+      dropdown_item = navbar.items_left.first
+      expect(dropdown_item.submenu.count { |sub| sub.type == :header }).to eq(1)
+      expect(dropdown_item.submenu.find { |sub| sub.type == :header }&.title).to eq("Kept header")
+      expect(dropdown_item.submenu.count { |sub| sub.type == :divider }).to eq(1)
+    end
+
+    it "dark_mode_toggle and divider group items are gated the same way -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left do |nav|
+        nav.dark_mode_toggle(auth: :denied)
+        nav.divider(auth: :denied)
+      end
+
+      expect(navbar.items_left).to be_empty
+    end
+
+    it "dark_mode_toggle and divider group items are gated the same way -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      navbar = TablerUi::Navbar::Component.new
+      navbar.auth = :allowed
+
+      navbar.left do |nav|
+        nav.dark_mode_toggle
+        nav.divider
+      end
+
+      expect(navbar.items_left.map(&:type)).to eq([:dark_mode_toggle, :divider])
+    end
+
+    describe "the existing action:/subject:/can? mechanism -- unrelated to auth:, unaffected by it" do
+      it "still hides an item can? denies, regardless of auth:" do
+        view = tabler_ui_view_context
+        view.define_singleton_method(:can?) { |_action, _subject| false }
+
+        fragment = component_fragment(:navbar) do |navbar|
+          navbar.left do |nav|
+            nav.add "Admin", url: "/admin", action: :manage, subject: :users, active: false
+          end
+        end
+
+        expect(fragment.css(".nav-link")).to be_empty
+      end
+
+      it "still shows an item can? allows, regardless of auth:" do
+        view = tabler_ui_view_context
+        view.define_singleton_method(:can?) { |_action, _subject| true }
+
+        fragment = component_fragment(:navbar) do |navbar|
+          navbar.left do |nav|
+            nav.add "Admin", url: "/admin", action: :manage, subject: :users, active: false
+          end
+        end
+
+        expect(fragment.css(".nav-link").map(&:text).map(&:strip)).to include("Admin")
+      end
+
+      it "auth: and can? gate the same item independently -- auth: allows it but can? still denies it" do
+        TablerUi.auth_method = ->(value) { value != :denied }
+        view = tabler_ui_view_context
+        view.define_singleton_method(:can?) { |_action, _subject| false }
+
+        fragment = component_fragment(:navbar) do |navbar|
+          navbar.left do |nav|
+            nav.add "Admin", url: "/admin", auth: :allowed, action: :manage, subject: :users, active: false
+          end
+        end
+
+        expect(fragment.css(".nav-link")).to be_empty
+      end
+    end
+  end
+
   it "marks the current page active automatically" do
     view = tabler_ui_view_context
     view.define_singleton_method(:request) { ActionDispatch::TestRequest.create("PATH_INFO" => "/dashboard") }

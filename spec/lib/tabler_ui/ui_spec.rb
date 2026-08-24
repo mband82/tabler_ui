@@ -257,4 +257,66 @@ RSpec.describe TablerUi::Ui do
       expect(fragment.text).to include("Loading")
     end
   end
+
+  # CLAUDE.md rule 8: the `auth:` option, gated centrally in #method_missing.
+  # TablerUi.auth_method is global, process-wide mutable state -- every
+  # example that installs a custom one restores the original afterward so it
+  # can never leak into a spec that runs later in the same process.
+  describe "auth: gating" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    describe "#set_auth_method" do
+      it "raises ArgumentError when called without a block" do
+        expect { dispatcher_view_context.tabler_ui.set_auth_method }
+          .to raise_error(ArgumentError, /requires a block/)
+      end
+
+      it "installs the block as the process-wide auth_method" do
+        dispatcher_view_context.tabler_ui.set_auth_method { |value| value == :ok }
+
+        expect(TablerUi.auth_method.call(:ok)).to be(true)
+        expect(TablerUi.auth_method.call(:nope)).to be(false)
+      end
+    end
+
+    it "renders normally under the default auth_method with no auth: given" do
+      fragment = fragment_for(:badge, text: "Hello")
+
+      expect(fragment.text).to include("Hello")
+    end
+
+    it "renders nothing, and never runs the block, for a class-backed component when denied" do
+      block_ran = false
+      dispatcher_view_context.tabler_ui.set_auth_method { false }
+
+      result = dispatch(:card, title: "x") { block_ran = true }
+
+      expect(result).to be_nil
+      expect(block_ran).to be(false)
+    end
+
+    it "renders nothing, and never runs the block, for an OpenStruct bare-partial call when denied" do
+      block_ran = false
+      dispatcher_view_context.tabler_ui.set_auth_method { false }
+
+      result = dispatch(:spec_bare, percent: 42, label: "Loading") { block_ran = true }
+
+      expect(result).to be_nil
+      expect(block_ran).to be(false)
+    end
+
+    it "passes through the exact auth: value given, including nil when it was omitted" do
+      received = []
+      dispatcher_view_context.tabler_ui.set_auth_method { |value| received << value; true }
+
+      dispatch(:badge, text: "Hello", auth: :manage_users)
+      dispatch(:badge, text: "Hello")
+
+      expect(received).to eq([:manage_users, nil])
+    end
+  end
 end

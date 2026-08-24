@@ -38,8 +38,11 @@ module TablerUi
       builder_style!
 
       # :html holds the caller's *raw* per-tab hook (Hash or Proc taking the
-      # tab), not resolved attributes -- see #tab_attributes.
-      Tab = Struct.new(:id, :title, :icon, :badge, :active, :content, :html, keyword_init: true)
+      # tab), not resolved attributes -- see #tab_attributes. :auth is the
+      # tab's resolved (post-inheritance) `auth:` value (CLAUDE.md rule 8) --
+      # stored for completeness, though only authorized tabs ever make it
+      # into @tabs in the first place.
+      Tab = Struct.new(:id, :title, :icon, :badge, :active, :content, :html, :auth, keyword_init: true)
 
       STYLES = %i[tabs pills card underline bordered segmented].freeze
 
@@ -89,9 +92,19 @@ module TablerUi
       #   explicitly marked active: true)
       # @option options [Hash, #call] :html HTML attributes for this tab's
       #   `a.nav-link` (part :tab) -- a plain Hash, or a callable taking the tab
+      # @option options [Object] :auth Per-tab authorization value (CLAUDE.md
+      #   rule 8) -- checked against the globally configured auth_method.
+      #   Defaults to tabs' own :auth when omitted. An unauthorized tab is not
+      #   appended, so it never counts toward "is this the first tab"
+      #   (active-by-default) and the id counter only advances over tabs that
+      #   actually render.
       # @param block [Proc] Content block for the tab panel, captured in the template
-      # @return [String] empty string, to avoid stray output in a capture context
+      # @return [String, nil] empty string, to avoid stray output in a capture
+      #   context; nil (no-op) if :auth denied it
       def tab(title, options = {}, &block)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :tab)
 
         @tab_counter += 1
@@ -106,7 +119,8 @@ module TablerUi
           badge: options[:badge],
           active: is_active,
           content: block,
-          html: options[:html]
+          html: options[:html],
+          auth: effective_auth
         )
 
         ""

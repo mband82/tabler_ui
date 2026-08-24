@@ -33,6 +33,28 @@ RSpec.describe "TablerUi::Card", type: :component do
   it_behaves_like "an element with an html hook", :card, {},
     hook: :html, selector: ".card"
 
+  it_behaves_like "an element with an auth option", :card, { title: "x" }
+
+  # Card is slot-style, not builder-style (see TablerUi::Base#builder_style?)
+  # -- its block only takes effect through `slots.<name> { }` calls. This
+  # confirms the auth: gate's "block never runs" guarantee (CLAUDE.md rule 8)
+  # holds for that shape too, not just for a builder-style component.
+  it "never evaluates a slot block at all when the auth_method denies it" do
+    original_auth_method = TablerUi.auth_method
+    TablerUi.auth_method = ->(_value) { false }
+    slot_ran = false
+
+    result = render_component(:card, title: "x", auth: :some_permission) do |slots|
+      slot_ran = true
+      slots.body { "Content" }
+    end
+
+    expect(result).to be_nil
+    expect(slot_ran).to be(false)
+  ensure
+    TablerUi.auth_method = original_auth_method
+  end
+
   it_behaves_like "an element with an html hook", :card, { title: "Card title" },
     hook: :header_html, selector: ".card-header"
 

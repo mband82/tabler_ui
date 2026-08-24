@@ -96,14 +96,25 @@ module TablerUi
       end
 
       # Yields the left nav-item group.
+      # @param options [Hash]
+      # @option options [Object] :auth Authorization value (CLAUDE.md rule 8) for
+      #   this group's items -- checked against the globally configured auth_method.
+      #   Defaults to the navbar's own :auth when omitted; items added inside the
+      #   block (NavigationGroup#add / #dropdown / #dark_mode_toggle / #divider)
+      #   inherit this as their own default in turn.
       # @yield [NavigationGroup]
-      def left
+      def left(options = {})
+        @items_left.auth = options.key?(:auth) ? options[:auth] : auth
         yield @items_left if block_given?
       end
 
       # Yields the right nav-item group.
+      # @param options [Hash]
+      # @option options [Object] :auth Authorization value (CLAUDE.md rule 8) for
+      #   this group's items -- see #left.
       # @yield [NavigationGroup]
-      def right
+      def right(options = {})
+        @items_right.auth = options.key?(:auth) ? options[:auth] : auth
         yield @items_right if block_given?
       end
 
@@ -252,9 +263,12 @@ module TablerUi
         # :html holds the caller's *raw* per-item hook (Hash or Proc taking
         # the item), not resolved attributes -- see Component#item_attributes.
         # :link_html is the same kind of raw hook, for the nav link itself
-        # rather than its `<li>` -- see Component#link_attributes.
+        # rather than its `<li>` -- see Component#link_attributes. :auth is
+        # the item's resolved (post-inheritance) `auth:` value (CLAUDE.md
+        # rule 8) -- stored for completeness, though only authorized items
+        # ever make it into @items in the first place.
         Item = Struct.new(:type, :title, :url, :target, :method, :action, :subject,
-                           :active, :submenu, :align, :toggle_options, :html, :link_html, keyword_init: true)
+                           :active, :submenu, :align, :toggle_options, :html, :link_html, :auth, keyword_init: true)
 
         def initialize
           @items = []
@@ -276,7 +290,16 @@ module TablerUi
         #   itself (part :link) -- the `<a>`, or the `<button>` inside `button_to`'s `<form>`
         #   for a non-GET `method:`. Merged on top of the component-level `link_html:` option
         #   -- see Component#link_attributes.
+        # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+        #   -- checked against the globally configured auth_method. Defaults to this
+        #   group's own :auth (see Component#left / #right) when omitted. An
+        #   unauthorized item is not appended. Unrelated to :action/:subject above.
+        # @return [String, nil] empty string, to avoid stray output in a capture
+        #   context; nil (no-op) if :auth denied it
         def add(title, options = {})
+          effective_auth = options.key?(:auth) ? options[:auth] : auth
+          return unless TablerUi::Authorization.authorized?(effective_auth)
+
           builder_argument!(title, :title, builder: :add)
 
           @items << Item.new(
@@ -289,7 +312,8 @@ module TablerUi
             subject: options[:subject],
             active: options[:active],
             html: options[:html],
-            link_html: options[:link_html]
+            link_html: options[:link_html],
+            auth: effective_auth
           )
 
           ""
@@ -303,11 +327,24 @@ module TablerUi
         #   Also tolerates the strings "start"/"end". Any other value (including the old "left"/"right")
         #   raises ArgumentError -- see TablerUi::Align.validate!.
         # @option options [Hash, #call] :html HTML attributes for this item's `li.nav-item` (part :item)
+        # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8) for
+        #   the dropdown item itself -- checked against the globally configured auth_method.
+        #   Defaults to this group's own :auth (see Component#left / #right) when omitted. An
+        #   unauthorized dropdown is not appended, and its block never runs (its items are
+        #   never built). This resolved value is also the default that everything added
+        #   inside the block (DropDownProxy#item / #divider / #header) inherits, one level
+        #   deeper than the group's own inheritance.
         # @yield [DropDownProxy]
+        # @return [String, nil] empty string, to avoid stray output in a capture
+        #   context; nil (no-op) if :auth denied it
         def dropdown(title, options = {})
+          effective_auth = options.key?(:auth) ? options[:auth] : auth
+          return unless TablerUi::Authorization.authorized?(effective_auth)
+
           builder_argument!(title, :title, builder: :dropdown)
 
           proxy = DropDownProxy.new
+          proxy.auth = effective_auth
           yield proxy if block_given?
 
           @items << Item.new(
@@ -315,7 +352,8 @@ module TablerUi
             title: title,
             submenu: proxy.items,
             align: TablerUi::Align.validate!(options[:align], context: "navbar dropdown"),
-            html: options[:html]
+            html: options[:html],
+            auth: effective_auth
           )
 
           ""
@@ -326,15 +364,33 @@ module TablerUi
         #
         # @param options [Hash]
         # @option options [Hash, #call] :html HTML attributes for this item's `li.nav-item` (part :item)
+        # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+        #   -- defaults to this group's own :auth (see Component#left / #right) when
+        #   omitted. Not forwarded to the inner `tabler_ui.dark_mode_toggle` call, which
+        #   has its own independent :auth gating via the dispatcher.
         # @option options remaining keys forwarded to `tabler_ui.dark_mode_toggle` (e.g. :size, :title)
+        # @return [String, nil] empty string, to avoid stray output in a capture
+        #   context; nil (no-op) if :auth denied it
         def dark_mode_toggle(options = {})
-          @items << Item.new(type: :dark_mode_toggle, html: options[:html], toggle_options: options.except(:html))
+          effective_auth = options.key?(:auth) ? options[:auth] : auth
+          return unless TablerUi::Authorization.authorized?(effective_auth)
+
+          @items << Item.new(type: :dark_mode_toggle, html: options[:html],
+                              toggle_options: options.except(:html, :auth), auth: effective_auth)
           ""
         end
 
         # Adds a divider (vertical separator).
-        def divider
-          @items << Item.new(type: :divider)
+        # @param options [Hash]
+        # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+        #   -- defaults to this group's own :auth (see Component#left / #right) when omitted.
+        # @return [String, nil] empty string, to avoid stray output in a capture
+        #   context; nil (no-op) if :auth denied it
+        def divider(options = {})
+          effective_auth = options.key?(:auth) ? options[:auth] : auth
+          return unless TablerUi::Authorization.authorized?(effective_auth)
+
+          @items << Item.new(type: :divider, auth: effective_auth)
           ""
         end
 
@@ -373,9 +429,12 @@ module TablerUi
 
           # :link_html holds the caller's *raw* per-item hook (Hash or Proc
           # taking the item), not resolved attributes -- see
-          # Component#dropdown_item_link_attributes.
+          # Component#dropdown_item_link_attributes. :auth is the item's
+          # resolved (post-inheritance) `auth:` value (CLAUDE.md rule 8) --
+          # stored for completeness, though only authorized items ever make
+          # it into @items in the first place.
           Item = Struct.new(:type, :title, :url, :target, :method, :action, :subject,
-                             :icon, :disabled, :active, :link_html, keyword_init: true)
+                             :icon, :disabled, :active, :link_html, :auth, keyword_init: true)
 
           attr_reader :items
 
@@ -400,7 +459,16 @@ module TablerUi
           #   itself (not routed through a component-level option -- see
           #   Component#dropdown_item_link_attributes) -- the `<a>`, or the `<button>` inside
           #   `button_to`'s `<form>` for a non-GET `method:`.
+          # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+          #   -- checked against the globally configured auth_method. Defaults to this
+          #   dropdown's own :auth (its resolved value from NavigationGroup#dropdown) when
+          #   omitted. An unauthorized item is not appended.
+          # @return [String, nil] empty string, to avoid stray output in a capture
+          #   context; nil (no-op) if :auth denied it
           def item(title, options = {})
+            effective_auth = options.key?(:auth) ? options[:auth] : auth
+            return unless TablerUi::Authorization.authorized?(effective_auth)
+
             builder_argument!(title, :title, builder: :item)
 
             @items << Item.new(
@@ -414,24 +482,41 @@ module TablerUi
               icon: options[:icon],
               disabled: options[:disabled],
               active: options[:active],
-              link_html: options[:link_html]
+              link_html: options[:link_html],
+              auth: effective_auth
             )
 
             ""
           end
 
           # Adds a divider line between dropdown items.
-          def divider
-            @items << Item.new(type: :divider)
+          # @param options [Hash]
+          # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+          #   -- defaults to this dropdown's own :auth when omitted.
+          # @return [String, nil] empty string, to avoid stray output in a capture
+          #   context; nil (no-op) if :auth denied it
+          def divider(options = {})
+            effective_auth = options.key?(:auth) ? options[:auth] : auth
+            return unless TablerUi::Authorization.authorized?(effective_auth)
+
+            @items << Item.new(type: :divider, auth: effective_auth)
             ""
           end
 
           # Adds a header label between dropdown items.
           # @param title [String] Header text
-          def header(title)
+          # @param options [Hash]
+          # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
+          #   -- defaults to this dropdown's own :auth when omitted.
+          # @return [String, nil] empty string, to avoid stray output in a capture
+          #   context; nil (no-op) if :auth denied it
+          def header(title, options = {})
+            effective_auth = options.key?(:auth) ? options[:auth] : auth
+            return unless TablerUi::Authorization.authorized?(effective_auth)
+
             builder_argument!(title, :title, builder: :header)
 
-            @items << Item.new(type: :header, title: title)
+            @items << Item.new(type: :header, title: title, auth: effective_auth)
             ""
           end
         end

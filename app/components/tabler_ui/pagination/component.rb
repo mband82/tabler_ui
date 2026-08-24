@@ -125,8 +125,12 @@ module TablerUi
       # of :page, :gap, :prev, :next. :page/:active only mean anything for
       # :page items; :label only for :prev/:next (falls back to the
       # component-level prev_label:/next_label: option, then to a translated
-      # default -- see #item_text).
-      Item = Struct.new(:kind, :page, :label, :url, :active, :disabled, :html, keyword_init: true)
+      # default -- see #item_text). :auth is the effective `auth:` value this
+      # item was authorized under (CLAUDE.md rule 8) -- purely informational
+      # by the time an item is in @items, since #item/#prev/#next already
+      # filtered out anything unauthorized before it got here; always nil for
+      # computed-mode items (#build_computed! never checks auth).
+      Item = Struct.new(:kind, :page, :label, :url, :active, :disabled, :html, :auth, keyword_init: true)
 
       attr_reader :items, :size, :circle, :outline, :window, :frame
 
@@ -205,12 +209,19 @@ module TablerUi
       # @option options [Hash, #call] :html HTML attributes for this item's
       #   `<li class="page-item">` (part :item) -- a plain Hash, or a
       #   callable taking the item
+      # @option options [Object] :auth CLAUDE.md rule 8 -- authorizes this
+      #   item independently of the pagination's own `auth:`. Defaults to
+      #   the pagination's `auth:` when omitted. An unauthorized item is
+      #   never appended, and this returns "" the same as a normal call.
       # @return [String] empty string, to avoid stray output in a capture context
       def item(page, options = {})
         builder_argument!(page, :page, builder: :item)
         guard_against_computed!(:item)
 
-        add_page(page, options)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return "" unless TablerUi::Authorization.authorized?(effective_auth)
+
+        add_page(page, options.merge(auth: effective_auth))
       end
 
       # Adds a gap ("...") between page entries. Always renders as
@@ -235,20 +246,28 @@ module TablerUi
       #   `<li class="page-item">` (part :item) -- gains `page-prev` too, but
       #   only when this is a prev/next-only pager with no #item calls; see
       #   "page-prev / page-next" above.
+      # @option options [Object] :auth CLAUDE.md rule 8 -- see #item's :auth.
       # @return [String] empty string, to avoid stray output in a capture context
       def prev(options = {})
         guard_against_computed!(:prev)
 
-        add_prev(options)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return "" unless TablerUi::Authorization.authorized?(effective_auth)
+
+        add_prev(options.merge(auth: effective_auth))
       end
 
       # Adds the "next page" control. See #prev -- same shape, opposite end.
       #
+      # @option options [Object] :auth CLAUDE.md rule 8 -- see #item's :auth.
       # @return [String] empty string, to avoid stray output in a capture context
       def next(options = {})
         guard_against_computed!(:next)
 
-        add_next(options)
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return "" unless TablerUi::Authorization.authorized?(effective_auth)
+
+        add_next(options.merge(auth: effective_auth))
       end
 
       # Called by TablerUi::Ui once a builder block has run (see
@@ -373,7 +392,7 @@ module TablerUi
 
       def add_page(page, options = {})
         @items << Item.new(kind: :page, page: page, url: options[:url], active: options[:active],
-                            disabled: options[:disabled], html: options[:html])
+                            disabled: options[:disabled], html: options[:html], auth: options[:auth])
         ""
       end
 
@@ -384,13 +403,13 @@ module TablerUi
 
       def add_prev(options = {})
         @items << Item.new(kind: :prev, label: options[:label], url: options[:url],
-                            disabled: options[:disabled], html: options[:html])
+                            disabled: options[:disabled], html: options[:html], auth: options[:auth])
         ""
       end
 
       def add_next(options = {})
         @items << Item.new(kind: :next, label: options[:label], url: options[:url],
-                            disabled: options[:disabled], html: options[:html])
+                            disabled: options[:disabled], html: options[:html], auth: options[:auth])
         ""
       end
 

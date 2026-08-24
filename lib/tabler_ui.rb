@@ -16,10 +16,22 @@ require_relative "tabler_ui/breakpoint"
 require_relative "tabler_ui/position"
 require_relative "tabler_ui/frame"
 require_relative "tabler_ui/css_bundle"
+require_relative "tabler_ui/authorization"
 require_relative "tabler_ui/base"
 require_relative "tabler_ui/ui"
 require_relative "tabler_ui/form_builder"
 
 module TablerUi
   class Error < StandardError; end
+
+  class << self
+    # Globally configured auth check for the `auth:` option (CLAUDE.md rule
+    # 8). Set via `tabler_ui.set_auth_method { |value| ... }`
+    # (lib/tabler_ui/ui.rb); read via TablerUi::Authorization.authorized?.
+    attr_accessor :auth_method
+  end
+
+  # Defaults to always-true, so a host that never calls set_auth_method sees
+  # no behavior change at all.
+  self.auth_method = ->(*) { true }
 end

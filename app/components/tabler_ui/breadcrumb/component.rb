@@ -74,7 +74,12 @@ module TablerUi
 
       # :html holds the caller's *raw* per-item hook (Hash or Proc taking the
       # item), not resolved attributes -- see #item_attributes.
-      Item = Struct.new(:title, :url, :active, :html, keyword_init: true)
+      # :auth holds the item's *effective* auth: value -- its own if it gave
+      # one, otherwise the breadcrumb's own (CLAUDE.md rule 8's inheritance
+      # rule) -- already resolved by the time the Item exists. It's not read
+      # anywhere yet, but kept for parity with the other builder-style
+      # components and any future need to introspect an item's auth: value.
+      Item = Struct.new(:title, :url, :active, :html, :auth, keyword_init: true)
 
       attr_reader :style, :muted, :items, :aria_label
 
@@ -111,15 +116,25 @@ module TablerUi
       # @option options [Hash, #call] :html HTML attributes for this item's
       #   `<li class="breadcrumb-item">` (part :item) -- a plain Hash, or a
       #   callable taking the item
+      # @option options :auth Per-item authorization check (CLAUDE.md rule 8),
+      #   run through the globally configured auth_method. Defaults to the
+      #   breadcrumb's own `auth:` value when omitted -- so an unauthorized
+      #   breadcrumb's items are unauthorized by default too, unless an item
+      #   overrides it with its own `auth:`. A denied item is silently never
+      #   added -- it does not appear in #items and never renders.
       # @return [String] empty string, to avoid stray output in a capture context
       def item(title, options = {})
+        effective_auth = options.key?(:auth) ? options[:auth] : auth
+        return "" unless TablerUi::Authorization.authorized?(effective_auth)
+
         builder_argument!(title, :title, builder: :item)
 
         @items << Item.new(
           title: title,
           url: options[:url],
           active: options[:active],
-          html: options[:html]
+          html: options[:html],
+          auth: effective_auth
         )
 
         ""

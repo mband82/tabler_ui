@@ -395,6 +395,175 @@ RSpec.describe "TablerUi::Pagination", type: :component do
     expect(items[1]["class"].split(/\s+/)).not_to include("callable-class-1")
   end
 
+  # CLAUDE.md rule 8: auth: gating on pagination's own manually-added
+  # subitems (item, prev, next). TablerUi.auth_method is global,
+  # process-wide mutable state -- restore it after every example so a
+  # custom auth_method here never leaks into specs that run afterward (see
+  # authorization_spec.rb / ui_spec.rb's identical around block for the
+  # same reasoning).
+  describe "auth: gating on subitems" do
+    around do |example|
+      original = TablerUi.auth_method
+      example.run
+      TablerUi.auth_method = original
+    end
+
+    it "renders exactly as before when default auth_method and no auth: is used anywhere" do
+      fragment = component_fragment(:pagination) do |p|
+        p.prev(url: "/1")
+        p.item(1, url: "/1")
+        p.item(2, url: "/2", active: true)
+        p.gap
+        p.item(5, url: "/5")
+        p.next(url: "/3")
+      end
+
+      expect(page_shape(fragment)).to eq([1, 2, :gap, 5])
+      expect(prev_li(fragment)).not_to be_nil
+      expect(next_li(fragment)).not_to be_nil
+    end
+
+    it "omits an item whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:pagination) do |p|
+        p.item(1, url: "/1", auth: :allowed)
+        p.item(2, url: "/2", auth: :denied)
+      end
+
+      pages = fragment.css("li.page-item").map { |li| li.text.strip }
+      expect(pages).to include("1")
+      expect(pages).not_to include("2")
+    end
+
+    it "includes an item whose own auth: is authorized" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:pagination) { |p| p.item(1, url: "/1", auth: :allowed) }
+
+      expect(fragment.css("li.page-item").map { |li| li.text.strip }).to include("1")
+    end
+
+    it "omits prev whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:pagination) do |p|
+        p.prev(url: "/0", auth: :denied)
+        p.item(1, url: "/1", auth: :allowed)
+      end
+
+      expect(fragment.css("li.page-item").length).to eq(1)
+    end
+
+    it "includes prev whose own auth: is authorized" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:pagination) { |p| p.prev(url: "/0", auth: :allowed) }
+
+      expect(fragment.css("li.page-item")).not_to be_empty
+    end
+
+    it "omits next whose own auth: is denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:pagination) do |p|
+        p.item(1, url: "/1", auth: :allowed)
+        p.next(url: "/2", auth: :denied)
+      end
+
+      expect(fragment.css("li.page-item").length).to eq(1)
+    end
+
+    it "includes next whose own auth: is authorized" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+
+      fragment = component_fragment(:pagination) { |p| p.next(url: "/2", auth: :allowed) }
+
+      expect(fragment.css("li.page-item")).not_to be_empty
+    end
+
+    # These inheritance/override examples build the component directly
+    # rather than going through the dispatcher (component_fragment /
+    # tabler_ui.pagination): the dispatcher's own top-level auth: gate (see
+    # ui_spec.rb's "auth: gating" describe block) would deny the *entire*
+    # pagination call -- block never run -- whenever the pagination-level
+    # auth: is itself denied, which would make it impossible to exercise
+    # #item/#prev/#next's inheritance/override branch in that case. Setting
+    # .auth= directly is exactly what the dispatcher does internally right
+    # after construction (see ui.rb's build path), so this exercises the
+    # same inheritance logic without that confound.
+    it "an item with no auth: of its own inherits pagination's auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      pagination = TablerUi::Pagination::Component.new
+      pagination.auth = :denied
+
+      pagination.item(1, url: "/1")
+
+      expect(pagination.items).to be_empty
+    end
+
+    it "an item with no auth: of its own inherits pagination's auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      pagination = TablerUi::Pagination::Component.new
+      pagination.auth = :allowed
+
+      pagination.item(1, url: "/1")
+
+      expect(pagination.items.map(&:page)).to include(1)
+    end
+
+    it "prev/next with no auth: of their own inherit pagination's auth: -- denied" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      pagination = TablerUi::Pagination::Component.new
+      pagination.auth = :denied
+
+      pagination.prev(url: "/0")
+      pagination.next(url: "/2")
+
+      expect(pagination.items).to be_empty
+    end
+
+    it "prev/next with no auth: of their own inherit pagination's auth: -- allowed" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      pagination = TablerUi::Pagination::Component.new
+      pagination.auth = :allowed
+
+      pagination.prev(url: "/0")
+      pagination.next(url: "/2")
+
+      expect(pagination.items.map(&:kind)).to eq(%i[prev next])
+    end
+
+    it "an item's own auth: overrides an otherwise-denying pagination auth:" do
+      TablerUi.auth_method = ->(value) { value == :allowed }
+      pagination = TablerUi::Pagination::Component.new
+      pagination.auth = :denied
+
+      pagination.item(1, url: "/1", auth: :allowed)
+
+      expect(pagination.items.map(&:page)).to include(1)
+    end
+
+    it "an item's own auth: overrides an otherwise-allowing pagination auth:" do
+      TablerUi.auth_method = ->(value) { value != :denied }
+      pagination = TablerUi::Pagination::Component.new
+      pagination.auth = :allowed
+
+      pagination.item(1, url: "/1", auth: :denied)
+
+      expect(pagination.items).to be_empty
+    end
+
+    it "computed-mode pagination is unaffected by a custom auth_method -- #build_computed! " \
+       "never runs #item/#prev/#next, so nothing there can deny it" do
+      TablerUi.auth_method = ->(_value) { false }
+
+      pagination = TablerUi::Pagination::Component.new(current: 3, total: 10, url: ->(n) { "/p/#{n}" })
+
+      expect(pagination.items.map(&:kind)).to eq(%i[prev page page page page page gap page next])
+    end
+  end
+
   describe "accessibility markup" do
     it "wraps the list in a nav landmark with a translated aria-label" do
       fragment = component_fragment(:pagination)
