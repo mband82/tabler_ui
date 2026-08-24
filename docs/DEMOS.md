@@ -75,6 +75,7 @@ Every `c.demo` call builds one `TablerUi::Docs::Demo`
 | `id`         | the `Symbol` passed to `c.demo`                                      |
 | `component`  | the `Symbol` passed to `DemoRegistry.define`                         |
 | `title`      | the `title:` string, verbatim                                        |
+| `toc_label`  | `title`, shortened for the Contents column nav (`TablerUi::Docs::TocLabel.shorten`) when it's long — unchanged when it's already short. `title` itself (used for the demo card heading) is never touched. |
 | `source`     | the `source:` ERB string, verbatim                                   |
 | `locals`     | the `locals:` Proc, or `nil`                                         |
 | `slug`       | `"<component>-<id>"`, e.g. `"badge-colors"` — globally unique (see below), used for anchors, search, and `DemoRegistry.find` |
