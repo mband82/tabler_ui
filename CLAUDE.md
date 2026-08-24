@@ -270,9 +270,12 @@ Current bare partials: `_button`, `_card` (slots: header/body/footer), `_page_he
 
 ## Gotchas
 
-- `FormBuilder#input` derives a method name from the DB column type and `send`s it, so
-  `:decimal`, `:float`, `:datetime` and `:time` columns raise `NoMethodError`.
-  Covered types: string, text, integer, date, boolean, file, select.
+- `FormBuilder#input` derives a method name from the DB column type and `send`s it.
+  `:date`, `:integer`, `:decimal`, `:float`, `:datetime` and `:time` all route through
+  `string_input`/`string_field`'s own finer-grained dispatch (see `lib/tabler_ui/form_builder.rb`).
+  An unrecognized type with no explicit `as:` raises `ArgumentError` (not `NoMethodError`),
+  naming the field/type and suggesting `as:` or a new `#<type>_input` method.
 - User-facing strings in `form_builder.rb` and `illustration/component.rb` are hardcoded
   German. New strings should not add to that.
 - `README.md` documents ~7 of the 19 components and is out of date.
+- `USAGE.md` is the generated, exhaustive alternative -- regenerate it with `rake tabler_ui:usage_doc` after touching a component's doc comments or a demos file.
