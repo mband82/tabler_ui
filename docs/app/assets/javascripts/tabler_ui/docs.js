@@ -12,6 +12,7 @@
 
 import DocsSearchController from "controllers/tabler_ui/docs/search_controller"
 import DocsEditorController from "controllers/tabler_ui/docs/editor_controller"
+import DocsEditorSortableController from "controllers/tabler_ui/docs/editor_sortable_controller"
 
 if (window.Stimulus) {
   window.Stimulus.register("tabler-ui--docs-search", DocsSearchController)
@@ -19,4 +20,8 @@ if (window.Stimulus) {
   // plain ES modules imported by the controller itself, not Stimulus
   // controllers -- only this one gets registered.
   window.Stimulus.register("tabler-ui--docs-editor", DocsEditorController)
+  // Attached to every sortable container the Structure/Explorer panes
+  // render (editor/structure.js, editor/explorer.js) -- a purely additive
+  // drag-and-drop enhancement on top of those panes' own buttons.
+  window.Stimulus.register("tabler-ui--docs-editor-sortable", DocsEditorSortableController)
 }

@@ -38,7 +38,11 @@ function layoutSectionHtml(schema) {
     return paletteItemHtml(label, `data-editor-kind="${escapeHtml(entry.kind)}"`)
   }).join("")
 
-  return `<h4 class="mt-2">Layout</h4><div class="list-group list-group-flush mb-2">${items}</div>`
+  // Deliberately not "Layout": Navigation's own component categories include
+  // one called Layout (accordion, card, table, ...), and rendering both under
+  // the same heading put two identical "Layout" headings in one scrolling
+  // list with unrelated contents under each.
+  return `<h4 class="mt-2">Structure &amp; text</h4><div class="list-group list-group-flush mb-2">${items}</div>`
 }
 
 function categoryHtml(schema, category) {

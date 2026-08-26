@@ -20,6 +20,7 @@ pin "controllers/tabler_ui/docs/search_controller", to: "controllers/tabler_ui/d
 # the rest are imported by it.
 pin "controllers/tabler_ui/docs/editor_controller", to: "controllers/tabler_ui/docs/editor_controller.js"
 pin "controllers/tabler_ui/docs/editor/explorer", to: "controllers/tabler_ui/docs/editor/explorer.js"
+pin "controllers/tabler_ui/docs/editor/export", to: "controllers/tabler_ui/docs/editor/export.js"
 pin "controllers/tabler_ui/docs/editor/html_escape", to: "controllers/tabler_ui/docs/editor/html_escape.js"
 pin "controllers/tabler_ui/docs/editor/inspector", to: "controllers/tabler_ui/docs/editor/inspector.js"
 pin "controllers/tabler_ui/docs/editor/palette", to: "controllers/tabler_ui/docs/editor/palette.js"
@@ -27,3 +28,22 @@ pin "controllers/tabler_ui/docs/editor/schema", to: "controllers/tabler_ui/docs/
 pin "controllers/tabler_ui/docs/editor/structure", to: "controllers/tabler_ui/docs/editor/structure.js"
 pin "controllers/tabler_ui/docs/editor/tree", to: "controllers/tabler_ui/docs/editor/tree.js"
 pin "controllers/tabler_ui/docs/editor/workspace", to: "controllers/tabler_ui/docs/editor/workspace.js"
+
+# Drag-and-drop reordering: a purely additive enhancement on top of the
+# move-up/move-down/delete buttons above, which remain the real mechanism
+# on a host whose CSP blocks this CDN pin (see editor_sortable_controller.js's
+# own header). Namespaced "tabler_ui/docs/sortable", deliberately NOT the
+# bare "sortablejs" -- so it can never collide with a host app that pins
+# the library itself under its own name, on top of the same-engine overlap
+# check spec/lib/tabler_ui/docs/engine_spec.rb already runs.
+pin "tabler_ui/docs/sortable", to: "https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/modular/sortable.esm.js"
+pin "controllers/tabler_ui/docs/editor_sortable_controller", to: "controllers/tabler_ui/docs/editor_sortable_controller.js"
+
+# Zip export of the whole workspace (editor/export.js). JSZip ships as
+# CommonJS only -- no native ESM build -- so a raw jsDelivr file URL would
+# not give a real `export default`; esm.sh wraps it into a genuine ES
+# module instead. Namespaced "tabler_ui/docs/jszip", deliberately NOT the
+# bare "jszip", for the same collision-avoidance reason as the sortable pin
+# above, on top of the same-engine overlap check
+# spec/lib/tabler_ui/docs/engine_spec.rb already runs.
+pin "tabler_ui/docs/jszip", to: "https://esm.sh/jszip@3.10.1"

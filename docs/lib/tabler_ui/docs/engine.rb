@@ -44,7 +44,9 @@ module TablerUi
           tabler_ui/docs.js
           controllers/tabler_ui/docs/search_controller.js
           controllers/tabler_ui/docs/editor_controller.js
+          controllers/tabler_ui/docs/editor_sortable_controller.js
           controllers/tabler_ui/docs/editor/explorer.js
+          controllers/tabler_ui/docs/editor/export.js
           controllers/tabler_ui/docs/editor/html_escape.js
           controllers/tabler_ui/docs/editor/inspector.js
           controllers/tabler_ui/docs/editor/palette.js

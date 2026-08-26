@@ -151,3 +151,22 @@
 .docs-editor-structure-slot {
   border-left: 2px dashed var(--tblr-border-color, #e6e7e9);
 }
+
+/* Drag-and-drop (editor_sortable_controller.js, purely additive on top of
+   the move-up/move-down/delete buttons already styled above -- see that
+   controller's own header). SortableJS applies these class names itself
+   (its `ghostClass`/`chosenClass`/`dragClass` options, set to these exact
+   names) to the row currently being dragged, so this only needs to state
+   the visual, never wire up the interaction. */
+.docs-editor-sortable-ghost {
+  opacity: 0.4;
+}
+
+.docs-editor-sortable-chosen.docs-editor-structure-row,
+.docs-editor-sortable-chosen.docs-editor-explorer-file {
+  background-color: var(--tblr-active-bg, rgba(32, 107, 196, 0.1));
+}
+
+.docs-editor-sortable-drag {
+  cursor: grabbing;
+}

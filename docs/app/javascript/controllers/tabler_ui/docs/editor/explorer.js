@@ -13,8 +13,27 @@
 //
 // Pure functions only -- the controller owns all DOM writes and event
 // wiring, and reads back `data-editor-path` on click.
+//
+// ## Drag-and-drop container id encoding
+//
+// Every directory's own file-list `<div>` (including the top-level
+// `.docs-editor-explorer` wrapper, standing in for the implied root
+// directory) already exists as a real per-directory container element --
+// this file only adds the `data-controller`/`data-editor-container-id`/
+// group-value attributes editor_sortable_controller.js and
+// editor_controller.js#handleSortableMove need onto those SAME elements,
+// plus `data-editor-item-id` onto file rows (directories are never
+// draggable -- there is no stored order for them, display is always
+// alphabetical). Container id: `explorer:<dirPath>`, with the literal
+// `explorer:root` standing in for the top-level (path === "") case -- see
+// #explorerContainerId. editor_controller.js owns this encoding jointly
+// with this file.
 import { basename, isPartial, isLayout } from "controllers/tabler_ui/docs/editor/workspace"
 import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
+
+function explorerContainerId(path) {
+  return `explorer:${path || "root"}`
+}
 
 function slug(path) {
   return path.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "root"
@@ -63,7 +82,8 @@ function fileRowHtml(path, openPath) {
     : (isLayout(path) ? '<span class="badge bg-azure-lt text-azure ms-1">layout</span>' : "")
 
   return `
-    <div class="list-group-item list-group-item-action py-1 d-flex align-items-center justify-content-between docs-editor-explorer-file${active}">
+    <div class="list-group-item list-group-item-action py-1 d-flex align-items-center justify-content-between docs-editor-explorer-file${active}"
+         data-editor-item-id="${escapeHtml(path)}">
       <span class="text-truncate flex-fill" role="button"
             data-action="click->tabler-ui--docs-editor#selectFile" data-editor-path="${escapeHtml(path)}">
         ${escapeHtml(name)}${badge}
@@ -95,7 +115,11 @@ function dirHtml(node, openPath, depth) {
               data-bs-toggle="collapse" data-bs-target="#${paneId}" aria-expanded="true" aria-controls="${paneId}">
         <span class="text-truncate">${escapeHtml(node.name)}/</span>
       </button>
-      <div id="${paneId}" class="collapse show ps-3" data-controller="tabler-ui--collapse">
+      <div id="${paneId}" class="collapse show ps-3"
+           data-controller="tabler-ui--collapse tabler-ui--docs-editor-sortable"
+           data-action="tabler-ui--docs-editor-sortable:move->tabler-ui--docs-editor#handleSortableMove"
+           data-editor-container-id="${explorerContainerId(node.path)}"
+           data-tabler-ui--docs-editor-sortable-group-value="explorer">
         ${inner}
       </div>
     </div>
@@ -112,7 +136,11 @@ export function explorerHtml(index) {
   const rootDirs = Object.values(tree.dirs).sort((a, b) => a.name.localeCompare(b.name))
 
   return `
-    <div class="docs-editor-explorer">
+    <div class="docs-editor-explorer"
+         data-controller="tabler-ui--docs-editor-sortable"
+         data-action="tabler-ui--docs-editor-sortable:move->tabler-ui--docs-editor#handleSortableMove"
+         data-editor-container-id="${explorerContainerId(tree.path)}"
+         data-tabler-ui--docs-editor-sortable-group-value="explorer">
       ${rootDirs.map((child) => dirHtml(child, index.open, 0)).join("")}
       ${tree.files.slice().sort().map((path) => fileRowHtml(path, index.open)).join("")}
     </div>

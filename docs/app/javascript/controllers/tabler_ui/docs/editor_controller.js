@@ -63,6 +63,7 @@ import { paletteHtml } from "controllers/tabler_ui/docs/editor/palette"
 import { inspectorHtml } from "controllers/tabler_ui/docs/editor/inspector"
 import { structureHtml } from "controllers/tabler_ui/docs/editor/structure"
 import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
+import { exportWorkspaceZip } from "controllers/tabler_ui/docs/editor/export"
 
 const FIELD_PRIORITY = ["title", "text", "label", "value"]
 
@@ -246,6 +247,97 @@ export default class extends Controller {
     this._schedulePreview()
   }
 
+  // === Drag-and-drop (editor_sortable_controller.js) ========================
+  //
+  // One handler for every "tabler-ui--docs-editor-sortable:move" event --
+  // dispatched by every editor_sortable_controller.js instance attached to
+  // a Structure or Explorer container (see structure.js/explorer.js, which
+  // own the `structure:<nodeId>:<key>` / `explorer:<dirPath>` container-id
+  // encoding jointly with the two methods below). Purely additive: the
+  // buttons that already perform these same mutations (moveNodeUp/
+  // moveNodeDown/deleteNode above, renameFile) are untouched -- this is
+  // just a second way to trigger them, and does nothing this controller
+  // couldn't already do without SortableJS ever having loaded.
+
+  handleSortableMove(event) {
+    const { itemId, fromContainer, toContainer, newIndex } = event.detail || {}
+    if (!itemId || !toContainer) return
+
+    if (toContainer.startsWith("structure:")) {
+      this._handleStructureMove(itemId, toContainer, newIndex)
+    } else if (toContainer.startsWith("explorer:")) {
+      this._handleExplorerMove(itemId, fromContainer, toContainer)
+    }
+  }
+
+  // Reorder/reparent within the design tree. tree.js is off-limits to
+  // edit -- this composes only its own documented exports (findNode,
+  // cloneTree, removeNode, insertNode, findContainer, moveNode).
+  // insertNode always appends, so the moved node is walked back "up" one
+  // position at a time to land it at `newIndex` -- this works the same way
+  // whether the move landed within one container or moved it to another,
+  // and goes through the same #_updateTree path every other structural
+  // mutation in this file already uses.
+  _handleStructureMove(itemId, toContainer, newIndex) {
+    const [, parentId, key] = toContainer.split(":")
+    if (!parentId || !key) return
+
+    this._updateTree((tree) => {
+      const movingNode = Tree.findNode(tree, itemId)
+      if (!movingNode) return tree
+      const nodeCopy = Tree.cloneTree(movingNode) // snapshot BEFORE removeNode below
+
+      let working = Tree.removeNode(tree, itemId)
+      const parent = Tree.findNode(working, parentId)
+      if (!parent) return tree // target container vanished (e.g. dropped into its own subtree) -- refuse
+
+      if (key.startsWith("slot__")) {
+        const slotName = key.slice("slot__".length)
+        const occupant = (parent.slots && parent.slots[slotName]) || []
+        // A slot holds at most one node. insertNode itself has no such
+        // guard (it only ever pushes) -- this is the one place that
+        // enforces it: refuse the drop (no-op) rather than silently
+        // displacing the existing occupant or stacking two nodes in one
+        // slot.
+        if (occupant.length > 0) return tree
+        working = Tree.insertNode(working, parentId, nodeCopy, { slot: slotName })
+      } else {
+        working = Tree.insertNode(working, parentId, nodeCopy, { container: key })
+      }
+
+      const container = Tree.findContainer(working, itemId)
+      if (container) {
+        const appendedIndex = container.array.length - 1
+        const target = Math.max(0, Math.min(newIndex, appendedIndex))
+        for (let i = appendedIndex; i > target; i -= 1) {
+          working = Tree.moveNode(working, itemId, "up")
+        }
+      }
+
+      return working
+    })
+    this._schedulePreview()
+  }
+
+  // File-tree move. Only a cross-directory drop is meaningful -- a file's
+  // position within one directory has no backing order field (files
+  // always render alphabetically, editor/explorer.js), so a same-directory
+  // drop is a pure no-op: re-render, which naturally shows alphabetical
+  // order again, and persist nothing.
+  _handleExplorerMove(itemId, fromContainer, toContainer) {
+    if (!itemId || fromContainer === toContainer) {
+      this._renderExplorer()
+      return
+    }
+
+    const newDir = toContainer.slice("explorer:".length)
+    const dirPath = newDir === "root" ? "" : newDir
+    const newPath = dirPath ? `${dirPath}/${Workspace.basename(itemId)}` : Workspace.basename(itemId)
+
+    this._workspace = Workspace.renameFile(this._workspace, itemId, newPath)
+    this._afterStructuralChange()
+  }
+
   // === Property panel =======================================================
 
   applyField(event) {
@@ -322,24 +414,23 @@ export default class extends Controller {
     this._downloadText(this._lastErb || "", path.split("/").pop())
   }
 
+  // Delegates the per-file fetch loop and the zip build to editor/export.js
+  // (see that file's header for why it stays sequential and never goes
+  // through the live preview's AbortController), passing #_fetchPreview
+  // itself as the callback so export.js never needs to know about fetch,
+  // CSRF, or this._workspace's shape beyond `files`' keys.
   exportAll() {
-    const paths = Object.keys(this._workspace.files)
-    const results = []
-
-    const runNext = (i) => {
-      if (i >= paths.length) {
-        const bundle = results.map((r) => `<%# ${r.path} %>\n${r.erb}\n`).join("\n\n")
-        this._downloadText(bundle, "workspace-export.html.erb")
-        return
-      }
-
-      const path = paths[i]
-      this._fetchPreview(path)
-        .then((data) => results.push({ path, erb: data.erb || `<%# ${(data.errors || []).join(", ")} %>` }))
-        .catch((error) => results.push({ path, erb: `<%# request failed: ${error.message} %>` }))
-        .then(() => runNext(i + 1))
-    }
-    runNext(0)
+    exportWorkspaceZip(this._workspace, { fetchPreview: (path) => this._fetchPreview(path) })
+      .then((result) => {
+        if (result.error) {
+          this._renderErrors([`export failed: ${result.error}`])
+          return
+        }
+        if (result.erroredPaths.length > 0) {
+          this._renderErrors([`exported with errors in: ${result.erroredPaths.join(", ")}`])
+        }
+        this._downloadBlob(result.blob, "workspace-export.zip")
+      })
   }
 
   _copyText(text) {
@@ -367,7 +458,14 @@ export default class extends Controller {
   }
 
   _downloadText(text, filename) {
-    const blob = new Blob([text], { type: "text/plain" })
+    this._downloadBlob(new Blob([text], { type: "text/plain" }), filename)
+  }
+
+  // #exportAll's counterpart to #_downloadText -- JSZip's #generateAsync
+  // already returns a Blob (a zip is binary; there's no "text" to build
+  // one from), so this is the same object-URL-download primitive, just not
+  // re-wrapping something that's already a Blob.
+  _downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
@@ -404,11 +502,12 @@ export default class extends Controller {
     const controller = new AbortController()
     this._previewAbort = controller
     const requestId = (this._previewRequestId += 1)
+    const sentVersion = this._workspaceVersion || 0
 
     this._fetchPreview(path, controller.signal)
       .then((data) => {
         if (requestId !== this._previewRequestId) return // superseded by a newer request
-        this._handlePreviewResult(data)
+        this._handlePreviewResult(data, sentVersion)
       })
       .catch((error) => {
         if (error.name === "AbortError") return
@@ -434,7 +533,23 @@ export default class extends Controller {
     }).then((response) => response.json())
   }
 
-  _handlePreviewResult(data) {
+  // `sentVersion` is #_workspaceVersion as it stood when this response's
+  // request went out. If it has moved, the user edited while the request was
+  // in flight and everything here describes a workspace that no longer
+  // exists -- adopting `data.workspace` would silently throw that edit away.
+  //
+  // The request-id check upstream does NOT cover this: an edit only schedules
+  // its preview on a debounce, so for the length of that debounce there is a
+  // newer workspace but not yet a newer request, and the in-flight response
+  // still looks current. That window really did lose edits -- reproduced live
+  // by adding two components ~300ms apart, where the second vanished.
+  //
+  // Rendering is skipped too, not just the write-back: the html/erb in a
+  // stale response describe the old tree, and the edit that superseded it has
+  // already scheduled the preview that will repaint correctly.
+  _handlePreviewResult(data, sentVersion) {
+    if ((this._workspaceVersion || 0) !== sentVersion) return
+
     this._renderErrors(data.errors || [])
     if (data.workspace) {
       this._workspace = data.workspace
@@ -669,7 +784,11 @@ export default class extends Controller {
     if (rebuildStructure) this._renderStructure()
   }
 
+  // Bumped on every write, so an in-flight preview can tell whether the
+  // workspace it was sent still describes the workspace that exists now.
+  // See #_handlePreviewResult for why that matters.
   _persist() {
+    this._workspaceVersion = (this._workspaceVersion || 0) + 1
     try {
       Workspace.saveWorkspace(this._workspace)
     } catch (e) {
