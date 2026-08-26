@@ -1,0 +1,127 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "ribbon1",
+      "name": "ribbon",
+      "args": {},
+      "options": {
+        "text": "Hot",
+        "color": "red",
+        "position": "top",
+        "align": "end",
+        "bookmark": true
+      },
+      "html": {
+        "root": {
+          "class": "shadow"
+        }
+      },
+      "slots": {
+        "body": [
+          {
+            "kind": "text",
+            "id": "ribbon1_b",
+            "tag": "p",
+            "content": "Card content behind the ribbon"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "component",
+      "id": "avatar1",
+      "name": "avatar",
+      "args": {},
+      "options": {
+        "initials": "JD",
+        "size": "md",
+        "shape": "circle",
+        "show_details": true,
+        "title": "Jane Doe",
+        "subtitle": "Admin",
+        "cover": false
+      },
+      "html": {
+        "root": {
+          "class": "me-2"
+        },
+        "details": {
+          "class": "small"
+        }
+      },
+      "slots": {
+        "overlay": [
+          {
+            "kind": "text",
+            "id": "avatar1_o",
+            "tag": "p",
+            "content": "online"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "component",
+      "id": "dimmer1",
+      "name": "dimmer",
+      "args": {},
+      "options": {
+        "active": true
+      },
+      "html": {
+        "root": {},
+        "loader": {
+          "class": "text-primary"
+        }
+      },
+      "slots": {
+        "content": [
+          {
+            "kind": "text",
+            "id": "dimmer1_c",
+            "tag": "p",
+            "content": "Loading content behind the dimmer"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "component",
+      "id": "ph1",
+      "name": "page_header",
+      "args": {},
+      "options": {
+        "title": "Dashboard",
+        "pretitle": "Overview",
+        "subtitle": "Last 30 days",
+        "border": true,
+        "title_size": "lg"
+      },
+      "html": {
+        "root": {},
+        "title": {
+          "class": "fw-bold"
+        }
+      },
+      "slots": {
+        "buttons": [
+          {
+            "kind": "component",
+            "id": "ph1_btn",
+            "name": "button",
+            "args": {},
+            "options": {
+              "text": "Export",
+              "color": "primary"
+            },
+            "html": {},
+            "slots": {}
+          }
+        ]
+      }
+    }
+  ]
+}

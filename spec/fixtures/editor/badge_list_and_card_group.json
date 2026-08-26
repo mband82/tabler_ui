@@ -1,0 +1,98 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "bl1",
+      "name": "badge_list",
+      "args": {},
+      "options": {},
+      "html": {
+        "root": {
+          "class": "mb-2"
+        }
+      },
+      "slots": {
+        "body": [
+          {
+            "kind": "component",
+            "id": "bl1_badge1",
+            "name": "badge",
+            "args": {},
+            "options": {
+              "text": "New",
+              "color": "azure"
+            },
+            "html": {},
+            "slots": {}
+          },
+          {
+            "kind": "component",
+            "id": "bl1_badge2",
+            "name": "badge",
+            "args": {},
+            "options": {
+              "text": "3",
+              "color": "red"
+            },
+            "html": {},
+            "slots": {}
+          }
+        ]
+      }
+    },
+    {
+      "kind": "component",
+      "id": "cg1",
+      "name": "card_group",
+      "args": {},
+      "options": {},
+      "html": {},
+      "slots": {
+        "body": [
+          {
+            "kind": "component",
+            "id": "cg1_card1",
+            "name": "card",
+            "args": {},
+            "options": {
+              "title": "Card A"
+            },
+            "html": {},
+            "slots": {
+              "body": [
+                {
+                  "kind": "text",
+                  "id": "cg1_card1_b",
+                  "tag": "p",
+                  "content": "A body"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "component",
+            "id": "cg1_card2",
+            "name": "card",
+            "args": {},
+            "options": {
+              "title": "Card B"
+            },
+            "html": {},
+            "slots": {
+              "body": [
+                {
+                  "kind": "text",
+                  "id": "cg1_card2_b",
+                  "tag": "p",
+                  "content": "B body"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

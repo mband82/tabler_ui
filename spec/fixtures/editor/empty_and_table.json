@@ -1,0 +1,87 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "empty1",
+      "name": "empty",
+      "args": {},
+      "options": {
+        "title": "No results",
+        "subtitle": "Try a different search",
+        "header": "404",
+        "icon": "mood-empty",
+        "image": "empty",
+        "bordered": true
+      },
+      "html": {
+        "root": {},
+        "title": {
+          "class": "fw-bold"
+        }
+      },
+      "slots": {
+        "header": [
+          {
+            "kind": "text",
+            "id": "empty1_h",
+            "tag": "p",
+            "content": "404"
+          }
+        ],
+        "icon": [
+          {
+            "kind": "text",
+            "id": "empty1_icon",
+            "tag": "p",
+            "content": "!"
+          }
+        ],
+        "img": [
+          {
+            "kind": "text",
+            "id": "empty1_img",
+            "tag": "p",
+            "content": "[image]"
+          }
+        ],
+        "action": [
+          {
+            "kind": "component",
+            "id": "empty1_btn",
+            "name": "button",
+            "args": {},
+            "options": {
+              "text": "Go home",
+              "url": "/"
+            },
+            "html": {},
+            "slots": {}
+          }
+        ]
+      }
+    },
+    {
+      "kind": "component",
+      "id": "table1",
+      "name": "table",
+      "args": {},
+      "options": {
+        "striped": true,
+        "sm": true
+      },
+      "html": {},
+      "slots": {
+        "footer": [
+          {
+            "kind": "text",
+            "id": "table1_f",
+            "tag": "p",
+            "content": "No rows"
+          }
+        ]
+      }
+    }
+  ]
+}

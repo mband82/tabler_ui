@@ -281,8 +281,9 @@ module TablerUi
         # @option options [String]  :url    Link URL
         # @option options [String]  :target Anchor target, e.g. "_blank"
         # @option options [Symbol]  :method HTTP method for a `button_to` link (e.g. :delete)
-        # @option options [Object]  :action, :subject Authorization check -- `can?(action, subject)`
-        #   if the view responds to `can?`, shown unconditionally otherwise
+        # @option options [Object]  :action  Authorization check -- paired with :subject as
+        #   `can?(action, subject)` if the view responds to `can?`, shown unconditionally otherwise
+        # @option options [Object]  :subject Authorization subject -- see :action
         # @option options [Boolean] :active Explicit active override. When nil (default), the
         #   template auto-detects via `current_page?(url)`.
         # @option options [Hash, #call] :html HTML attributes for this item's `li.nav-item` (part :item)
@@ -449,8 +450,9 @@ module TablerUi
           # @option options [String]  :url      Item URL
           # @option options [String]  :target   Anchor target
           # @option options [Symbol]  :method   HTTP method for a `button_to` link (e.g. :delete)
-          # @option options [Object]  :action, :subject Authorization check -- `can?(action, subject)`
-          #   if the view responds to `can?`, shown unconditionally otherwise
+          # @option options [Object]  :action  Authorization check -- paired with :subject as
+          #   `can?(action, subject)` if the view responds to `can?`, shown unconditionally otherwise
+          # @option options [Object]  :subject Authorization subject -- see :action
           # @option options [String]  :icon     Optional Tabler icon name, rendered via tabler_ui.icon
           # @option options [Boolean] :disabled
           # @option options [Boolean] :active Explicit active override. When nil (default), the

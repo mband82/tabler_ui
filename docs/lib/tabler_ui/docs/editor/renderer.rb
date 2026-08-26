@@ -316,7 +316,38 @@ module TablerUi
         end
 
         def symbolize(hash)
-          (hash || {}).each_with_object({}) { |(k, v), acc| acc[k.to_s.to_sym] = v }
+          (hash || {}).each_with_object({}) { |(k, v), acc| acc[k.to_s.to_sym] = deep_symbolize(v) }
+        end
+
+        # Symbolizing only an option's own top-level key is not enough. Tree
+        # normalizes every Hash key at every depth to a String, but components
+        # read structured option values with Symbol keys -- table's own
+        # template does `col[:label]` on each entry of `columns:` -- so a
+        # String-keyed Hash reaches the component and every lookup returns
+        # nil, rendering empty cells. ErbGenerator meanwhile emits `label:`,
+        # a real Symbol at runtime, so the EXPORTED code worked while the
+        # preview silently did not: the preview lied about the export, which
+        # is the worst failure this feature can have. Caught by the
+        # renderer/generator equivalence corpus (consistency_spec.rb).
+        #
+        # RUBY_LABEL mirrors ErbGenerator's constant of the same name on
+        # purpose: the generator emits a Symbol key only where the key is a
+        # valid Ruby label and a String key otherwise ("data-bs-toggle"),
+        # so matching that rule exactly is what keeps the two in agreement.
+        # Only option/arg values pass through here -- `html:` hooks are built
+        # separately by #build_html_opts and keep their own key handling.
+        RUBY_LABEL = /\A[A-Za-z_][A-Za-z0-9_]*[?!]?\z/
+
+        def deep_symbolize(value)
+          case value
+          when Hash
+            value.each_with_object({}) do |(k, v), acc|
+              key = k.to_s
+              acc[key.match?(RUBY_LABEL) ? key.to_sym : key] = deep_symbolize(v)
+            end
+          when Array then value.map { |element| deep_symbolize(element) }
+          else value
+          end
         end
 
         # `span` is `{"base" => 12, "md" => 6}` -> "col-12 col-md-6".

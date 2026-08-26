@@ -1,0 +1,100 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "modal1",
+      "name": "modal",
+      "args": {
+        "id": "confirm_modal"
+      },
+      "options": {
+        "title": "Confirm deletion",
+        "size": "lg",
+        "centered": true,
+        "scrollable": false,
+        "blur": true,
+        "status": "red",
+        "close_button": true
+      },
+      "html": {
+        "root": {
+          "class": "my-modal"
+        },
+        "dialog": {
+          "class": "modal-dialog-custom"
+        }
+      },
+      "slots": {
+        "header": [
+          {
+            "kind": "text",
+            "id": "modal1_h",
+            "tag": "p",
+            "content": "Are you sure?"
+          }
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "id": "modal1_b",
+            "tag": "p",
+            "content": "This cannot be undone."
+          }
+        ],
+        "footer": [
+          {
+            "kind": "component",
+            "id": "modal1_btn",
+            "name": "button",
+            "args": {},
+            "options": {
+              "text": "Delete",
+              "color": "danger",
+              "url": "#"
+            },
+            "html": {},
+            "slots": {}
+          }
+        ]
+      }
+    },
+    {
+      "kind": "component",
+      "id": "off1",
+      "name": "offcanvas",
+      "args": {
+        "id": "filters_panel"
+      },
+      "options": {
+        "title": "Filters",
+        "position": "end",
+        "narrow": true,
+        "expand": "lg",
+        "backdrop": true,
+        "scroll": false,
+        "close_button": true
+      },
+      "html": {},
+      "slots": {
+        "header": [
+          {
+            "kind": "text",
+            "id": "off1_h",
+            "tag": "p",
+            "content": "Filter options"
+          }
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "id": "off1_b",
+            "tag": "p",
+            "content": "Body content"
+          }
+        ]
+      }
+    }
+  ]
+}

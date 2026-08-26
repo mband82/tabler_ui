@@ -1,0 +1,116 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "bc1",
+      "name": "breadcrumb",
+      "args": {},
+      "options": {
+        "style": "dots",
+        "muted": true
+      },
+      "html": {
+        "root": {
+          "class": "mb-3"
+        }
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "bc_item1",
+          "method": "item",
+          "args": {
+            "title": "Home"
+          },
+          "options": {
+            "url": "/"
+          },
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "bc_item2",
+          "method": "item",
+          "args": {
+            "title": "Settings"
+          },
+          "options": {
+            "active": true
+          },
+          "html": {}
+        }
+      ]
+    },
+    {
+      "kind": "component",
+      "id": "pg1",
+      "name": "pagination",
+      "args": {},
+      "options": {
+        "size": "sm",
+        "circle": true,
+        "outline": false,
+        "prev_label": "Prev",
+        "next_label": "Next"
+      },
+      "html": {
+        "root": {
+          "class": "mt-3"
+        }
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "pg_prev",
+          "method": "prev",
+          "args": {},
+          "options": {},
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "pg_item1",
+          "method": "item",
+          "args": {
+            "page": 1
+          },
+          "options": {
+            "url": "/?page=1"
+          },
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "pg_gap",
+          "method": "gap",
+          "args": {},
+          "options": {},
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "pg_item2",
+          "method": "item",
+          "args": {
+            "page": 5
+          },
+          "options": {
+            "url": "/?page=5",
+            "active": true
+          },
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "pg_next",
+          "method": "next",
+          "args": {},
+          "options": {},
+          "html": {}
+        }
+      ]
+    }
+  ]
+}

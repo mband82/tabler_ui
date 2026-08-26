@@ -1,0 +1,79 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "heading",
+      "id": "h_top",
+      "level": 1,
+      "content": "Page title"
+    },
+    {
+      "kind": "row",
+      "id": "row1",
+      "attrs": {
+        "class": "row-cards",
+        "data": {
+          "controller": "example"
+        }
+      },
+      "children": [
+        {
+          "kind": "column",
+          "id": "col1",
+          "span": {
+            "base": 12,
+            "sm": 10,
+            "md": 8,
+            "lg": 6,
+            "xl": 4,
+            "xxl": 3
+          },
+          "attrs": {},
+          "children": [
+            {
+              "kind": "heading",
+              "id": "h1",
+              "level": 2,
+              "content": "Section title"
+            },
+            {
+              "kind": "text",
+              "id": "t1",
+              "tag": "small",
+              "content": "Supporting copy"
+            }
+          ]
+        },
+        {
+          "kind": "column",
+          "id": "col2",
+          "span": {
+            "base": 12,
+            "md": 6
+          },
+          "attrs": {
+            "data-bs-toggle": "collapse",
+            "aria": {
+              "expanded": "false"
+            }
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "t2",
+              "tag": "p",
+              "content": "Column two content"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "text",
+      "id": "t_top",
+      "tag": "div",
+      "content": "Fragment-level paragraph"
+    }
+  ]
+}

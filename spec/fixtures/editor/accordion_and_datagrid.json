@@ -1,0 +1,118 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "acc1",
+      "name": "accordion",
+      "args": {
+        "id": "faq_acc"
+      },
+      "options": {
+        "flush": true,
+        "inverted": false,
+        "style": "tabs",
+        "toggle_style": "chevron",
+        "multiple": true
+      },
+      "html": {
+        "root": {
+          "class": "mb-3"
+        }
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "acc_item1",
+          "method": "item",
+          "args": {
+            "title": "What is Tabler UI?"
+          },
+          "options": {
+            "open": true,
+            "icon": "help"
+          },
+          "html": {
+            "root": {},
+            "header": {
+              "class": "fw-bold"
+            },
+            "body": {}
+          },
+          "children": [
+            {
+              "kind": "text",
+              "id": "acc_item1_body",
+              "tag": "p",
+              "content": "A Rails engine wrapping the Tabler design system."
+            }
+          ]
+        },
+        {
+          "kind": "builder_item",
+          "id": "acc_item2",
+          "method": "item",
+          "args": {
+            "title": "Is it free?"
+          },
+          "options": {},
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "acc_item2_body",
+              "tag": "p",
+              "content": "Yes, MIT licensed."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "component",
+      "id": "dg1",
+      "name": "datagrid",
+      "args": {},
+      "options": {},
+      "html": {
+        "root": {
+          "class": "mb-3"
+        }
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "dg_item1",
+          "method": "item",
+          "args": {
+            "title": "Name"
+          },
+          "options": {
+            "content": "Ada Lovelace"
+          },
+          "html": {},
+          "children": []
+        },
+        {
+          "kind": "builder_item",
+          "id": "dg_item2",
+          "method": "item",
+          "args": {
+            "title": "Bio"
+          },
+          "options": {},
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "dg_item2_body",
+              "tag": "p",
+              "content": "Mathematician"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

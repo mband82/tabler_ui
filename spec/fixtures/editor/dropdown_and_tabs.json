@@ -1,0 +1,130 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "dd1",
+      "name": "dropdown",
+      "args": {},
+      "options": {
+        "label": "Actions",
+        "color": "primary",
+        "align": "end",
+        "direction": "up",
+        "dark": false,
+        "scrollable": false,
+        "arrow": true,
+        "align_breakpoint": "md"
+      },
+      "html": {
+        "root": {
+          "class": "mb-3"
+        },
+        "toggle": {
+          "data-bs-toggle": "dropdown"
+        },
+        "menu": {
+          "class": "shadow"
+        }
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "dd_item1",
+          "method": "item",
+          "args": {
+            "title": "Edit"
+          },
+          "options": {
+            "url": "/edit",
+            "icon": "pencil"
+          },
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "dd_div1",
+          "method": "divider",
+          "args": {},
+          "options": {},
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "dd_item2",
+          "method": "item",
+          "args": {
+            "title": "Delete"
+          },
+          "options": {
+            "url": "/delete",
+            "active": false
+          },
+          "html": {}
+        }
+      ]
+    },
+    {
+      "kind": "component",
+      "id": "tabs1",
+      "name": "tabs",
+      "args": {
+        "id": "profile_tabs"
+      },
+      "options": {
+        "style": "pills",
+        "fill": true,
+        "justified": false,
+        "vertical": false
+      },
+      "html": {
+        "root": {},
+        "nav": {
+          "class": "mb-2"
+        },
+        "content": {}
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "tab1",
+          "method": "tab",
+          "args": {
+            "title": "Overview"
+          },
+          "options": {},
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "tab1_body",
+              "tag": "p",
+              "content": "Overview content"
+            }
+          ]
+        },
+        {
+          "kind": "builder_item",
+          "id": "tab2",
+          "method": "tab",
+          "args": {
+            "title": "Settings"
+          },
+          "options": {
+            "icon": "settings"
+          },
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "tab2_body",
+              "tag": "p",
+              "content": "Settings content"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

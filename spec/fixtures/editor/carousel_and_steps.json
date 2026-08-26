@@ -1,0 +1,112 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "car1",
+      "name": "carousel",
+      "args": {
+        "id": "promo_carousel"
+      },
+      "options": {
+        "fade": false,
+        "dark": true,
+        "indicators": "dot",
+        "controls": true,
+        "interval": 5000,
+        "wrap": true,
+        "keyboard": true
+      },
+      "html": {
+        "root": {
+          "class": "mb-3"
+        },
+        "inner": {}
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "car_item1",
+          "method": "item",
+          "args": {},
+          "options": {
+            "image": "/img/slide1.jpg",
+            "caption": "First slide",
+            "active": true
+          },
+          "html": {},
+          "children": []
+        },
+        {
+          "kind": "builder_item",
+          "id": "car_item2",
+          "method": "item",
+          "args": {},
+          "options": {},
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "car_item2_body",
+              "tag": "p",
+              "content": "Custom slide markup"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "component",
+      "id": "steps1",
+      "name": "steps",
+      "args": {},
+      "options": {
+        "current": 2,
+        "vertical": false,
+        "counter": true,
+        "color": "blue",
+        "light": true
+      },
+      "html": {
+        "root": {
+          "class": "mb-3"
+        }
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "step1",
+          "method": "item",
+          "args": {
+            "title": "Step one"
+          },
+          "options": {},
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "step2",
+          "method": "item",
+          "args": {
+            "title": "Step two"
+          },
+          "options": {
+            "url": "#"
+          },
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "step3",
+          "method": "item",
+          "args": {
+            "title": "Step three"
+          },
+          "options": {},
+          "html": {}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "toast1",
+      "name": "toast",
+      "args": {},
+      "options": {
+        "title": "Saved",
+        "color": "azure",
+        "autohide": true,
+        "delay": 4000,
+        "close_button": true,
+        "position": "top-right"
+      },
+      "html": {
+        "root": {},
+        "header": {
+          "class": "text-azure"
+        }
+      },
+      "slots": {
+        "header": [
+          {
+            "kind": "text",
+            "id": "toast1_h",
+            "tag": "p",
+            "content": "Saved"
+          }
+        ],
+        "body": [
+          {
+            "kind": "text",
+            "id": "toast1_b",
+            "tag": "p",
+            "content": "Your changes were saved."
+          }
+        ]
+      }
+    },
+    {
+      "kind": "component",
+      "id": "alert1",
+      "name": "alert",
+      "args": {},
+      "options": {
+        "color": "muted",
+        "title": "Heads up",
+        "dismissible": true,
+        "important": false,
+        "url": "/more",
+        "link_text": "See more",
+        "minor": true,
+        "link_style": "action"
+      },
+      "html": {},
+      "slots": {
+        "body": [
+          {
+            "kind": "text",
+            "id": "alert1_b",
+            "tag": "p",
+            "content": "Something needs your attention."
+          }
+        ]
+      }
+    }
+  ]
+}

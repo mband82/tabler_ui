@@ -145,9 +145,12 @@ module TablerUi
             "link_style" => { values: -> { TablerUi::Alert::Component::LINK_STYLES }, symbol: true }.freeze
           }.freeze,
           "card" => {
-            "status_position" => { values: -> { TablerUi::Card::Component::STATUS_POSITIONS }, symbol: false }.freeze
-            # "status" (the strip's colour) is plain TablerUi::Color::ALL,
-            # no extra -- matches GLOBAL's "color" entry, so no override here.
+            "status_position" => { values: -> { TablerUi::Card::Component::STATUS_POSITIONS }, symbol: false }.freeze,
+            # The strip's colour takes plain Color::ALL with no extra, but it
+            # still needs an entry of its own: GLOBAL is keyed by literal
+            # option NAME, and this option is called :status, not :color, so
+            # GLOBAL's "color" entry never matches it. Same for modal below.
+            "status" => { values: -> { TablerUi::Color::ALL }, symbol: false }.freeze
           }.freeze,
           "badge" => {
             # NOT raise-validated -- Badge::Component#validate_size silently
@@ -206,7 +209,9 @@ module TablerUi
             "size" => { values: -> { TablerUi::Illustration::Component::SIZES.keys }, symbol: true }.freeze
           }.freeze,
           "modal" => {
-            "size" => { values: -> { TablerUi::Modal::Component::SIZES }, symbol: false }.freeze
+            "size" => { values: -> { TablerUi::Modal::Component::SIZES }, symbol: false }.freeze,
+            # Named :status, not :color, so GLOBAL never matches it -- see card above.
+            "status" => { values: -> { TablerUi::Color::ALL }, symbol: false }.freeze
           }.freeze,
           "steps" => {
             # Narrower than GLOBAL's "color" -- steps only accepts the

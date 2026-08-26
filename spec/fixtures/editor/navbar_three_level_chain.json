@@ -1,0 +1,132 @@
+{
+  "kind": "component",
+  "id": "nav1",
+  "name": "navbar",
+  "args": {},
+  "options": {
+    "brand": "<span>Tabler</span>",
+    "brand_autodark": true,
+    "expand": "lg",
+    "dark": false,
+    "transparent": false,
+    "overlap": false,
+    "nav_scroll": false
+  },
+  "html": {
+    "root": {
+      "class": "sticky-top"
+    },
+    "brand": {},
+    "toggler": {},
+    "menu": {}
+  },
+  "items": [
+    {
+      "kind": "builder_item",
+      "id": "nav_left",
+      "method": "left",
+      "args": {},
+      "options": {},
+      "html": {},
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "nav_add",
+          "method": "add",
+          "args": {
+            "title": "Home"
+          },
+          "options": {
+            "url": "/",
+            "active": true
+          },
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "nav_divider",
+          "method": "divider",
+          "args": {},
+          "options": {},
+          "html": {}
+        },
+        {
+          "kind": "builder_item",
+          "id": "nav_dd",
+          "method": "dropdown",
+          "args": {
+            "title": "Admin"
+          },
+          "options": {
+            "align": "end"
+          },
+          "html": {},
+          "items": [
+            {
+              "kind": "builder_item",
+              "id": "nav_dd_item1",
+              "method": "item",
+              "args": {
+                "title": "Users"
+              },
+              "options": {
+                "url": "/users",
+                "active": false
+              },
+              "html": {}
+            },
+            {
+              "kind": "builder_item",
+              "id": "nav_dd_header",
+              "method": "header",
+              "args": {
+                "title": "Danger zone"
+              },
+              "options": {},
+              "html": {}
+            },
+            {
+              "kind": "builder_item",
+              "id": "nav_dd_div",
+              "method": "divider",
+              "args": {},
+              "options": {},
+              "html": {}
+            },
+            {
+              "kind": "builder_item",
+              "id": "nav_dd_item2",
+              "method": "item",
+              "args": {
+                "title": "Delete account"
+              },
+              "options": {
+                "url": "/delete",
+                "active": false
+              },
+              "html": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "builder_item",
+      "id": "nav_right",
+      "method": "right",
+      "args": {},
+      "options": {},
+      "html": {},
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "nav_toggle",
+          "method": "dark_mode_toggle",
+          "args": {},
+          "options": {},
+          "html": {}
+        }
+      ]
+    }
+  ]
+}

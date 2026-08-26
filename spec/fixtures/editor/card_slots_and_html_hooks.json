@@ -1,0 +1,82 @@
+{
+  "kind": "component",
+  "id": "card1",
+  "name": "card",
+  "args": {},
+  "options": {
+    "title": "Team Card",
+    "status": "red",
+    "status_position": "start",
+    "borderless": true,
+    "stacked": false
+  },
+  "html": {
+    "root": {
+      "class": "shadow-sm",
+      "data": {
+        "controller": "card"
+      }
+    },
+    "header": {
+      "data-bs-toggle": "tooltip"
+    }
+  },
+  "slots": {
+    "header": [
+      {
+        "kind": "text",
+        "id": "card1_h",
+        "tag": "p",
+        "content": "Team"
+      }
+    ],
+    "body": [
+      {
+        "kind": "row",
+        "id": "card1_body_row",
+        "attrs": {},
+        "children": [
+          {
+            "kind": "column",
+            "id": "card1_body_col",
+            "span": {
+              "base": 12
+            },
+            "attrs": {},
+            "children": [
+              {
+                "kind": "component",
+                "id": "nested_alert",
+                "name": "alert",
+                "args": {},
+                "options": {
+                  "color": "warning",
+                  "title": "Notice"
+                },
+                "html": {},
+                "slots": {
+                  "body": [
+                    {
+                      "kind": "text",
+                      "id": "nested_alert_body",
+                      "tag": "p",
+                      "content": "Alert inside card"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "footer": [
+      {
+        "kind": "text",
+        "id": "card1_f",
+        "tag": "p",
+        "content": "Updated recently"
+      }
+    ]
+  }
+}

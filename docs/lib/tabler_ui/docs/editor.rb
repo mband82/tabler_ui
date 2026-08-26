@@ -8,9 +8,12 @@ module TablerUi
     # here is held to. SlotMap, BuilderMap and EnumMap are the metadata
     # registries (see each file's own header for what it covers and why it's
     # hand-maintained rather than derived at load time). Then the pipeline:
-    # Tree validates and normalizes one design, Renderer turns a normalized
-    # tree into preview HTML through the real dispatcher, and ErbGenerator
-    # turns the same tree into exportable .html.erb.
+    # Tree validates and normalizes one design, Workspace does the same for a
+    # whole multi-file document (path rules, partial-reference cycles),
+    # Schema assembles the palette/property-panel payload the editor's UI
+    # reads, Renderer turns a normalized tree into preview HTML through the
+    # real dispatcher, and ErbGenerator turns the same tree into exportable
+    # .html.erb.
     #
     # Renderer and ErbGenerator both assume Tree has already run and neither
     # re-validates -- Tree is the security boundary, and it is the only one of
@@ -32,5 +35,7 @@ require_relative "editor/slot_map"
 require_relative "editor/builder_map"
 require_relative "editor/enum_map"
 require_relative "editor/tree"
+require_relative "editor/workspace"
+require_relative "editor/schema"
 require_relative "editor/renderer"
 require_relative "editor/erb_generator"

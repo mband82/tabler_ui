@@ -35,6 +35,27 @@ RSpec.describe TablerUi::Docs::Editor::Renderer, type: :component do
     node
   end
 
+  # Regression: Tree normalizes every Hash key at every depth to a String,
+  # but components read structured option values with Symbol keys --
+  # datagrid's template does item[:title]. Symbolizing only the option's own
+  # top-level key left a String-keyed Hash reaching the component, so every
+  # lookup returned nil and the preview rendered blank while the ERB
+  # ErbGenerator exported (which emits real Symbol keys) rendered correctly.
+  # The preview lying about the export is the worst failure this feature has;
+  # found by the renderer/generator equivalence corpus, not by either
+  # module's own specs.
+  describe "structured option values" do
+    it "deep-symbolizes label-shaped keys inside Hash and Array-of-Hash options" do
+      node = component_node("datagrid", "dg1",
+                            options: { "items" => [{ "title" => "Owner", "content" => "Ada Lovelace" }] })
+
+      html = renderer.render(node).to_s
+
+      expect(html).to include("Owner")
+      expect(html).to include("Ada Lovelace")
+    end
+  end
+
   def builder_item(id, method, args: {}, options: {}, items: nil, children: nil, html: {})
     node = { "kind" => "builder_item", "id" => id, "method" => method, "args" => args, "options" => options,
              "html" => html }

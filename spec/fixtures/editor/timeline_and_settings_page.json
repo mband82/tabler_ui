@@ -1,0 +1,116 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "tl1",
+      "name": "timeline",
+      "args": {},
+      "options": {
+        "simple": false
+      },
+      "html": {
+        "root": {
+          "class": "mb-3"
+        }
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "tl_item1",
+          "method": "item",
+          "args": {},
+          "options": {
+            "icon": "check",
+            "color": "green"
+          },
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "tl_item1_body",
+              "tag": "p",
+              "content": "Order shipped"
+            }
+          ]
+        },
+        {
+          "kind": "builder_item",
+          "id": "tl_item2",
+          "method": "item",
+          "args": {},
+          "options": {},
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "tl_item2_body",
+              "tag": "p",
+              "content": "Order delivered"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "component",
+      "id": "sp1",
+      "name": "settings_page",
+      "args": {
+        "id": "account_settings"
+      },
+      "options": {
+        "title": "Account settings"
+      },
+      "html": {
+        "root": {},
+        "sidebar": {
+          "class": "border-end"
+        },
+        "content": {}
+      },
+      "items": [
+        {
+          "kind": "builder_item",
+          "id": "sp_item1",
+          "method": "item",
+          "args": {
+            "title": "Profile"
+          },
+          "options": {
+            "icon": "user",
+            "active": true
+          },
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "sp_item1_body",
+              "tag": "p",
+              "content": "Profile settings form"
+            }
+          ]
+        },
+        {
+          "kind": "builder_item",
+          "id": "sp_item2",
+          "method": "item",
+          "args": {
+            "title": "Security"
+          },
+          "options": {},
+          "html": {},
+          "children": [
+            {
+              "kind": "text",
+              "id": "sp_item2_body",
+              "tag": "p",
+              "content": "Security settings form"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
