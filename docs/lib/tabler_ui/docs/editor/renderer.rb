@@ -69,6 +69,17 @@ module TablerUi
       # `heading`/`text` additionally carry `data-editor-field="content"` for
       # in-canvas text editing. `contenteditable` is never emitted here -- the
       # editor's own JS applies/removes it at runtime.
+      #
+      # ## `table`'s :columns is declarative, not callable
+      #
+      # `table`'s real :columns option needs a `value:` Proc per column
+      # (`col[:value].call(row)`, see the component's own partial) -- JSON
+      # cannot express a Proc, so a design tree instead carries a
+      # declarative `key:` per column and #synthesize_table_columns builds
+      # the real callable from it right before dispatch, scoped to exactly
+      # `table`'s own :columns option. See that method's doc for the full
+      # story, and ErbGenerator#format_columns_array for the export-side
+      # counterpart that must stay in agreement with it.
       class Renderer
         MAX_DEPTH = Contract::LIMITS.fetch(:depth)
 
@@ -268,7 +279,73 @@ module TablerUi
         def component_opts(node)
           opts = symbolize(node["options"])
           opts.merge!(symbolize(node["args"]))
+          opts = synthesize_table_columns(node["name"], opts)
           opts.merge(build_html_opts(node["html"], node["id"]))
+        end
+
+        # --- table :columns synthesis ------------------------------------
+
+        # A design tree is JSON, so `table`'s :columns can never carry a real
+        # `value:` Proc the way hand-written ERB does -- see contract.rb and
+        # this file's class docs. The tree instead carries a declarative
+        # `key:` per column ("columns" => [{ "label" => "Name", "key" =>
+        # "name" }]) and this synthesizes the real `value: ->(row) {
+        # row[key] }` the component actually needs, right before dispatch.
+        # ErbGenerator#format_columns_array derives the identical lambda,
+        # as literal Ruby source, from the same `key:` -- see that method's
+        # doc for why the two independently agreeing is the whole point.
+        #
+        # Scoped to exactly (component == "table", option == :columns) --
+        # never applied to an arbitrary Array<Hash> option elsewhere (e.g.
+        # datagrid's :items, which has no callable field to synthesize at
+        # all: its items are plain title/content pairs).
+        def synthesize_table_columns(name, opts)
+          return opts unless name == "table" && opts[:columns].is_a?(Array)
+
+          opts.merge(columns: opts[:columns].map { |col| synthesize_column(col) })
+        end
+
+        # @param col [Hash] one column entry, already deep-symbolized by
+        #   #symbolize/#deep_symbolize above -- a "key"-shaped String key
+        #   (matching RUBY_LABEL) has already become the Symbol :key by the
+        #   time this runs, exactly like every row Hash under :data has
+        #   already had its own String keys turned into Symbols the same
+        #   way. #ruby_label_key re-derives a row lookup key by that same
+        #   rule, so `row[row_key]` actually finds the row's synthesized
+        #   Symbol key rather than missing it against a leftover String.
+        # @return [Hash] col unchanged if it already carries a real callable
+        #   :value (a caller building a node by hand, bypassing Tree/JSON
+        #   entirely, may still pass one); otherwise col with a synthesized
+        #   :value and its editor-only :key dropped -- Table::Component
+        #   itself has no concept of :key, only :label/:class/:sort/:value,
+        #   so leaving :key in would be inert noise on the real dispatcher
+        #   call. A raw, non-callable :value (never producible by Tree,
+        #   which only lets JSON-shaped values through -- see tree.rb's
+        #   #sanitize_generic_value) is likewise discarded rather than ever
+        #   being invoked: only #synthesize_column's own key-derived lambda
+        #   is ever called, never anything that arrived as a String.
+        def synthesize_column(col)
+          return col unless col.is_a?(Hash)
+          return col if col[:value].respond_to?(:call)
+
+          key = col[:key]
+          if key.nil?
+            raise ArgumentError, "table column #{col.inspect} has neither key: nor a callable value: -- " \
+                                  "nothing to render this cell with"
+          end
+
+          row_key = ruby_label_key(key)
+          col.except(:key).merge(value: ->(row) { row[row_key] })
+        end
+
+        # Mirrors #deep_symbolize's own RUBY_LABEL rule for turning a Hash
+        # key into a Symbol -- see that method's doc comment. Applied here
+        # to a column's :key *value* (not a Hash key) so the row lookup
+        # matches whatever #deep_symbolize already did to the matching key
+        # in every row Hash under :data.
+        def ruby_label_key(key)
+          key_s = key.to_s
+          key_s.match?(RUBY_LABEL) ? key_s.to_sym : key_s
         end
 
         # A builder item's own `html:` hook -- e.g. accordion's `item` takes

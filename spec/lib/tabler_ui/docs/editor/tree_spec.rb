@@ -205,6 +205,36 @@ RSpec.describe TablerUi::Docs::Editor::Tree do
     end
   end
 
+  # Renderer and ErbGenerator disagree on a table column carrying neither
+  # key: nor a callable value: -- Renderer isolates it into an inline marker,
+  # ErbGenerator raises. A raise escapes the preview endpoint as a failed
+  # request rather than a rendered design, so this class rejects the shape
+  # once, up front, and both downstream walkers only ever see trees they
+  # agree on. Verified end to end: before this rule, that exact tree returned
+  # Rails' HTML exception page from POST /ui/editor/preview.
+  describe "table's declarative columns" do
+    it "drops a column with neither key: nor value:, reporting why, and keeps the good ones" do
+      tree = fragment("f1", [component("c1", "table", "options" => {
+                                         "columns" => [{ "label" => "Name", "key" => "name" },
+                                                       { "label" => "Orphan" }],
+                                         "data" => [{ "name" => "Ada" }]
+                                       })])
+      result = call(tree)
+
+      expect(result.fatal?).to be false
+      expect(result.node["children"].first["options"]["columns"])
+        .to eq([{ "label" => "Name", "key" => "name" }])
+      expect(result.errors).to include(a_string_matching(/columns\[1\].*key:/))
+    end
+
+    it "removes the option entirely when no column survives, rather than leaving an empty Array" do
+      tree = fragment("f1", [component("c1", "table", "options" => { "columns" => [{ "label" => "Orphan" }] })])
+      result = call(tree)
+
+      expect(result.node["children"].first["options"]).not_to have_key("columns")
+    end
+  end
+
   # --- auth stripped everywhere -----------------------------------------------
 
   describe "'auth' is forbidden everywhere, always reported as an error (never silently dropped)" do

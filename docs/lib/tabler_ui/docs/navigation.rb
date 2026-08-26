@@ -63,6 +63,16 @@ module TablerUi
       # it active without hardcoding the string.
       HTML_ATTRIBUTES = "html_attributes"
 
+      # The in-browser design editor (GET /ui/editor, EditorController#show)
+      # is likewise not a component directory -- it's a tool for building
+      # designs out of components, not a component itself -- so it gets its
+      # own top-level sidebar entry, same placement as HTML_ATTRIBUTES
+      # above (a cross-cutting page, not a member of CATEGORIES). Deliberately
+      # NOT added to CATEGORIES: navigation_spec.rb asserts every name in
+      # CATEGORIES is a real app/components/tabler_ui directory, and this
+      # isn't one.
+      EDITOR = "editor"
+
       # Ordered Hash: category display name => Array of component names
       # (Strings, matching the directory name under app/components/tabler_ui).
       # Order here is the sidebar's order, top to bottom -- a literal Hash

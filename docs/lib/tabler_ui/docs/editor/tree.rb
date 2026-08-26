@@ -390,6 +390,7 @@ module TablerUi
 
           meta = component_option_metadata(name)
           options_out = normalize_options(raw["options"], meta: meta, owner: "component '#{name}'", path: path)
+          normalize_declarative_columns(options_out, name: name, path: path)
           html_out = normalize_html(raw["html"], allowed_parts: meta[:html_parts], path: "#{path}.html")
 
           result = { "kind" => "component", "id" => id, "name" => name, "args" => args_out,
@@ -414,6 +415,37 @@ module TablerUi
 
         def valid_component_name?(name)
           name.is_a?(String) && Contract::COMPONENT_NAME.match?(name) && Navigation.components.include?(name)
+        end
+
+        # table's real :columns wants a `value:` Proc per column, which JSON
+        # cannot carry, so a design tree declares `key:` instead and both
+        # Renderer and ErbGenerator build the callable from it (see
+        # Renderer#synthesize_table_columns). A column with neither is the one
+        # shape those two disagree on: Renderer isolates it into an inline
+        # marker, ErbGenerator raises, and a raise reaches the preview
+        # endpoint as a failed request rather than a rendered design. Rejecting
+        # it here, once, is what keeps the two downstream walkers on trees they
+        # both accept -- the same reason every other cross-module invariant
+        # lives in this class rather than in either of them.
+        DECLARATIVE_COLUMN_COMPONENTS = %w[table].freeze
+
+        def normalize_declarative_columns(options, name:, path:)
+          return unless DECLARATIVE_COLUMN_COMPONENTS.include?(name)
+
+          columns = options["columns"]
+          return unless columns.is_a?(Array)
+
+          kept = columns.reject.with_index do |column, index|
+            missing = !column.is_a?(Hash) || (column["key"].nil? && column["value"].nil?)
+            add_error("#{path}.options.columns[#{index}]: needs a key: naming the row field to display") if missing
+            missing
+          end
+
+          if kept.empty?
+            options.delete("columns")
+          else
+            options["columns"] = kept
+          end
         end
 
         # Defensive against a future component whose class somehow doesn't

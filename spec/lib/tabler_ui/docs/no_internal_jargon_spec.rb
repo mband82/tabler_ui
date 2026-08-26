@@ -53,6 +53,14 @@ RSpec.describe "TablerUi docs carry no internal jargon" do
       assert_no_jargon("/ui/html-attributes")
     end
 
+    it "renders the design editor with no 'Rule 5' reference" do
+      assert_no_jargon("/ui/editor")
+    end
+
+    it "renders the design editor's preview frame with no 'Rule 5' reference" do
+      assert_no_jargon("/ui/editor/frame")
+    end
+
     TablerUi::Docs::Navigation.components.each do |component_name|
       it "renders /ui/components/#{component_name} with no 'Rule 5' reference" do
         assert_no_jargon("/ui/components/#{component_name}")

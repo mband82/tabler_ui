@@ -56,6 +56,90 @@ RSpec.describe TablerUi::Docs::Editor::Renderer, type: :component do
     end
   end
 
+  # --- table :columns synthesis -------------------------------------------
+
+  # A design tree is JSON, so table's real `value:` callable per column
+  # can't survive the trip -- the tree carries a declarative `key:` instead
+  # and Renderer#synthesize_table_columns builds the real Proc from it right
+  # before dispatch. See erb_generator_spec.rb's mirror-image coverage of
+  # the export side, and consistency_spec.rb's fixture for the end-to-end
+  # (preview == rendered export) guarantee.
+  describe "table :columns synthesis" do
+    it "renders real header text and cell values from a declarative key:" do
+      node = component_node("table", "t1",
+                            options: {
+                              "columns" => [{ "label" => "Name", "key" => "name" }],
+                              "data" => [{ "name" => "Ada Lovelace" }, { "name" => "Grace Hopper" }]
+                            })
+
+      doc = frag(renderer.render(node))
+
+      expect(doc.css("th").map(&:text)).to eq(["Name"])
+      expect(doc.css("td").map(&:text)).to eq(["Ada Lovelace", "Grace Hopper"])
+    end
+
+    it "reads the row by the SAME key deep_symbolize would have already turned into a Symbol -- " \
+       "a String-vs-Symbol mismatch here would silently render every cell blank" do
+      # "name" is RUBY_LABEL-shaped, so by the time #component_opts calls
+      # #synthesize_table_columns, deep_symbolize has already turned every
+      # row's "name" key into the Symbol :name. If the synthesized lambda
+      # looked row up by the String "name" instead, row["name"] would miss
+      # and every cell would render blank rather than erroring -- the kind
+      # of silent wrong-output bug a positive assertion here (not just
+      # "doesn't raise") is required to catch.
+      node = component_node("table", "t1",
+                            options: {
+                              "columns" => [{ "label" => "Name", "key" => "name" }],
+                              "data" => [{ "name" => "Ada" }]
+                            })
+
+      html = renderer.render(node).to_s
+
+      expect(html).to include("Ada")
+      expect(html).not_to include("<td></td>")
+    end
+
+    it "leaves a column alone when it already carries a real callable :value " \
+       "(a node built by hand, not from Tree/JSON)" do
+      node = component_node("table", "t1",
+                            options: {
+                              "columns" => [{ "label" => "Name", "value" => ->(row) { row[:name].upcase } }],
+                              "data" => [{ "name" => "Ada" }]
+                            })
+
+      html = renderer.render(node).to_s
+
+      expect(html).to include("ADA")
+    end
+
+    it "renders an error marker, not a NoMethodError, for a column with neither key: nor a callable value:" do
+      node = component_node("table", "t1",
+                            options: { "columns" => [{ "label" => "Name" }], "data" => [{ "name" => "Ada" }] })
+
+      doc = frag(renderer.render(node))
+
+      marker = doc.at_css('[data-editor-node-id="t1"]')
+      expect(marker["class"]).to eq("alert alert-danger")
+      expect(marker.text).to include("key")
+    end
+
+    it "drops the editor-only key: before handing options to the real dispatcher (harmless either way, " \
+       "but keeps the two sides in agreement -- see ErbGenerator#format_column_entry)" do
+      node = component_node("table", "t1",
+                            options: { "columns" => [{ "label" => "Name", "key" => "name" }], "data" => [] })
+
+      html = renderer.render(node).to_s
+
+      expect(html).not_to include("alert alert-danger")
+    end
+
+    it "does nothing to a non-table component's own Array<Hash> option (datagrid's :items has no :key concept)" do
+      node = component_node("datagrid", "dg1", options: { "items" => [{ "title" => "Owner", "content" => "Ada" }] })
+
+      expect { renderer.render(node) }.not_to raise_error
+    end
+  end
+
   def builder_item(id, method, args: {}, options: {}, items: nil, children: nil, html: {})
     node = { "kind" => "builder_item", "id" => id, "method" => method, "args" => args, "options" => options,
              "html" => html }

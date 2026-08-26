@@ -190,6 +190,29 @@ RSpec.describe "Renderer/ErbGenerator consistency" do
     end
   end
 
+  # --- table's declarative :columns/:data -----------------------------
+
+  # The fixture-corpus loop above already proves structural agreement for
+  # table_declarative_columns (a table with no explicit fixture-specific
+  # assertion could still "agree" while both sides silently rendered every
+  # cell blank -- a String-vs-Symbol row-key mismatch would do exactly
+  # that, agreeing on an empty <td></td> either way). This is the positive
+  # check the task calls for: real header text and real cell values, on
+  # both sides, not just "the two sides match whatever they produced".
+  describe "table_declarative_columns" do
+    it "renders real header text and cell values, matching on both the Renderer and generated-ERB sides" do
+      node = load_fixture("table_declarative_columns")
+
+      renderer_html = Renderer.new(view_context).render(node).to_s
+      generated = ErbGenerator.new(node).call
+      rendered_from_generated = view_context.render(inline: generated).to_s
+
+      [renderer_html, rendered_from_generated].each do |html|
+        expect(html).to include("Name", "Role", "Ada Lovelace", "Mathematician", "Grace Hopper", "Rear Admiral")
+      end
+    end
+  end
+
   # --- (d) Structural guard: every Contract::KINDS entry is implemented in
   #     both modules ------------------------------------------------------
 

@@ -73,6 +73,19 @@ module TablerUi
       # the developer's own markup -- like `contenteditable`, it is a
       # preview-only concern (the Renderer stamps it as
       # `data-editor-node-id`) and this class never emits it either.
+      #
+      # ## `table`'s :columns is declarative, not callable
+      #
+      # `table`'s real :columns option needs a `value:` Proc per column --
+      # JSON cannot express one, so a design tree carries a declarative
+      # `key:` per column instead, and #format_columns_array emits the real
+      # `value: ->(row) { row[:key] }` as literal Ruby source, built from
+      # that same `key:`. Renderer#synthesize_table_columns derives the
+      # equivalent real Proc from the identical `key:` on the preview side --
+      # see that method's doc for why the two independently agreeing is the
+      # whole point (consistency_spec.rb is the guard). The `key:` string
+      # itself is never emitted as, or treated as, executable code -- only
+      # ever read as a plain identifier to build a Symbol/String literal.
       class ErbGenerator
         INDENT = "  "
         WRAP_WIDTH = 100
@@ -306,11 +319,63 @@ module TablerUi
         # entry has a name matching a positional's key, so this is a no-op
         # for args in practice, not a special case.
         def format_value(component_name, key, value)
-          if key && TablerUi::Docs::Editor::EnumMap.symbol?(component_name, key)
+          if component_name == "table" && key == "columns" && value.is_a?(Array)
+            format_columns_array(value)
+          elsif key && TablerUi::Docs::Editor::EnumMap.symbol?(component_name, key)
             format_symbol(value)
           else
             format_scalar(value)
           end
+        end
+
+        # --- table :columns -> literal Ruby lambda -----------------------
+
+        # The export-side counterpart to Renderer#synthesize_table_columns
+        # -- see that method's doc for the shared story. Where the Renderer
+        # builds a real `->(row) { row[key] }` Proc to call immediately,
+        # this builds the identical lambda as *source text*, from the same
+        # `key`, so a developer pasting the exported ERB into their own app
+        # gets working code and the live preview can never show something
+        # the export wouldn't actually produce (see consistency_spec.rb).
+        # Each column Hash still has String keys here -- ErbGenerator never
+        # deep-symbolizes the way Renderer does, it walks the Tree-
+        # normalized node directly.
+        def format_columns_array(columns)
+          return "[]" if columns.empty?
+
+          "[#{columns.map { |col| format_column_entry(col) }.join(', ')}]"
+        end
+
+        # A column's editor-only "key" is consumed here, never emitted --
+        # Table::Component has no concept of :key, only :label/:class/:sort/
+        # :value (see the table component's own @option docs), so the
+        # exported code should read like a developer wrote it by hand, not
+        # carry a field the real component silently ignores. Any raw
+        # "value" the tree happened to carry is dropped the same way, and
+        # NEVER formatted as a literal -- only this method's own
+        # `key`-derived lambda is ever emitted as the value: (see the
+        # class's "Two hard constraints" doc and the module-level note on
+        # never turning a user-supplied string into executable code).
+        def format_column_entry(col)
+          pairs = col.reject { |k, _| %w[key value].include?(k) }.map { |k, v| format_pair(k, v) }
+          pairs << "value: #{format_column_value_lambda(col['key'])}"
+          "{ #{pairs.join(', ')} }"
+        end
+
+        # @param key [String, nil] the column's declarative row key
+        # @return [String] literal Ruby source for the synthesized lambda,
+        #   e.g. "->(row) { row[:name] }" -- a bareword-safe key emits an
+        #   unquoted Symbol literal (`:name`), matching how
+        #   Renderer#ruby_label_key would resolve the very same key against
+        #   an already-deep-symbolized row Hash; anything else emits a
+        #   quoted String key instead, via the same RUBY_LABEL rule.
+        def format_column_value_lambda(key)
+          if key.nil?
+            raise ArgumentError, "table column is missing key: -- ErbGenerator only formats an " \
+                                  "already-normalized tree (see this class's own doc comment)"
+          end
+
+          "->(row) { row[#{key.match?(RUBY_LABEL) ? ":#{key}" : key.inspect}] }"
         end
 
         def format_symbol(value)

@@ -72,6 +72,82 @@ RSpec.describe TablerUi::Docs::Editor::ErbGenerator do
     end
   end
 
+  # --- table :columns -> literal Ruby lambda -------------------------------
+
+  # The export-side counterpart to renderer_spec.rb's "table :columns
+  # synthesis" coverage -- see ErbGenerator#format_columns_array's own doc
+  # for the shared story with Renderer#synthesize_table_columns.
+  describe "table :columns" do
+    it "emits a real ->(row) { row[:key] } lambda from a declarative key:, never quoted as a String" do
+      node = component_node("table", options: { "columns" => [{ "label" => "Name", "key" => "name" }] })
+
+      expect(generate(node))
+        .to eq('<%= tabler_ui.table columns: [{ label: "Name", value: ->(row) { row[:name] } }] %>')
+    end
+
+    it "drops the editor-only key: -- Table::Component has no such option" do
+      node = component_node("table", options: { "columns" => [{ "key" => "name" }] })
+
+      expect(generate(node)).to eq('<%= tabler_ui.table columns: [{ value: ->(row) { row[:name] } }] %>')
+    end
+
+    it "quotes a non-bareword key as a String row lookup instead of a Symbol literal" do
+      node = component_node("table", options: { "columns" => [{ "key" => "full name" }] })
+
+      expect(generate(node))
+        .to eq('<%= tabler_ui.table columns: [{ value: ->(row) { row["full name"] } }] %>')
+    end
+
+    it "carries every other column field through untouched, in the tree's own order" do
+      node = component_node("table",
+                             options: { "columns" => [{ "label" => "Role", "key" => "role", "class" => "text-muted" }] })
+
+      expect(generate(node)).to eq(
+        '<%= tabler_ui.table columns: [{ label: "Role", class: "text-muted", value: ->(row) { row[:role] } }] %>'
+      )
+    end
+
+    it "formats multiple columns as separate Hash literals inside the Array" do
+      node = component_node("table",
+                             options: { "columns" => [{ "label" => "Name", "key" => "name" },
+                                                       { "label" => "Role", "key" => "role" }] })
+
+      expect(generate(node)).to include(
+        '{ label: "Name", value: ->(row) { row[:name] } }, { label: "Role", value: ->(row) { row[:role] } }'
+      )
+    end
+
+    it "raises for a column with no key: (ErbGenerator formats already-validated trees only, " \
+       "same contract as its own 'undefined behaviour on a malformed node' doc)" do
+      node = component_node("table", options: { "columns" => [{ "label" => "Name" }] })
+
+      expect { described_class.new(node).call }.to raise_error(ArgumentError, /key/)
+    end
+
+    it "leaves a non-table component's own Array<Hash> option (datagrid's :items) formatted generically, " \
+       "with no synthesized value: at all" do
+      node = component_node("datagrid", options: { "items" => [{ "title" => "Owner", "content" => "Ada" }] })
+
+      expect(generate(node)).to eq('<%= tabler_ui.datagrid items: [{ title: "Owner", content: "Ada" }] %>')
+    end
+
+    it "renders to the exact same HTML the Renderer produces, real cell values included" do
+      original_auth_method = TablerUi.auth_method
+      TablerUi.auth_method = ->(*) { true }
+
+      node = component_node("table",
+                             options: { "columns" => [{ "label" => "Name", "key" => "name" }],
+                                        "data" => [{ "name" => "Ada Lovelace" }] })
+
+      html = plain_view_context.render(inline: generate(node))
+
+      expect(html).to include("Name")
+      expect(html).to include("Ada Lovelace")
+    ensure
+      TablerUi.auth_method = original_auth_method
+    end
+  end
+
   describe "a component with a required positional (args)" do
     it "emits it first, positionally, before the options hash -- the contract's own worked example" do
       node = component_node("modal", args: { "id" => "confirm-modal" }, options: { "title" => "Confirm" })

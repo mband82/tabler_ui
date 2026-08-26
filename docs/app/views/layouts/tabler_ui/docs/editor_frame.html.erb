@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Design preview</title>
+    <%# Only the compiled component stylesheet -- never stylesheet_link_tag
+        "tabler_ui/docs" (docs.css), which styles editor chrome the design
+        being previewed has no business inheriting. This document shows the
+        design, not the editor around it -- see EditorController#frame. %>
+    <%= stylesheet_link_tag "tabler_ui_all" %>
+    <%# Same importmap-rails guard as the main docs layout (application.html.erb)
+        -- a host without importmap-rails installed (including this gem's
+        own Combustion spec harness) gets zero script tags here too. %>
+    <% if respond_to?(:javascript_importmap_tags) %>
+      <%= javascript_importmap_tags %>
+    <% end %>
+  </head>
+  <body>
+    <%# The editor's own JS writes the rendered design into this element --
+        see EditorController#preview's response shape (html:) and this
+        layout's own doc comment. The child template (editor/frame.html.erb)
+        contributes nothing of its own; yield is only here so this stays an
+        ordinary Rails layout rather than a special case. %>
+    <div id="tabler-ui-editor-canvas"><%= yield %></div>
+  </body>
+</html>

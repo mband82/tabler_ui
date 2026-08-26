@@ -46,4 +46,26 @@ TablerUi::Docs::Engine.routes.draw do
   # -- explained once here instead of on each of the 35 component pages. See
   # PagesController#html_attributes and Navigation::HTML_ATTRIBUTES.
   get "html-attributes", to: "pages#html_attributes", as: :html_attributes
+
+  # In-browser design editor: the page shell (own sidebar entry, see
+  # Navigation::EDITOR) and its three JSON-speaking endpoints. See
+  # EditorController and docs/lib/tabler_ui/docs/editor.rb for the pipeline.
+  get "editor", to: "editor#show", as: :editor
+
+  # Sandboxed preview document, loaded in an <iframe> by the show page --
+  # its own minimal layout (editor_frame, not the shared docs chrome) so
+  # only the design renders, never editor chrome. See EditorController#frame.
+  get "editor/frame", to: "editor#frame", as: :editor_frame
+
+  # Palette + property-panel payload (TablerUi::Docs::Editor::Schema.as_json)
+  # for the editor's own JS to build its UI from -- same "served as JSON,
+  # fetched once" shape as GET /ui/search above.
+  get "editor/schema", to: "editor#schema", as: :editor_schema
+
+  # Takes a { path:, workspace: } body, validates it through
+  # Editor::Workspace, and returns rendered preview HTML + generated ERB.
+  # The only POST (and the only endpoint that renders attacker-controlled
+  # input) in this whole engine -- see EditorController#preview for why its
+  # response is always JSON, never HTML.
+  post "editor/preview", to: "editor#preview", as: :editor_preview
 end

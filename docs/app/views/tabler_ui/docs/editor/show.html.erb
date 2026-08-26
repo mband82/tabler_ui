@@ -1,0 +1,122 @@
+<%# locals: none.
+
+    Design editor page shell: toolbar, Explorer/Components rail, Preview/
+    Structure/Code centre pane, Inspector rail. Static markup only -- the
+    tabler-ui--docs-editor Stimulus controller (another agent's work) reads
+    the values on the root element below and wires up drag/drop, the
+    property panel and the toolbar buttons; nothing here calls into it yet,
+    so this page has to render sensibly with no JS at all.
+
+    Deliberately does NOT call content_for(:contents) -- there is no
+    per-page "Contents" rail to link to here, so the editor keeps the full
+    content column the layout gives a page with none (col-lg-10, same as
+    the index/forms pages -- see application.html.erb's own comment).
+
+    Both tab strips below (Explorer/Components, Preview/Structure/Code)
+    reuse the tabs component's own Bootstrap-tab markup convention
+    (data-bs-toggle="tabs" data-controller="tabler-ui--tab", see
+    app/components/tabler_ui/tabs/_component.html.erb) rather than a bare
+    tabler_ui.tabs call -- the editor's three-pane layout doesn't fit that
+    component's single nav+content shape, but the Bootstrap Tab lifecycle
+    underneath is the same already-registered controller, not a second
+    implementation of it (rule 6). %>
+<%= tabler_ui.icon icon: "layout-grid-add", class: "me-2" %>
+<%= tabler_ui.page_header title: "Design editor", pretitle: "Editor" %>
+
+<div id="tabler-ui-docs-editor"
+     data-controller="tabler-ui--docs-editor"
+     data-tabler-ui--docs-editor-schema-url-value="<%= editor_schema_path %>"
+     data-tabler-ui--docs-editor-preview-url-value="<%= editor_preview_path %>"
+     data-tabler-ui--docs-editor-csrf-token-value="<%= form_authenticity_token %>">
+
+  <div class="docs-editor-toolbar d-flex align-items-center gap-2 mb-3">
+    <select class="form-select form-select-sm w-auto" disabled>
+      <option>index.html.erb</option>
+    </select>
+    <div class="ms-auto btn-list">
+      <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Copy ERB</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Download</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Export all</button>
+    </div>
+  </div>
+
+  <div class="row docs-editor-panes">
+    <div class="col-12 col-lg-3 mb-3">
+      <div class="card docs-editor-rail">
+        <ul data-bs-toggle="tabs" data-controller="tabler-ui--tab" role="tablist" class="nav nav-tabs">
+          <li class="nav-item" role="presentation">
+            <a href="#docs-editor-explorer" data-bs-toggle="tab" data-tabler-ui--tab-target="toggle"
+               role="tab" aria-selected="true" class="nav-link active">Explorer</a>
+          </li>
+          <li class="nav-item" role="presentation">
+            <a href="#docs-editor-components" data-bs-toggle="tab" data-tabler-ui--tab-target="toggle"
+               role="tab" aria-selected="false" class="nav-link">Components</a>
+          </li>
+        </ul>
+        <div class="tab-content card-body docs-editor-rail-body">
+          <div class="tab-pane active show" id="docs-editor-explorer" role="tabpanel">
+            <p class="text-secondary small mb-0">
+              The workspace's file tree renders here once a workspace is loaded.
+            </p>
+          </div>
+          <div class="tab-pane" id="docs-editor-components" role="tabpanel">
+            <% TablerUi::Docs::Navigation.category_names.each do |category| %>
+              <h4 class="mt-2"><%= category %></h4>
+              <div class="list-group list-group-flush mb-2">
+                <% TablerUi::Docs::Navigation.components_in(category).each do |name| %>
+                  <div class="list-group-item list-group-item-action py-1 docs-editor-palette-item"
+                       data-component-name="<%= name %>">
+                    <%= TablerUi::Docs::Navigation.title_for(name) %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6 mb-3">
+      <div class="card docs-editor-rail">
+        <ul data-bs-toggle="tabs" data-controller="tabler-ui--tab" role="tablist" class="nav nav-tabs">
+          <li class="nav-item" role="presentation">
+            <a href="#docs-editor-preview" data-bs-toggle="tab" data-tabler-ui--tab-target="toggle"
+               role="tab" aria-selected="true" class="nav-link active">Preview</a>
+          </li>
+          <li class="nav-item" role="presentation">
+            <a href="#docs-editor-structure" data-bs-toggle="tab" data-tabler-ui--tab-target="toggle"
+               role="tab" aria-selected="false" class="nav-link">Structure</a>
+          </li>
+          <li class="nav-item" role="presentation">
+            <a href="#docs-editor-code" data-bs-toggle="tab" data-tabler-ui--tab-target="toggle"
+               role="tab" aria-selected="false" class="nav-link">Code</a>
+          </li>
+        </ul>
+        <div class="tab-content docs-editor-rail-body">
+          <div class="tab-pane active show" id="docs-editor-preview" role="tabpanel">
+            <iframe src="<%= editor_frame_path %>" class="docs-editor-frame" title="Design preview"></iframe>
+          </div>
+          <div class="tab-pane p-3" id="docs-editor-structure" role="tabpanel">
+            <p class="text-secondary small mb-0">The current file's view tree renders here.</p>
+          </div>
+          <div class="tab-pane p-3" id="docs-editor-code" role="tabpanel">
+            <p class="text-secondary small mb-0">Generated .html.erb source renders here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-3 mb-3">
+      <div class="card docs-editor-rail">
+        <div class="card-header">
+          <h3 class="card-title">Inspector</h3>
+        </div>
+        <div class="card-body docs-editor-rail-body">
+          <p class="text-secondary small mb-0">
+            Select a node in the preview or the structure tree to edit its properties.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

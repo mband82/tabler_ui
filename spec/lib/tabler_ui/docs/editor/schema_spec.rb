@@ -222,6 +222,45 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
     end
   end
 
+  describe "table's :columns/:data get a dedicated declarative control, not the generic 'json' escape hatch" do
+    it "table's columns is control: 'columns', with a fields: describing the declarative shape" do
+      option = payload["components"]["table"]["options"].find { |o| o["name"] == "columns" }
+
+      expect(option["control"]).to eq("columns")
+      expect(option["type"]).to eq("Array<Hash>") # unchanged -- only the derived control differs
+      expect(option["fields"]).to eq(described_class::COLUMN_FIELDS)
+      expect(option["fields"].find { |f| f["name"] == "key" }["required"]).to be(true)
+    end
+
+    it "table's data is control: 'rows', and carries no fields: (rows: shape follows columns:, not fixed)" do
+      option = payload["components"]["table"]["options"].find { |o| o["name"] == "data" }
+
+      expect(option["control"]).to eq("rows")
+      expect(option["type"]).to eq("Enumerable")
+      expect(option).not_to have_key("fields")
+    end
+
+    it "neither table option lands in unsupported any more" do
+      names = payload["components"]["table"]["unsupported"].map { |u| u["name"] }
+
+      expect(names).not_to include("columns", "data")
+    end
+
+    it "does NOT override datagrid's :items or rating's :choices -- both share :columns' own Array<Hash> " \
+       "type string but stay on the generic 'json' control" do
+      expect(payload["components"]["datagrid"]["options"].find { |o| o["name"] == "items" }["control"]).to eq("json")
+      expect(payload["components"]["rating"]["options"].find { |o| o["name"] == "choices" }["control"]).to eq("json")
+    end
+
+    it "no non-'columns' option anywhere carries a fields: key" do
+      all_option_lists(payload).each do |options|
+        options.reject { |o| o["control"] == "columns" }.each do |o|
+          expect(o).not_to have_key("fields")
+        end
+      end
+    end
+  end
+
   describe "auth is stripped everywhere" do
     it "the literal string 'auth' appears nowhere as a name in the serialized payload" do
       names = payload["components"].values.flat_map do |entry|

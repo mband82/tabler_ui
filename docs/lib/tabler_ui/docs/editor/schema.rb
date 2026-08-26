@@ -38,7 +38,8 @@ module TablerUi
       #     "docPath"     => "/ui/components/card",  # via Engine.routes.url_helpers -- never hardcoded
       #     "args"        => [ { "name" => "id", "control" => "text", "required" => true } ],
       #     "options"     => [ { "name" => ..., "control" => ..., "type" => ..., "default" => ...,
-      #                          "description" => ..., "values" => [...], "symbol" => bool } ],
+      #                          "description" => ..., "values" => [...], "symbol" => bool,
+      #                          "fields" => [...] } ],
       #     "htmlParts"   => ["root", "header", "body", "footer"],
       #     "slots"       => ["body", "footer", "header"],
       #     "builder"     => nil,   # or { "root" => { "item" => { "arg" => {...}|nil, "block" => ...,
@@ -56,9 +57,11 @@ module TablerUi
       # icon's `icon` and illustration's `name`); every entry gets
       # `control: "text"` since the positional is always a plain identifier
       # string in every one of the 8. "values"/"symbol" are present only on
-      # a `"control" => "select"` option -- other controls omit both keys
-      # rather than carrying them as null, so a client can branch on key
-      # presence alone.
+      # a `"control" => "select"` option, "fields" only on a `"control" =>
+      # "columns"` one (today, only table's :columns -- see
+      # DECLARATIVE_CONTROLS/COLUMN_FIELDS below) -- every other control
+      # omits all three rather than carrying them as null, so a client can
+      # branch on key presence alone.
       #
       # `auth` (Contract::FORBIDDEN_OPTIONS) is dropped at every level --
       # top-level options, builder sub-method options -- before any other
@@ -73,6 +76,15 @@ module TablerUi
       # `/\s*,\s*/` into a type set, then classified in this fixed order --
       # first match wins:
       #
+      #   0. (handled by the DECLARATIVE_CONTROLS lookup, also before
+      #      #control_for -- see that constant's own doc) a (component,
+      #      option) pair with an entry there gets that entry's control
+      #      outright, type string never even inspected. Exists for exactly
+      #      table's :columns ("columns") and :data ("rows") today -- both
+      #      would otherwise fall through to the generic "json" control via
+      #      rule 7 below, same as datagrid's :items/rating's :choices,
+      #      which share :columns' own "Array<Hash>" type but stay on rule
+      #      7 since they aren't in this table.
       #   1. (handled by #html_part_for, before #control_for is ever
       #      called) name == "html" or ends "_html" -> not an option at all,
       #      contributes to htmlParts instead ("header_html" -> "header",
@@ -158,13 +170,79 @@ module TablerUi
         # genuinely new structured type raises instead of silently landing
         # here. Every entry was confirmed against a real option today (see
         # each comment).
+        #
+        # table's own :columns ("Array<Hash>") and :data ("Enumerable") are
+        # intercepted by DECLARATIVE_CONTROLS below, keyed by (component,
+        # option) rather than by type, before #control_for/this list ever
+        # runs for them -- see that constant's doc. Both type strings stay
+        # listed here regardless: #control_for itself is still exercised
+        # directly, type-string-only, by every other Array<Hash>/Enumerable
+        # option (datagrid's :items, rating's :choices) and by
+        # schema_spec.rb's "type vocabulary anti-rot" sweep over every
+        # distinct type string DocParser finds, table's included.
         STRUCTURED_TYPE_SETS = [
           %w[Hash],           # bare Hash -- table's :sort/:filter, most *_html hooks (handled earlier, but
                                # the type itself is still just "Hash")
           %w[Hash String],    # "String, Hash" -- pagination's/table's :frame
-          %w[Array<Hash>],    # datagrid's :items, rating's :choices, table's :columns
+          %w[Array<Hash>],    # datagrid's :items, rating's :choices (table's :columns is overridden -- see above)
           %w[Array<Integer>], # placeholder's :lines
-          %w[Enumerable]      # table's :data
+          %w[Enumerable]      # table's :data would land here too, but is overridden -- see above
+        ].freeze
+
+        # (component, option name) => dedicated editor control, bypassing
+        # #control_for (and its type-string-only view of the world)
+        # entirely for exactly these pairs. table's :columns/:data need
+        # more than the generic "json" escape hatch: :columns holds a
+        # declarative per-column shape (Renderer#synthesize_table_columns /
+        # ErbGenerator#format_columns_array both key off it) that a real
+        # property-panel control can build a form from, and :data is the
+        # matching row editor. Scoped by (component, option) -- not by type
+        # string -- so this can never accidentally swallow datagrid's
+        # :items or rating's :choices, which share :columns' own
+        # "Array<Hash>" type string but have no `key:`/callable concept at
+        # all.
+        DECLARATIVE_CONTROLS = {
+          "table" => { "columns" => "columns", "data" => "rows" }
+        }.freeze
+
+        # Declarative sub-fields a "columns" control's UI can build one
+        # column's edit form from -- see Renderer#synthesize_column /
+        # ErbGenerator#format_column_entry for the two places that actually
+        # consume them. Deliberately narrower than every key
+        # Table::Component's real :columns hash accepts (see that
+        # component's own @option :columns doc):
+        #
+        #   * `key`   -- NEW, editor-only. Not a real Table::Component
+        #     option at all; it's what both Renderer and ErbGenerator
+        #     synthesize `value:` from. The one mandatory field.
+        #   * `label`, `class` -- real column keys, simple enough (plain
+        #     String) to round-trip through a text control as-is.
+        #
+        # Deliberately left out:
+        #
+        #   * `value` -- the whole reason this control exists: a raw
+        #     callable can never come from JSON, and the tree must never
+        #     let a user-supplied string be treated as one (see both
+        #     modules' own doc comments on this) -- so there is no field
+        #     for it at all, declarative or otherwise; `key` is the only
+        #     way to make a cell render something.
+        #   * `sort` -- a column's `sort:` is only meaningful alongside the
+        #     table-level `sort_url:`, and `sort_url:` is itself a callable
+        #     (`#call`, reported in `unsupported`, same as `value` would
+        #     be) that a design tree can never supply. Offering a per-column
+        #     sort field with no way to ever give it a working `sort_url:`
+        #     would just be a control that always breaks the table
+        #     (Table::Component#guard_sort_url! raises ArgumentError,
+        #     caught only as a whole-node error marker -- see Renderer's
+        #     error-isolation doc) the moment it's used. Left out until the
+        #     editor has some other way to wire up sort_url:.
+        #   * `sort_url` -- table-level, not per-column, and itself a
+        #     callable -- already correctly reported as `unsupported`
+        #     (reason: "callable") via the ordinary #control_for path.
+        COLUMN_FIELDS = [
+          { "name" => "key", "control" => "text", "required" => true },
+          { "name" => "label", "control" => "text", "required" => false },
+          { "name" => "class", "control" => "text", "required" => false }
         ].freeze
 
         # `/(default: ...)/ ` inside an option's description -- a lossy,
@@ -322,6 +400,12 @@ module TablerUi
               next
             end
 
+            declarative_control = DECLARATIVE_CONTROLS.dig(component, opt.name)
+            if declarative_control
+              options << option_payload(opt, declarative_control)
+              next
+            end
+
             enum_entry = EnumMap.entry_for(component, opt.name)
             if enum_entry
               options << option_payload(opt, "select", component: component)
@@ -362,6 +446,8 @@ module TablerUi
           if control == "select"
             payload["values"] = EnumMap.values_for(component, opt.name)
             payload["symbol"] = EnumMap.symbol?(component, opt.name)
+          elsif control == "columns"
+            payload["fields"] = COLUMN_FIELDS
           end
 
           payload

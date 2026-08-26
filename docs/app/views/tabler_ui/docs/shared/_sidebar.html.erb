@@ -9,10 +9,10 @@
     navigation.rb's comment on FORM_BUILDER for why it has no category of
     its own (it isn't an app/components/tabler_ui directory, so
     Navigation.components/CATEGORIES correctly omit it). The html: /
-    <part>_html: reference page (Navigation::HTML_ATTRIBUTES) is the same
-    story, but sits above the categories instead, alongside "Overview" --
-    it's a cross-cutting mechanism every component uses, not a component or
-    a sibling concern like form_builder.
+    <part>_html: reference page (Navigation::HTML_ATTRIBUTES) and the
+    design editor (Navigation::EDITOR) are the same story, and sit above
+    the categories instead, alongside "Overview" -- both are cross-cutting
+    pages, not a component or a sibling concern like form_builder.
 
     Each category, and Forms, is a Bootstrap collapse pane rendered by
     shared/_sidebar_category, so both call sites stay byte-identical --
@@ -33,6 +33,9 @@
     <%= link_to "HTML attributes", html_attributes_path,
                  class: ["list-group-item", "list-group-item-action",
                          ("active" if current == TablerUi::Docs::Navigation::HTML_ATTRIBUTES)].compact.join(" ") %>
+    <%= link_to "Design editor", editor_path,
+                 class: ["list-group-item", "list-group-item-action",
+                         ("active" if current == TablerUi::Docs::Navigation::EDITOR)].compact.join(" ") %>
   </div>
 
   <% TablerUi::Docs::Navigation.category_names.each do |category| %>
