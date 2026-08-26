@@ -88,6 +88,15 @@ module TablerUi
       BLANK_LINE = /\A\s*\z/.freeze
       INDENTED_LINE = /\A\s+\S/.freeze
 
+      # Used only by .builder_options / #each_builder_def below -- matches
+      # (against the already-`lstrip`ped line, like every anchor above)
+      # any `def`, a `class`/`module` opener capturing its name, or a bare
+      # `end`. Comment lines never match any of the three: they start with
+      # `#` after lstrip, not `d`/`c`/`m`/`e`.
+      DEF_LINE = /\Adef\s+([a-zA-Z_]\w*[?!]?)/.freeze
+      NESTING_LINE = /\A(class|module)\s+([A-Za-z_][\w:]*)/.freeze
+      END_LINE = /\Aend\s*\z/.freeze
+
       class << self
         # @return [Array<String>] absolute paths to every component.rb
         #   under app/components/tabler_ui/*/component.rb -- there is no
@@ -116,11 +125,38 @@ module TablerUi
           all[name.to_s]
         end
 
+        # Recovers @option rows documented on a builder-style component's
+        # sub-item methods (NavigationGroup#add, DropDownProxy#item,
+        # Tabs#tab, ...) -- rows #parse_file never sees, since its
+        # #comment_block_above(lines, INITIALIZE_LINE) call only ever
+        # reaches the *first* `def initialize` in the file (the top-level
+        # Component's). Purely additive: does not touch, and is never
+        # consulted by, #parse_file or the .all/.find cache -- see the
+        # "Caching" section above for why this keeps its own
+        # @builder_cache instead of sharing @cache.
+        #
+        # @param name [String] a component name, e.g. "navbar"
+        # @return [Hash{String => Hash{String => Array<ParsedComponent::Option>}}]
+        #   options keyed first by the enclosing class name -- there can be
+        #   more than one per component (navbar defines `divider` on both
+        #   NavigationGroup and DropDownProxy; collapsing that to a flat
+        #   method-name key would silently merge two unrelated methods'
+        #   options), then by method name. {} for an unknown component, or
+        #   one with no builder sub-methods carrying @option rows. Never
+        #   raises.
+        def builder_options(name)
+          path = component_paths.find { |p| component_name(p) == name.to_s }
+          return {} unless path
+
+          cached_builder_options(path)
+        end
+
         # Drops the memoized cache. Not needed for normal operation (the
         # mtime check already keeps .all fresh) -- exists for specs that
         # want a clean slate.
         def reset!
           @cache = {}
+          @builder_cache = {}
         end
 
         # Parses a single component.rb. Pure function of +path+: no
@@ -169,20 +205,107 @@ module TablerUi
           ParsedComponent.new(name)
         end
 
-        # Walks upward from the line immediately above the first line
-        # matching +anchor+, collecting contiguous `#`-comment lines into
-        # their content (the text after the line's first `#`, with exactly
-        # one conventional leading space stripped so deeper-indented
-        # continuation lines keep their relative indentation). Stops at
-        # the first line that isn't a comment (blank line or code) -- for
-        # a real component that non-comment line is the module/class
-        # nesting it always sits inside, so the walk naturally stops at
-        # the block's true start.
+        # Same mtime-keyed memoization as #cached_parse, in a separate
+        # @builder_cache so a bug in this brand-new path can never corrupt
+        # or invalidate @cache (or vice versa).
+        def cached_builder_options(path)
+          @builder_cache ||= {}
+          name = component_name(path)
+          mtime = File.mtime(path)
+          cached = @builder_cache[name]
+          return cached[:parsed] if cached && cached[:mtime] == mtime
+
+          parsed = parse_builder_options(path)
+          @builder_cache[name] = { mtime: mtime, parsed: parsed }
+          parsed
+        rescue Errno::ENOENT
+          {}
+        end
+
+        # Pure function of +path+, like #parse_file -- never raises. Walks
+        # the file once (#each_builder_def), and for every `def` other
+        # than `initialize` whose comment block yields at least one
+        # @option row -- run through the very same #scan_block state
+        # machine #parse_file uses, per the module doc's warning against a
+        # second comment-grammar parser -- records those options under the
+        # method's enclosing class name and its own name.
+        def parse_builder_options(path)
+          lines = File.readlines(path, chomp: true)
+          result = {}
+
+          each_builder_def(lines) do |class_name, method_name, def_index|
+            next if method_name == "initialize"
+
+            options = scan_block(comment_block_above(lines, DEF_LINE, start: def_index))[:options]
+            next if options.empty?
+
+            (result[class_name] ||= {})[method_name] = options
+          end
+
+          result
+        rescue StandardError
+          {}
+        end
+
+        # Walks +lines+ tracking class/module nesting by indentation, and
+        # yields [enclosing_class_name, method_name, line_index] for every
+        # `def` found inside some `class`. A `def` with no enclosing class
+        # (never happens for a real component.rb, which always sits inside
+        # at least `module TablerUi; module X; class Component`) is
+        # skipped rather than yielded with a nil name.
+        #
+        # Indentation-based, not a real Ruby parser -- reliable here only
+        # because this codebase is uniformly 2-space indented (CLAUDE.md
+        # rule 4's neighbourhood) and rubocop-free files still follow it.
+        # A construct's `end` always sits at the same indentation as the
+        # line that opened it, and everything nested inside is indented
+        # strictly deeper than that -- so matching a bare `end` line's
+        # indentation against the indentation the top-of-stack frame was
+        # *opened* at is enough to know that `end` closes that frame, and
+        # not some more deeply nested class/module/def/if/block whose own
+        # `end` merely happens to come first.
+        def each_builder_def(lines)
+          stack = []
+
+          lines.each_with_index do |line, index|
+            indent = line[/\A */].length
+            stripped = line.lstrip
+
+            if (match = NESTING_LINE.match(stripped))
+              stack.push(kind: match[1], name: match[2], indent: indent)
+            elsif END_LINE.match?(stripped) && stack.last && stack.last[:indent] == indent
+              stack.pop
+            elsif (match = DEF_LINE.match(stripped))
+              enclosing = stack.reverse_each.find { |frame| frame[:kind] == "class" }
+              yield(enclosing[:name], match[1], index) if enclosing
+            end
+          end
+        end
+
+        # Walks upward from the line immediately above the first line at
+        # index +start+ or later matching +anchor+, collecting contiguous
+        # `#`-comment lines into their content (the text after the line's
+        # first `#`, with exactly one conventional leading space stripped
+        # so deeper-indented continuation lines keep their relative
+        # indentation). Stops at the first line that isn't a comment
+        # (blank line or code) -- for a real component that non-comment
+        # line is the module/class nesting it always sits inside, so the
+        # walk naturally stops at the block's true start.
+        #
+        # +start:+ defaults to 0, so #parse_file's two call sites (each
+        # still passing only +lines+ and +anchor+) get exactly the same
+        # first-match to end-of-file search, hence the same result, as
+        # before this parameter existed. .builder_options is what needs
+        # +start:+: it calls this once per `def` occurrence, seeding
+        # +start+ with that occurrence's own line index so each call finds
+        # that exact `def` (DEF_LINE matches any `def`) rather than
+        # re-finding the first one in the file every time.
         #
         # @return [Array<String>] the block's lines, in source order, or
-        #   [] when +anchor+ isn't found or has no comment block above it
-        def comment_block_above(lines, anchor)
-          anchor_index = lines.index { |line| anchor.match?(line.lstrip) }
+        #   [] when +anchor+ isn't found at or after +start+, or has no
+        #   comment block above it
+        def comment_block_above(lines, anchor, start: 0)
+          anchor_index = (start...lines.length).find { |i| anchor.match?(lines[i].lstrip) }
           return [] unless anchor_index
 
           raw = []

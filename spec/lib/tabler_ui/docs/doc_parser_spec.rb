@@ -206,4 +206,72 @@ RSpec.describe TablerUi::Docs::DocParser do
       expect(described_class.find("does-not-exist")).to be_nil
     end
   end
+
+  # .builder_options recovers @option rows documented on builder-style
+  # components' sub-item methods (NavigationGroup#add, DropDownProxy#item,
+  # Tabs#tab, ...) that .find/.all's comment_block_above(lines,
+  # INITIALIZE_LINE) never reaches, since that anchor only matches the
+  # *first* `def initialize` in the file.
+  describe ".builder_options" do
+    after { described_class.reset! }
+
+    it "recovers navbar's sub-item @option rows, keyed by enclosing class rather than flattened" do
+      result = described_class.builder_options("navbar")
+      total = result.values.sum { |methods| methods.values.sum(&:size) }
+
+      # A naive "@option lines above def initialize" minus "@option lines
+      # total" count suggests 28 recovered rows, but two of navbar's
+      # @option lines never produce an Option in the first place -- one
+      # documents two keys on a single `:action, :subject` line (the
+      # shared OPTION regex, reused unchanged per the module docs, folds
+      # that into one Option named "action,", not two), so the real
+      # figure is 27. Asserting a slightly looser floor keeps this from
+      # being brittle to that regex's own known quirks.
+      expect(total).to be >= 25
+      expect(result.keys).to include("NavigationGroup", "DropDownProxy")
+    end
+
+    it "keeps NavigationGroup#divider and DropDownProxy#divider as distinct entries with distinct option sets" do
+      result = described_class.builder_options("navbar")
+
+      nav_divider = result["NavigationGroup"]["divider"]
+      dropdown_divider = result["DropDownProxy"]["divider"]
+
+      expect(nav_divider).not_to be_nil
+      expect(dropdown_divider).not_to be_nil
+      # Same option name/type (:auth, Object) on both -- only the
+      # description text (and which class it's filed under) tells them
+      # apart, which is exactly the collision rule 5's own class-keying
+      # exists to prevent.
+      expect(nav_divider.map(&:name)).to eq(["auth"])
+      expect(dropdown_divider.map(&:name)).to eq(["auth"])
+      expect(nav_divider.first.description).not_to eq(dropdown_divider.first.description)
+      expect(nav_divider.first.description).to include("this group's own :auth")
+      expect(dropdown_divider.first.description).to include("this dropdown's own :auth")
+    end
+
+    it "recovers a simpler builder's options under its bare Component class" do
+      result = described_class.builder_options("tabs")
+
+      expect(result.keys).to eq(["Component"])
+      expect(result["Component"]["tab"].map(&:name)).to include("icon", "badge", "active", "html", "auth")
+    end
+
+    it "returns an empty hash for a component with no builder sub-methods" do
+      expect(described_class.builder_options("badge")).to eq({})
+    end
+
+    it "returns an empty hash for an unknown component name, without raising" do
+      expect { described_class.builder_options("does-not-exist") }.not_to raise_error
+      expect(described_class.builder_options("does-not-exist")).to eq({})
+    end
+
+    it "never leaks into .find's existing output -- navbar's regular option count is unchanged" do
+      # Pinned to the value this returned before .builder_options existed
+      # (verified by running this spec against main). If this goes red,
+      # something about #parse_file's own path changed, not just this
+      # new additive one.
+      expect(described_class.find("navbar").options.size).to eq(13)
+    end
+  end
 end

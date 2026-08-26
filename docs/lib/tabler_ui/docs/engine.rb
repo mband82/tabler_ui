@@ -29,7 +29,9 @@ module TablerUi
       # initializer so the two can never collide. Mirrors that
       # initializer's own three asset paths (see lib/tabler_ui/engine.rb)
       # plus a precompile entry for each -- needed once this engine
-      # started shipping its own JavaScript (docs/app/assets/javascripts/tabler_ui/docs.js,
+      # started shipping its own stylesheet (docs/app/assets/stylesheets/tabler_ui/docs.css,
+      # linked by docs/app/views/layouts/tabler_ui/docs/application.html.erb)
+      # and JavaScript (docs/app/assets/javascripts/tabler_ui/docs.js,
       # docs/app/javascript/controllers/tabler_ui/docs/*), which the
       # docs/config/importmap.rb pins added for it now need to actually
       # resolve to a real file on Sprockets'/Propshaft's asset paths.
@@ -38,6 +40,7 @@ module TablerUi
         app.config.assets.paths << root.join("app/assets/javascripts")
         app.config.assets.paths << root.join("app/javascript")
         app.config.assets.precompile += %w[
+          tabler_ui/docs.css
           tabler_ui/docs.js
           controllers/tabler_ui/docs/search_controller.js
         ]

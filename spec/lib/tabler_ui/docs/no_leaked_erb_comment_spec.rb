@@ -41,6 +41,10 @@ RSpec.describe "TablerUi::Docs pages render no leaked ERB comment text", type: :
     assert_clean("/ui/forms")
   end
 
+  it "renders the HTML attributes page with no stray ERB comment text" do
+    assert_clean("/ui/html-attributes")
+  end
+
   TablerUi::Docs::Navigation.components.each do |name|
     it "renders /ui/components/#{name} with no stray ERB comment text" do
       assert_clean("/ui/components/#{name}")

@@ -116,7 +116,7 @@ module TablerUi
       # @option options [Hash, #call] :html HTML attributes for this item's
       #   `<li class="breadcrumb-item">` (part :item) -- a plain Hash, or a
       #   callable taking the item
-      # @option options :auth Per-item authorization check (CLAUDE.md rule 8),
+      # @option options [Object] :auth Per-item authorization check (CLAUDE.md rule 8),
       #   run through the globally configured auth_method. Defaults to the
       #   breadcrumb's own `auth:` value when omitted -- so an unauthorized
       #   breadcrumb's items are unauthorized by default too, unless an item
