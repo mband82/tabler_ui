@@ -68,8 +68,8 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
   end
 
   describe "top-level shape" do
-    it "carries exactly version, limits, layout, categories, components" do
-      expect(payload.keys).to match_array(%w[version limits layout categories components])
+    it "carries exactly version, limits, layout, kinds, categories, components" do
+      expect(payload.keys).to match_array(%w[version limits layout kinds categories components])
     end
 
     it "version matches Contract::VERSION" do
@@ -83,6 +83,34 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
     it "layout is row/column/heading/text/partial -- Contract::KINDS minus fragment/component/builder_item" do
       expect(payload["layout"]).to eq(%w[row column heading text partial].map { |k| { "kind" => k } })
       expect(described_class::LAYOUT_KINDS).to eq(Contract::KINDS - %w[fragment component builder_item])
+    end
+  end
+
+  # The editor's property panel builds the non-component kinds' controls from
+  # this section. Before it existed, inspector.js carried a hand-typed copy of
+  # each of these lists, which would have rotted silently the first time
+  # Contract gained a text tag or Breakpoint gained a size. Publishing them and
+  # asserting equality here is what makes the client's copy unnecessary.
+  describe "kinds -- the vocabularies only Contract knows" do
+    it "publishes heading levels, text tags, span keys/values and attribute keys, straight from Contract" do
+      kinds = payload["kinds"]
+
+      expect(kinds["heading"]["levels"]).to eq(Contract::HEADING_LEVELS.to_a)
+      expect(kinds["text"]["tags"]).to eq(Contract::TEXT_TAGS)
+      expect(kinds["column"]["spanKeys"]).to eq(Contract::SPAN_KEYS)
+      expect(kinds["column"]["spanValues"]).to eq(Contract::SPAN_VALUES)
+      expect(kinds["attrs"]["keys"]).to eq(Contract::ATTR_KEYS)
+      expect(kinds["attrs"]["nestedKeys"]).to eq(Contract::ATTR_NESTED_KEYS)
+    end
+
+    it "carries every breakpoint a column can span at, so the panel offers all of them" do
+      expect(payload["kinds"]["column"]["spanKeys"]).to include(*TablerUi::Breakpoint::ALL)
+    end
+
+    it "serializes to JSON without losing anything -- it crosses the wire as the schema endpoint's body" do
+      round_tripped = JSON.parse(JSON.generate(payload))["kinds"]
+
+      expect(round_tripped).to eq(payload["kinds"])
     end
   end
 

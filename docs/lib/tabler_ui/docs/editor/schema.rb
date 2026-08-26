@@ -278,8 +278,31 @@ module TablerUi
             "version" => Contract::VERSION,
             "limits" => Contract::LIMITS.transform_keys(&:to_s),
             "layout" => LAYOUT_KINDS.map { |kind| { "kind" => kind } },
+            "kinds" => kinds_payload,
             "categories" => Navigation.category_names.map { |label| category_payload(label) },
             "components" => Navigation.components.each_with_object({}) { |name, out| out[name] = component_payload(name) }
+          }
+        end
+
+        # The value vocabularies the non-component node kinds need, published
+        # so the property panel can build their controls from the payload
+        # instead of restating them.
+        #
+        # Everything else in this payload is derived from DocParser or the
+        # registries, so a client can read it and stay correct. These four
+        # lists were the exception: they live only in Contract, on the server,
+        # and the editor's inspector had to hardcode a copy of each. Two
+        # copies of a vocabulary with nothing asserting they match is exactly
+        # the drift this codebase's anti-rot specs exist to prevent, so the
+        # lists ship instead.
+        #
+        # @api private
+        def kinds_payload
+          {
+            "heading" => { "levels" => Contract::HEADING_LEVELS.to_a },
+            "text" => { "tags" => Contract::TEXT_TAGS },
+            "column" => { "spanKeys" => Contract::SPAN_KEYS, "spanValues" => Contract::SPAN_VALUES },
+            "attrs" => { "keys" => Contract::ATTR_KEYS, "nestedKeys" => Contract::ATTR_NESTED_KEYS }
           }
         end
 

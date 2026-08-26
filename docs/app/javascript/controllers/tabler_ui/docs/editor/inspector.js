@@ -15,30 +15,35 @@
 // the way a per-keystroke "input" listener would. That hazard is real only
 // for the in-canvas contenteditable fields (see editor_controller.js).
 //
-// ## Two vocabularies the schema payload does not carry
+// ## The non-component kinds' vocabularies
 //
-// Heading levels (1..6) and text tags (p/span/div/small/strong/em) are
-// Contract-level constants (docs/lib/tabler_ui/docs/editor/contract.rb's
-// HEADING_LEVELS/TEXT_TAGS), not schema/DocParser-derived the way a
-// component's own options are -- GET /ui/editor/schema has no "layout
-// kind metadata" section to carry them, only the bare `{"kind": "heading"}`
-// entries in its "layout" array. Same story for row/column attrs (Contract's
-// ATTR_KEYS) and a column's span keys/values (Contract::SPAN_KEYS/
-// SPAN_VALUES, TablerUi::Breakpoint::ALL) -- Contract lives on the server
-// and none of these constants round-trip through the schema endpoint. They
-// are mirrored here by hand instead. If Contract ever changes any of them,
-// this file has to change by hand too -- worth the schema endpoint growing
-// a "kinds" section instead, flagged in this task's final report.
+// Heading levels, text tags, row/column attribute keys and a column's span
+// keys/values are Contract-level constants living on the server
+// (docs/lib/tabler_ui/docs/editor/contract.rb). They reach this file through
+// the schema payload's "kinds" section (Schema#kinds_payload) rather than
+// being restated here: a hand-mirrored copy with nothing asserting it still
+// matches Contract is precisely the drift this codebase writes anti-rot
+// specs to prevent, and it would rot the moment Contract gained a text tag
+// or a breakpoint.
 import { findNodeContext } from "controllers/tabler_ui/docs/editor/tree"
 import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
 
-const HEADING_LEVELS = [1, 2, 3, 4, 5, 6]
-const TEXT_TAGS = ["p", "span", "div", "small", "strong", "em"]
-const ATTR_KEYS = ["class", "id", "title", "role"]
-const SPAN_KEYS = ["base", "sm", "md", "lg", "xl", "xxl"]
-const SPAN_VALUES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, "auto"]
+// Set from the schema payload on every inspectorHtml() call. The schema is
+// fetched once per page load and cached module-scope by editor/schema.js, so
+// by the time anything below reads this it is populated. An empty list here
+// therefore means the payload lost its "kinds" section, which schema_spec.rb
+// guards against -- it is not a case to paper over with a literal fallback.
+let KINDS = {}
+
+const headingLevels = () => (KINDS.heading && KINDS.heading.levels) || []
+const textTags = () => (KINDS.text && KINDS.text.tags) || []
+const attrKeys = () => (KINDS.attrs && KINDS.attrs.keys) || []
+const spanKeys = () => (KINDS.column && KINDS.column.spanKeys) || []
+const spanValues = () => (KINDS.column && KINDS.column.spanValues) || []
 
 export function inspectorHtml(schema, tree, nodeId, selectedSlot) {
+  KINDS = (schema && schema.kinds) || {}
+
   if (!nodeId) {
     if (selectedSlot) return slotSelectionHtml(selectedSlot)
     return '<p class="text-secondary small mb-0">Select a node in the preview or the structure tree to edit its properties.</p>'
@@ -73,7 +78,7 @@ export function slotSelectionHtml(selectedSlot) {
 // --- fixed-shape node kinds ------------------------------------------------
 
 function headingFields(node) {
-  const options = HEADING_LEVELS.map((l) => (
+  const options = headingLevels().map((l) => (
     `<option value="${l}" ${node.level === l ? "selected" : ""}>${l}</option>`
   )).join("")
 
@@ -96,7 +101,7 @@ function headingFields(node) {
 }
 
 function textFields(node) {
-  const options = TEXT_TAGS.map((t) => (
+  const options = textTags().map((t) => (
     `<option value="${t}" ${node.tag === t ? "selected" : ""}>${t}</option>`
   )).join("")
 
@@ -120,7 +125,7 @@ function textFields(node) {
 
 function attrsFields(node, { withSpan }) {
   const attrs = node.attrs || {}
-  const attrInputs = ATTR_KEYS.map((key) => `
+  const attrInputs = attrKeys().map((key) => `
     <div class="mb-2">
       <label class="form-label small mb-1">${key}</label>
       <input type="text" class="form-control form-control-sm" data-action="change->tabler-ui--docs-editor#applyField"
@@ -138,8 +143,8 @@ function attrsFields(node, { withSpan }) {
 
 function spanFields(node) {
   const span = node.span || {}
-  const cells = SPAN_KEYS.map((key) => {
-    const options = SPAN_VALUES.map((v) => (
+  const cells = spanKeys().map((key) => {
+    const options = spanValues().map((v) => (
       `<option value="${v}" ${String(span[key]) === String(v) ? "selected" : ""}>${v}</option>`
     )).join("")
 
