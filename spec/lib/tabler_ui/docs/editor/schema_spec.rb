@@ -5,6 +5,7 @@ require "tabler_ui/docs/editor/schema"
 require "tabler_ui/docs/editor/contract"
 require "tabler_ui/docs/editor/slot_map"
 require "tabler_ui/docs/editor/builder_map"
+require "tabler_ui/docs/editor/tree"
 require "tabler_ui/docs/navigation"
 require "tabler_ui/docs/doc_parser"
 
@@ -28,6 +29,7 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
   Contract = TablerUi::Docs::Editor::Contract
   Navigation = TablerUi::Docs::Navigation
   DocParser = TablerUi::Docs::DocParser
+  Tree = TablerUi::Docs::Editor::Tree
 
   # component name => its one mandatory positional's parameter name. The
   # only 8 of the 35 components whose `initialize` takes one at all -- see
@@ -101,6 +103,14 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
       expect(kinds["column"]["spanValues"]).to eq(Contract::SPAN_VALUES)
       expect(kinds["attrs"]["keys"]).to eq(Contract::ATTR_KEYS)
       expect(kinds["attrs"]["nestedKeys"]).to eq(Contract::ATTR_NESTED_KEYS)
+    end
+
+    it "publishes Tree's three placement vocabularies, straight from Tree" do
+      placement = payload["kinds"]["placement"]
+
+      expect(placement["rootKinds"]).to eq(Tree::ROOT_KINDS)
+      expect(placement["nonRowContainerKinds"]).to eq(Tree::NON_ROW_CONTAINER_KINDS)
+      expect(placement["rowContainerKinds"]).to eq(Tree::ROW_CONTAINER_KINDS)
     end
 
     it "carries every breakpoint a column can span at, so the panel offers all of them" do

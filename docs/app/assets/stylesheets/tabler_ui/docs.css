@@ -104,21 +104,54 @@
 }
 
 /* The scrolling region inside a rail -- .docs-editor-rail itself stays a
-   fixed height (above), this is what actually scrolls. */
+   fixed height (above), this is what actually scrolls. min-height: 0
+   overrides the flex default of min-height: auto, which lets a flex item
+   refuse to shrink below its content's own intrinsic size and report an
+   indefinite height to its children -- without it, .docs-editor-preview-
+   pane's height: 100% below has nothing definite to resolve against, even
+   though this element visibly has a fixed height on screen (from flex: 1
+   inside .docs-editor-rail's own fixed-height column). */
 .docs-editor-rail-body {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
+}
+
+/* The Preview tab's pane (editor/show.html.erb) is the one tab-pane that
+   needs to fill the whole rail rather than size to its own content -- its
+   only child is the <iframe class="docs-editor-frame"> below, and an
+   iframe's height: 100% only resolves against an ancestor chain of
+   definite heights. A bare .tab-pane has no height of its own (Bootstrap
+   doesn't set one), so without this the iframe fell back to its
+   min-height and only filled the top of the pane, leaving the editor
+   card's own white background exposed underneath -- this is the other
+   half of the fix .docs-editor-rail-body's min-height: 0 (above) starts.
+   Kept on this one tab-pane, not .tab-pane globally, since the Structure
+   and Code tab-panes are meant to size to their own content and scroll
+   inside .docs-editor-rail-body instead. */
+.docs-editor-preview-pane {
+  height: 100%;
 }
 
 /* The <iframe> loading GET /ui/editor/frame (EditorController#frame) --
-   fills its tab-pane rather than collapsing to zero height, which an
-   <iframe> with no explicit size does by default. */
+   fills its tab-pane (see .docs-editor-preview-pane, above) rather than
+   collapsing to zero height, which an <iframe> with no explicit size does
+   by default. The frame's own document paints Tabler's ordinary page
+   background (--tblr-body-bg) once it has loaded -- that grey is the
+   correct surface for a design preview -- but the <iframe> element itself
+   is otherwise transparent, so backing it with that same variable here
+   means the editor card's white never shows through at its edges or
+   during the moment before the frame document paints. Between this and
+   the height fix above, the centre pane reads as one continuous surface
+   instead of the rendered design, the frame's grey body and the card's
+   white all stacking visibly on top of each other. */
 .docs-editor-frame {
   display: block;
   width: 100%;
   height: 100%;
   min-height: 20rem;
   border: 0;
+  background-color: var(--tblr-body-bg, #f9fafb);
 }
 
 /* Palette items (Explorer rail's "Components" tab, both the static
@@ -128,6 +161,38 @@
    buttons, so they need their own pointer cursor. */
 .docs-editor-palette-item {
   cursor: pointer;
+}
+
+/* Palette items are also native HTML5 drag sources now (editor/dnd.js,
+   editor/palette.js, editor/show.html.erb's no-JS fallback -- both carry
+   draggable="true"). `grab`/`grabbing` on top of the click cursor above
+   signals "this can also be picked up and dragged" without taking
+   anything away from the existing click-to-insert behaviour. */
+.docs-editor-palette-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+/* The chip dataTransfer.setDragImage follows under the cursor for the
+   rest of a palette-item drag (editor/dnd.js#paintDragImage) -- painted
+   off-screen (position: fixed; top/left: -1000px, set from JS) purely so
+   the browser has something real to rasterize; it is never seen at that
+   position. Styled loosely like a Tabler badge -- see editor_canvas.css's
+   own .docs-editor-canvas-label for why the in-frame chrome doesn't reach
+   for the real badge component either: this is a one-off label with no
+   reason to track a real component pixel-for-pixel, and it lives in the
+   PARENT document (dragstart always fires on a palette item, never inside
+   the frame), which is why this rule belongs here and not in
+   editor_canvas.css. */
+.docs-editor-drag-chip {
+  padding: 0.15em 0.6em;
+  font-family: var(--tblr-body-font-family);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #fff;
+  white-space: nowrap;
+  background: var(--tblr-primary);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 /* The Code tab's generated .html.erb output

@@ -188,11 +188,28 @@ and clicking, with a live preview, without writing ERB by hand.
 
 A design is a Rails-shaped tree -- rows/columns, headings/text, and
 `tabler_ui.*` components with their own options, HTML hooks and (for
-builder-style components) sub-items -- built up on a canvas via
-drag-and-drop or plain move-up/move-down/delete buttons, with in-canvas
-text editing and a property panel driven by each component's own
-documented options. A workspace can hold several files and directories;
-one file can reference another as a partial.
+builder-style components) sub-items -- built up via an outline pane
+(add, reorder, delete) or directly on the canvas, with in-canvas text
+editing and a property panel driven by each component's own documented
+options. A workspace can hold several files and directories; one file
+can reference another as a partial.
+
+**Editing on the canvas.** Drag a component from the palette straight
+onto the preview to add it, or drag an existing element to move it --
+hovering near the top or bottom edge of another element inserts before
+or after it, and hovering over its middle drops inside it. Where a
+container could hold the new element in more than one place (a slot,
+say, or a navbar's left/right item lists), a small menu of chips
+appears so you can pick which. Selecting an element shows a floating
+toolbar for jumping to its parent, moving it up or down, duplicating
+it, or deleting it, and the same actions are available from the
+keyboard once something is selected: Delete or Backspace removes it,
+Escape deselects, Ctrl/Cmd+D duplicates, `p` selects the parent, and
+Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z undoes or redoes the single most recent
+change. An element that belongs to a different file -- reached through
+a partial -- can't be edited or dragged from the file that includes it;
+selecting it names the file it actually lives in and offers a button
+to open that file instead.
 
 **Where a design lives.** Nowhere on the server. The whole workspace
 (every file's tree) is kept in the browser's own `localStorage` --

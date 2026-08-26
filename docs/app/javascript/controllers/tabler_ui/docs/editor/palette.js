@@ -6,6 +6,14 @@
 // Every item carries data-editor-kind (and, for a component, data-editor-
 // component) so editor_controller.js#addFromPalette can build the right
 // node kind without this module needing to know anything about the tree.
+//
+// Each item is also draggable="true" and carries dragstart/dragend actions
+// (editor_controller.js#paletteDragStart/#paletteDragEnd) alongside the
+// click action -- dragging onto the canvas is additive on top of
+// click-to-insert, never a replacement for it. This markup duplicates
+// docs/app/views/tabler_ui/docs/editor/show.html.erb's own no-JS fallback
+// palette item -- see that view's comment for why the two must stay in
+// sync by hand.
 import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
 
 const LAYOUT_LABELS = {
@@ -25,7 +33,8 @@ export function paletteHtml(schema) {
 function paletteItemHtml(label, dataAttrs) {
   return `
     <div class="list-group-item list-group-item-action py-1 docs-editor-palette-item"
-         data-action="click->tabler-ui--docs-editor#addFromPalette"
+         draggable="true"
+         data-action="click->tabler-ui--docs-editor#addFromPalette dragstart->tabler-ui--docs-editor#paletteDragStart dragend->tabler-ui--docs-editor#paletteDragEnd"
          ${dataAttrs}>
       ${escapeHtml(label)}
     </div>

@@ -127,7 +127,46 @@ export function findNodeContext(schema, tree, id) {
   return visitWithContext(schema, tree, id, null)
 }
 
+// @return the node that OWNS the container (children/slots/items) holding
+//   the node with this id (a reference INTO `tree`) -- distinct from
+//   findContainer, which returns the array and index but not the node that
+//   array belongs to. null if `id` names the root itself (nothing owns the
+//   root) or isn't found anywhere.
+export function findParent(tree, id) {
+  if (!tree) return null
+
+  for (const arr of childArrays(tree)) {
+    if (arr.some((child) => child.id === id)) return tree
+    for (const child of arr) {
+      const found = findParent(child, id)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 // --- structural mutation -- each returns a NEW tree -----------------------
+
+// Resolves the array `container` addresses on `parent`, creating it (and,
+// for a slot, the `slots` object it lives in) if it doesn't exist yet --
+// the shared plumbing under insertNode's own {slot, container} options,
+// insertAt and moveNodeTo below. `container` is either the literal string
+// "children"/"items", or "slot__<name>" for a named slot -- the same `<key>`
+// half of the `structure:<nodeId>:<key>` container-id encoding
+// editor/structure.js and editor_controller.js already share, so a caller
+// holding that raw key never has to translate it into a separate {slot,
+// container} shape first.
+function resolveContainerArray(parent, container) {
+  if (container.startsWith("slot__")) {
+    const slotName = container.slice("slot__".length)
+    parent.slots = parent.slots || {}
+    parent.slots[slotName] = Array.isArray(parent.slots[slotName]) ? parent.slots[slotName] : []
+    return parent.slots[slotName]
+  }
+
+  parent[container] = Array.isArray(parent[container]) ? parent[container] : []
+  return parent[container]
+}
 
 export function removeNode(tree, id) {
   const clone = cloneTree(tree)
@@ -189,6 +228,106 @@ export function insertAfter(tree, siblingId, node) {
 
   container.array.splice(container.index + 1, 0, node)
   return clone
+}
+
+// Inserts `node` into `parentId`'s `container` at `index`, clamped into
+// range (below 0 clamps to 0; past the end clamps to the array's own
+// length, i.e. appended). See resolveContainerArray above for what
+// `container` addresses. No-op returning the original tree if `parentId`
+// isn't found -- same "the controller is responsible for only ever calling
+// this with a live target" contract insertNode already documents.
+export function insertAt(tree, parentId, container, index, node) {
+  const clone = cloneTree(tree)
+  const parent = findNode(clone, parentId)
+  if (!parent) return clone
+
+  const array = resolveContainerArray(parent, container)
+  const clamped = Math.max(0, Math.min(index, array.length))
+  array.splice(clamped, 0, node)
+  return clone
+}
+
+// Reparents/reorders `id` in one step: removes it from wherever it
+// currently lives and inserts it into `parentId`'s `container` at `index`
+// (see resolveContainerArray above for the `container` addressing).
+//
+// Same-container move: the node is removed BEFORE the destination array is
+// resolved, so a same-container move resolves "source" and "destination"
+// to the very same (already-shrunk) array object -- by the time the insert
+// runs, every later sibling has already closed the gap the removal left,
+// so splicing in at the raw `index` lands the node at exactly that final
+// index with no separate arithmetic correction needed. Getting this wrong
+// looks like resolving the destination array/index against a tree snapshot
+// taken BEFORE the removal (or inserting before removing) -- either one
+// leaves a downward move one slot short, because the still-present source
+// node is still occupying a slot the destination index was counted against.
+//
+// No-op (returns a fresh clone of the ORIGINAL tree, not a mutated one with
+// the node dropped on the floor) if `id` isn't found, or if `parentId`
+// can't be found once `id` has been removed -- which also naturally covers
+// dropping a node into its own subtree, since removing `id` takes that
+// whole subtree, `parentId` included, out of the working tree with it.
+export function moveNodeTo(tree, id, parentId, container, index) {
+  const clone = cloneTree(tree)
+  const source = findContainer(clone, id)
+  if (!source) return clone
+
+  const [node] = source.array.splice(source.index, 1)
+
+  const parent = findNode(clone, parentId)
+  if (!parent) return cloneTree(tree)
+
+  const array = resolveContainerArray(parent, container)
+  const clamped = Math.max(0, Math.min(index, array.length))
+  array.splice(clamped, 0, node)
+  return clone
+}
+
+// Deep-clones the node with `id` -- generating a FRESH id (via generateId)
+// for it and every descendant it carries, so the copy never collides with
+// the original it was copied from -- and inserts the copy immediately
+// after the original, in whatever array currently holds it.
+//
+// @return {tree, id} -- the new tree plus the copy's own freshly-generated
+//   id, mirroring findNodeContext's {node, context} shape rather than the
+//   plain-tree return every other mutator here uses, since a caller (e.g.
+//   to select the duplicate afterwards) has no other way to learn that id.
+export function duplicateNode(tree, id) {
+  const clone = cloneTree(tree)
+  const node = findNode(clone, id)
+  if (!node) return { tree: clone, id: null }
+
+  const copy = rekeyed(node)
+  const container = findContainer(clone, id)
+  if (!container) {
+    // `id` names the root -- there's no sibling array to insert a copy
+    // into, and duplicating the root wouldn't mean anything (a file has
+    // exactly one). Clean no-op rather than guessing at a fallback.
+    return { tree: clone, id: null }
+  }
+
+  container.array.splice(container.index + 1, 0, copy)
+  return { tree: clone, id: copy.id }
+}
+
+// Recursively assigns a fresh id to `node` and every descendant it carries
+// (children/slots/items -- the same traversal childArrays() walks), so a
+// duplicated subtree never collides with the original it was copied from.
+function rekeyed(node) {
+  // Deep-cloning is needed because a shallow spread would leave options, args,
+  // html, and other nested objects shared with the original node, so the copy
+  // and original would not be independent of each other.
+  const copy = { ...cloneTree(node), id: generateId() }
+  if (Array.isArray(copy.children)) copy.children = copy.children.map(rekeyed)
+  if (copy.slots && typeof copy.slots === "object") {
+    const slots = {}
+    Object.keys(copy.slots).forEach((key) => {
+      slots[key] = Array.isArray(copy.slots[key]) ? copy.slots[key].map(rekeyed) : copy.slots[key]
+    })
+    copy.slots = slots
+  }
+  if (Array.isArray(copy.items)) copy.items = copy.items.map(rekeyed)
+  return copy
 }
 
 // --- field mutation ---------------------------------------------------

@@ -39,6 +39,8 @@
 // QuotaExceededError) must never be swallowed, or an edit the user thinks
 // is saved quietly isn't. The controller is responsible for catching this
 // and telling the user.
+import * as Tree from "controllers/tabler_ui/docs/editor/tree"
+
 const PREFIX = "tabler-ui-docs-editor:"
 export const WORKSPACE_KEY = `${PREFIX}workspace`
 export const INDEX_KEY = `${PREFIX}index`
@@ -209,4 +211,82 @@ export function deleteDirectory(workspace, path) {
 export function setOpen(workspace, path) {
   if (!workspace.files[path]) return workspace
   return { ...workspace, open: path }
+}
+
+// --- Cross-file lookup ------------------------------------------------
+
+// A `partial` node renders ANOTHER file's tree inline -- the elements it
+// produces on the canvas carry `data-editor-node-id` values from THAT
+// file's tree, not the open one (node ids are only guaranteed unique
+// WITHIN one file -- the server's own duplicate-id validator scopes its
+// check to a single tree). editor_controller.js needs to resolve such an
+// id back to a real node (to show it read-only in the inspector, or to
+// refuse a drag on it) without the server's help -- the client already
+// holds every file's tree in `workspace.files`, so this is a pure,
+// client-side search over that.
+//
+// Deliberately NOT in tree.js: that module is scoped to operating over ONE
+// file's tree at a time and knows nothing about `path`/multi-file concerns
+// (see its own header) -- this is exactly the kind of multi-file lookup
+// this module already owns (createFile/renameFile/... above). It does
+// reuse Tree.findNode per-file, though: that function's own contract
+// ("search one tree for an id") holds unchanged here, just called once per
+// candidate file instead of once overall.
+//
+// Search order: the OPEN file's own tree first, then -- only if not found
+// there -- each `partial` node reachable from it, recursively, in document
+// order. This is the correct tie-break precisely because ids are only
+// file-scoped: if the open file happens to reuse an id that also exists in
+// some included file, the open file's own node is what a click on it
+// actually means.
+//
+// `visited` bounds the search to at most one visit per file, which is what
+// keeps a legal A -> B -> A partial cycle from being an infinite recursion
+// -- a plain "have I seen this id before" check has no natural stopping
+// point (ids aren't visited, files are), so the bound has to be on paths,
+// not on individual node visits.
+//
+// @return {node, path} -- `path` is the file the node actually lives in
+//   (== openPath when it's a local hit), or null if `id` resolves nowhere
+//   in the whole reachable workspace.
+export function findNodeAcrossWorkspace(files, openPath, id) {
+  const visited = new Set()
+
+  function searchFile(path) {
+    if (!path || visited.has(path) || !files[path]) return null
+    visited.add(path)
+
+    const tree = files[path].tree
+    const node = Tree.findNode(tree, id)
+    if (node) return { node, path }
+
+    for (const partialPath of partialPaths(tree)) {
+      const found = searchFile(partialPath)
+      if (found) return found
+    }
+    return null
+  }
+
+  return searchFile(openPath)
+}
+
+// Every path a `partial` node inside `tree` references, in document order
+// -- the edges #findNodeAcrossWorkspace's recursion follows into other
+// files. A standalone walk rather than reusing tree.js's own childArrays
+// (that helper isn't exported, and has no notion of a `partial` node's
+// cross-file MEANING anyway -- it just knows which arrays hold children).
+function partialPaths(node) {
+  if (!node) return []
+  const paths = []
+  if (node.kind === "partial" && node.path) paths.push(node.path)
+
+  if (Array.isArray(node.children)) node.children.forEach((child) => paths.push(...partialPaths(child)))
+  if (node.slots && typeof node.slots === "object") {
+    Object.values(node.slots).forEach((arr) => {
+      if (Array.isArray(arr)) arr.forEach((child) => paths.push(...partialPaths(child)))
+    })
+  }
+  if (Array.isArray(node.items)) node.items.forEach((child) => paths.push(...partialPaths(child)))
+
+  return paths
 }

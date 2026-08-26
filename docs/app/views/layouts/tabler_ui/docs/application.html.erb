@@ -73,6 +73,22 @@
         changes. %>
     <% header_height = content_for?(:breadcrumb) ? "6.3125rem" : "4rem" %>
 
+    <%# The design editor (docs/app/views/tabler_ui/docs/editor/show.html.erb)
+        needs the full window width for its own three-pane toolbar layout, so
+        it flags itself with content_for(:wide_layout) -- the same
+        content_for? convention this layout already uses for :breadcrumb
+        above and :contents below, rather than an instance variable a
+        controller would have to set, or branching on the request path. In
+        wide mode the outer container drops its max-width (container-fluid
+        instead of container-xl) and the permanently-visible sidebar column
+        further down becomes a collapsed-by-default collapse pane spanning
+        the full row instead of a standing column, so every column-inch is
+        available to the page below. Every other docs page leaves
+        content_for(:wide_layout) unset, so this is false there and both
+        branches below fall through to the layout's original markup,
+        unchanged. %>
+    <% wide_layout = content_for?(:wide_layout) %>
+
     <div class="docs-shell" style="--docs-header-height: <%= header_height %>;">
       <header class="docs-fixed-header fixed-top">
         <%= tabler_ui.navbar(brand: search_and_brand) do |navbar| %>
@@ -92,28 +108,59 @@
 
       <div class="page-wrapper">
         <div class="page-body">
-          <div class="container-xl">
+          <div class="<%= wide_layout ? "container-fluid" : "container-xl" %>">
             <div class="row">
-              <div class="col-12 col-lg-2 mb-4">
-                <%= render "tabler_ui/docs/shared/sidebar", current: @nav_current %>
-              </div>
-              <%# Contents (docs/app/views/tabler_ui/docs/shared/_contents.html.erb)
-                  only takes up a column when there's one to render -- see
-                  components/show.html.erb's own comment on when it calls
-                  content_for(:contents). Content widens to fill the space
-                  it would have used otherwise, same as the sidebar/content
-                  split already did for the breadcrumb bar above. %>
-              <div class="col-12 <%= content_for?(:contents) ? "col-lg-8" : "col-lg-10" %> mb-4 docs-content">
-                <%= yield %>
-              </div>
-              <% if content_for?(:contents) %>
-                <%# Hidden below the lg breakpoint here, on the column, not
-                    inside the partial -- there's no room for a third nav
-                    column on a narrow viewport, and everything it links to
-                    is already in reading order right above it. %>
-                <div class="col-lg-2 mb-4 d-none d-lg-block">
-                  <%= yield :contents %>
+              <% if wide_layout %>
+                <%# Same collapse markup shared/_sidebar_category.html.erb uses for
+                    each category pane inside the sidebar itself -- data-bs-toggle
+                    ="collapse" / aria-expanded / aria-controls on the trigger,
+                    class="collapse" (no "show": this pane starts collapsed, unlike
+                    a category's default-open state) + data-controller=
+                    "tabler-ui--collapse" on the pane -- so the chevron rotation
+                    docs.css already defines for .docs-sidebar-toggle applies here
+                    for free, and there's no second collapse implementation to keep
+                    in sync with the first (rule 6). Spans the full row (col-12) so
+                    the toggle and, once opened, the sidebar itself, both read as a
+                    strip across the top of the page rather than a narrow column. %>
+                <div class="col-12 mb-3">
+                  <button type="button"
+                          class="docs-sidebar-toggle btn btn-link d-flex align-items-center gap-2 px-0 py-1 text-secondary text-uppercase fs-6 text-decoration-none collapsed"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#docs-wide-sidebar"
+                          aria-expanded="false"
+                          aria-controls="docs-wide-sidebar">
+                    Browse components
+                    <%= tabler_ui.icon icon: "chevron-down", size: "sm", html: { class: "docs-sidebar-toggle-icon" } %>
+                  </button>
+                  <div id="docs-wide-sidebar" class="collapse" data-controller="tabler-ui--collapse">
+                    <%= render "tabler_ui/docs/shared/sidebar", current: @nav_current %>
+                  </div>
                 </div>
+                <div class="col-12 mb-4 docs-content">
+                  <%= yield %>
+                </div>
+              <% else %>
+                <div class="col-12 col-lg-2 mb-4">
+                  <%= render "tabler_ui/docs/shared/sidebar", current: @nav_current %>
+                </div>
+                <%# Contents (docs/app/views/tabler_ui/docs/shared/_contents.html.erb)
+                    only takes up a column when there's one to render -- see
+                    components/show.html.erb's own comment on when it calls
+                    content_for(:contents). Content widens to fill the space
+                    it would have used otherwise, same as the sidebar/content
+                    split already did for the breadcrumb bar above. %>
+                <div class="col-12 <%= content_for?(:contents) ? "col-lg-8" : "col-lg-10" %> mb-4 docs-content">
+                  <%= yield %>
+                </div>
+                <% if content_for?(:contents) %>
+                  <%# Hidden below the lg breakpoint here, on the column, not
+                      inside the partial -- there's no room for a third nav
+                      column on a narrow viewport, and everything it links to
+                      is already in reading order right above it. %>
+                  <div class="col-lg-2 mb-4 d-none d-lg-block">
+                    <%= yield :contents %>
+                  </div>
+                <% end %>
               <% end %>
             </div>
           </div>

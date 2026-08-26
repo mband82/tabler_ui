@@ -90,8 +90,8 @@ RSpec.describe "TablerUi::Docs::Engine", type: :request do
     end
 
     # The other half, and the one that would actually have caught the
-    # docs.css omission: a stylesheet the layout links is never an importmap
-    # pin, so the check above structurally cannot see it. Scans the layout
+    # docs.css omission: a stylesheet a layout links is never an importmap
+    # pin, so the check above structurally cannot see it. Scans a layout
     # for the logical names it links and asserts each is precompiled --
     # ".css" appended because stylesheet_link_tag takes the extensionless
     # name while the precompile list carries the real filename.
@@ -99,16 +99,27 @@ RSpec.describe "TablerUi::Docs::Engine", type: :request do
       File.read(path).scan(/stylesheet_link_tag\s+["']([^"']+)["']/).flatten
     end
 
-    it "precompiles every stylesheet the docs layout links" do
-      layout = TablerUi::Docs::Engine.root.join("app/views/layouts/tabler_ui/docs/application.html.erb")
-      linked = linked_stylesheets(layout).map { |name| "#{name}.css" }
+    # Every layout under docs/, not just application.html.erb -- discovered
+    # by globbing rather than listed by name, so a third layout added later
+    # (the editor page already added a second one, editor_frame.html.erb,
+    # which links its own extra stylesheet, tabler_ui/docs/editor_canvas)
+    # is covered automatically instead of silently falling outside this
+    # check the way editor_frame.html.erb itself would have if this example
+    # had stayed hardcoded to application.html.erb alone. That's the exact
+    # blind spot that let the docs.css precompile omission ship once
+    # already, just one layout over -- glob rather than hardcode ANY layout
+    # name here, including application.html.erb's own.
+    it "precompiles every stylesheet every docs layout links" do
+      layouts = Dir[TablerUi::Docs::Engine.root.join("app/views/layouts/tabler_ui/docs/*.html.erb")]
+      expect(layouts).not_to be_empty
 
+      linked = layouts.flat_map { |layout| linked_stylesheets(layout) }.uniq.map { |name| "#{name}.css" }
       expect(linked).not_to be_empty
 
       # tabler_ui_all.css belongs to the main engine, which precompiles it
       # in its own 'tabler_ui.assets' initializer -- both engines' entries
       # land in the same app-level list, so checking against that list
-      # covers the layout's full set regardless of which engine owns each.
+      # covers every layout's full set regardless of which engine owns each.
       expect(linked - Rails.application.config.assets.precompile).to eq([])
     end
   end

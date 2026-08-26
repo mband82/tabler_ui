@@ -35,20 +35,30 @@ module TablerUi
       # docs/app/javascript/controllers/tabler_ui/docs/*), which the
       # docs/config/importmap.rb pins added for it now need to actually
       # resolve to a real file on Sprockets'/Propshaft's asset paths.
+      #
+      # tabler_ui/docs/editor_canvas.css is a second stylesheet, linked only
+      # by the editor's OTHER layout (editor_frame.html.erb, not
+      # application.html.erb -- see that layout's own comment) -- it is not
+      # an importmap pin, so nothing above catches it either; it needs its
+      # own precompile entry for the same reason docs.css does.
       initializer "tabler_ui.docs.assets" do |app|
         app.config.assets.paths << root.join("app/assets/stylesheets")
         app.config.assets.paths << root.join("app/assets/javascripts")
         app.config.assets.paths << root.join("app/javascript")
         app.config.assets.precompile += %w[
           tabler_ui/docs.css
+          tabler_ui/docs/editor_canvas.css
           tabler_ui/docs.js
           controllers/tabler_ui/docs/search_controller.js
           controllers/tabler_ui/docs/editor_controller.js
           controllers/tabler_ui/docs/editor_sortable_controller.js
+          controllers/tabler_ui/docs/editor/dnd.js
+          controllers/tabler_ui/docs/editor/drop_target.js
           controllers/tabler_ui/docs/editor/explorer.js
           controllers/tabler_ui/docs/editor/export.js
           controllers/tabler_ui/docs/editor/html_escape.js
           controllers/tabler_ui/docs/editor/inspector.js
+          controllers/tabler_ui/docs/editor/overlay.js
           controllers/tabler_ui/docs/editor/palette.js
           controllers/tabler_ui/docs/editor/schema.js
           controllers/tabler_ui/docs/editor/structure.js

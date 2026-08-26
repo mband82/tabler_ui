@@ -7,6 +7,7 @@ require "tabler_ui/docs/editor/contract"
 require "tabler_ui/docs/editor/slot_map"
 require "tabler_ui/docs/editor/builder_map"
 require "tabler_ui/docs/editor/enum_map"
+require "tabler_ui/docs/editor/tree"
 
 module TablerUi
   module Docs
@@ -296,13 +297,35 @@ module TablerUi
         # the drift this codebase's anti-rot specs exist to prevent, so the
         # lists ship instead.
         #
+        # `placement` is the same idea applied to Tree's three allowed-kinds
+        # lists (root/non-row-container/row-container). Tree is the only
+        # place that enforces them -- it is the security boundary a hostile
+        # payload gets checked against, and nothing here changes that: the
+        # server still re-validates every save/preview from scratch,
+        # unconditionally. Publishing the lists just lets the canvas's
+        # drag-and-drop compute, client-side, whether a given drop *would*
+        # be legal, so it can show a refused-drop cursor instead of letting
+        # the user drop a node the server is only going to reject anyway.
+        # That's purely a UX hint -- worst case a stale or spoofed copy
+        # produces a wrong cursor, never a wrongly-accepted tree, because
+        # Tree re-checks unconditionally regardless of what the client
+        # thought was allowed. Referencing Tree's constants directly (rather
+        # than retyping the arrays) is what keeps this from becoming a fifth
+        # copy of a vocabulary that can quietly drift out from under the one
+        # that actually matters.
+        #
         # @api private
         def kinds_payload
           {
             "heading" => { "levels" => Contract::HEADING_LEVELS.to_a },
             "text" => { "tags" => Contract::TEXT_TAGS },
             "column" => { "spanKeys" => Contract::SPAN_KEYS, "spanValues" => Contract::SPAN_VALUES },
-            "attrs" => { "keys" => Contract::ATTR_KEYS, "nestedKeys" => Contract::ATTR_NESTED_KEYS }
+            "attrs" => { "keys" => Contract::ATTR_KEYS, "nestedKeys" => Contract::ATTR_NESTED_KEYS },
+            "placement" => {
+              "rootKinds" => Tree::ROOT_KINDS,
+              "nonRowContainerKinds" => Tree::NON_ROW_CONTAINER_KINDS,
+              "rowContainerKinds" => Tree::ROW_CONTAINER_KINDS
+            }
           }
         end
 

@@ -1,0 +1,253 @@
+/* Chrome drawn over the design editor's Preview iframe by editor/overlay.js
+   -- a selection box, a hover box, a floating action toolbar, a
+   drag-and-drop ghost box and an insertion line (see overlay.js's own
+   header). Every rule in this file is scoped to a
+   .docs-editor-canvas-* class that only overlay.js's own markup ever
+   carries -- NEVER `body`, `html`, or any other bare element selector, and
+   NEVER an unscoped class some ordinary Tabler markup might also use. This
+   stylesheet is linked into the SAME frame document as the design being
+   previewed (see editor_frame.html.erb's own comment: that layout
+   deliberately does not link tabler_ui/docs/docs.css, because the design
+   has no business inheriting editor chrome styling -- this file is the one
+   deliberate exception, and it earns that exception only by staying
+   scoped this tightly). Anything broader than that would visibly change
+   what the previewed design looks like, which is exactly the failure mode
+   the whole "never touch the design's DOM" approach (overlay.js, the task
+   this file belongs to) exists to avoid.
+
+   The frame mirrors data-bs-theme from the parent editor page
+   (editor_controller.js#_syncFrameTheme) and already loads
+   tabler_ui_all.css for the design itself, so Tabler's CSS custom
+   properties (--tblr-primary, --tblr-primary-rgb, ...) are available here
+   too -- used throughout instead of hardcoded colours so this chrome
+   follows dark mode the same way the design around it does. */
+
+/* The one element overlay.js appends to the frame's <body>, a sibling of
+   #tabler-ui-editor-canvas -- never a descendant of it, so nothing here
+   ever becomes part of the design's own subtree. Fixed and
+   viewport-covering so a child's left/top/width/height, set directly from
+   a getBoundingClientRect() snapshot, line up with whatever they're
+   pointing at with no scroll-position translation (see overlay.js's
+   header for why that holds even though the design can be taller than the
+   iframe). pointer-events: none here is inherited by every descendant
+   that doesn't turn it back on below -- none of this chrome may ever
+   intercept a click meant for the design underneath it. z-index clears
+   Tabler's own highest reserved layer, --tblr-toast-zindex (1090), with
+   room to spare. */
+.docs-editor-canvas-overlay-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1100;
+}
+
+/* Shared shape for both the selection and hover rectangles -- position:
+   absolute against the fixed root above, so overlay.js sets
+   left/top/width/height directly in viewport pixels. Each box starts (and
+   is reset to) `hidden` -- the boolean attribute, toggled from JS rather
+   than a class -- which is how clearSelection/clearHover make a box
+   disappear entirely rather than merely collapsing to zero size.
+   box-sizing: border-box so the border below sits just outside the
+   measured rect instead of inflating past it. */
+.docs-editor-canvas-box {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 2px;
+}
+
+.docs-editor-canvas-box-selection {
+  border: 2px solid var(--tblr-primary);
+}
+
+/* A lighter, dashed treatment so a hover box can never be mistaken for an
+   actual selection once a later phase starts drawing both at once (hover
+   over an unselected sibling while something else stays selected). The
+   same primary hue at partial opacity via --tblr-primary-rgb, rather than
+   a second hardcoded colour, so it stays in sync with the selection box
+   across light/dark mode instead of drifting out of step with it. */
+.docs-editor-canvas-box-hover {
+  border: 1px dashed rgba(var(--tblr-primary-rgb), 0.6);
+}
+
+/* The small pill naming the selected/hovered component. position: fixed
+   here, NOT relative to .docs-editor-canvas-box the way it used to be --
+   overlay.js#positionLabel flips the label above/below its box and clamps
+   it horizontally so it never clips out of the frame viewport (the defect
+   this replaced: a label above an element sitting at the very top of the
+   canvas used to render at a negative `top`, invisible), and that flip/
+   clamp math already resolves in frame-viewport coordinates. Doing the
+   arithmetic once against the viewport and then converting it a second
+   time into box-local coordinates would be pure waste, so left/top below
+   are left unset here -- overlay.js sets them on every showBox/showToolbar
+   call, and the label is never shown before that first call sets them
+   (see #_positionLabel's own "measure before position" note). Sized and
+   coloured by eye against Tabler's own badge tokens rather than reaching
+   for the badge component itself -- pulling in a whole component partial
+   for one label chip isn't worth it, and this chip has no reason to ever
+   match a badge pixel-for-pixel. */
+.docs-editor-canvas-label {
+  position: fixed;
+  padding: 0.1em 0.5em;
+  font-family: var(--tblr-body-font-family);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  border-radius: 3px;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.docs-editor-canvas-label-selection {
+  background: var(--tblr-primary);
+}
+
+.docs-editor-canvas-label-hover {
+  background: rgba(var(--tblr-primary-rgb), 0.85);
+}
+
+/* The floating action toolbar drawn next to the selected element --
+   select-parent/move-up/move-down/duplicate/delete. position: absolute
+   here resolves against .docs-editor-canvas-overlay-root the same way
+   .docs-editor-canvas-box does (the root is `position: fixed; inset: 0`,
+   i.e. it exactly covers the frame viewport with no scroll offset of its
+   own, so "absolute against the root" and "fixed against the viewport"
+   land on the same pixel -- overlay.js's flip/clamp math is written once
+   and used for both this and the label above without needing to know
+   which of the two coordinate systems it's feeding). pointer-events: auto
+   is the one deliberate break from the root's own `pointer-events: none`
+   -- see overlay.js's header for why turning it back on HERE, and only
+   here, is safe: pointer-events is a per-element property, so re-enabling
+   it on the toolbar has no effect on the selection/hover boxes it's a
+   sibling of, and the buttons inside it are the only thing in this whole
+   overlay a click is ever meant to land on. */
+.docs-editor-canvas-toolbar {
+  position: absolute;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--tblr-bg-surface, #fff);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+}
+
+/* Plain buttons rather than the tabler_ui button component -- this markup
+   is built by hand in overlay.js from a {label, title, onClick} list
+   editor_controller.js supplies (see that module's own header for why it
+   must not gain a dependency on any real component), so it only ever
+   needs to look like a button, not render one. */
+.docs-editor-canvas-toolbar-btn {
+  min-width: 1.75rem;
+  padding: 0.15rem 0.4rem;
+  font-family: var(--tblr-body-font-family);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--tblr-body-color);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.docs-editor-canvas-toolbar-btn:hover,
+.docs-editor-canvas-toolbar-btn:focus-visible {
+  background: rgba(var(--tblr-primary-rgb), 0.12);
+  border-color: rgba(var(--tblr-primary-rgb), 0.3);
+  outline: none;
+}
+
+/* The in-canvas drag-and-drop placeholder (editor/dnd.js +
+   editor/drop_target.js drive this through overlay.js#setGhost) -- a
+   faded, dashed box standing in for the node about to be dropped, labelled
+   with the dragged component's own title via .docs-editor-canvas-label
+   (reused as-is; this box shares the label markup #buildBox already gives
+   every kind, not a special case). Deliberately NOT the selection box's
+   solid --tblr-primary border -- this is a preview of something that
+   doesn't exist in the tree yet, not a real selection, and needs to read
+   as tentative at a glance. */
+.docs-editor-canvas-box-ghost {
+  border: 2px dashed rgba(var(--tblr-primary-rgb), 0.5);
+  background: rgba(var(--tblr-primary-rgb), 0.06);
+}
+
+/* Validity is advisory only (editor/drop_target.js's own header) -- this
+   class only ever changes how the ghost LOOKS, it never blocks the drop
+   itself. Danger red rather than a second shade of the primary hue so an
+   illegal target reads as unambiguously different from a legal one even
+   at a glance, the same distinction Tabler's own .text-danger/.btn-danger
+   make elsewhere. */
+.docs-editor-canvas-box-ghost-invalid {
+  border-color: rgba(var(--tblr-danger-rgb), 0.6);
+  background: rgba(var(--tblr-danger-rgb), 0.08);
+}
+
+/* The ghost's own label reuses .docs-editor-canvas-label's shape (padding,
+   font, radius) but not the selection/hover kind's solid primary fill --
+   a lighter surface keeps the dashed-box's "not real yet" read consistent
+   between the box and its own caption. */
+.docs-editor-canvas-label-ghost {
+  background: rgba(var(--tblr-primary-rgb), 0.75);
+}
+
+/* The insertion line drawn at the exact boundary a before/after drop would
+   land on -- a single 2px bar, not a bordered box (see overlay.js#buildLine
+   for why this gets its own shape rather than reusing .docs-editor-canvas-
+   box). position: fixed against the frame viewport exactly like every
+   other piece of chrome here, so left/top/width set directly from a
+   getBoundingClientRect()-derived rect line up with no translation.
+   Vertically centred on its own `top` (the exact insertion y-coordinate)
+   via a negative margin-top half its own height, rather than setting `top`
+   itself to that offset -- so overlay.js never has to know this line's
+   thickness to position it correctly. */
+.docs-editor-canvas-insertion-line {
+  position: fixed;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--tblr-primary);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* The floating "drop into..." chip menu (overlay.js#setChips/#showChips) --
+   a sibling of the toolbar, same shape rationale: position: absolute
+   against the fixed root (see the toolbar's own comment above for why
+   that lands on the same pixel as position: fixed here), pointer-events:
+   auto is the same deliberate break from the root's own `pointer-events:
+   none` the toolbar already makes, for the same reason -- the chips
+   inside are the only thing here a drop is ever meant to land on. Anchored
+   to the drag's cursor position rather than to a rendered element's own
+   box (drop_target.js's header explains why: an empty slot renders no DOM
+   to anchor to), so unlike the toolbar this can appear anywhere the
+   pointer currently is, not just beside a selection. */
+.docs-editor-canvas-chips {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--tblr-bg-surface, #fff);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+}
+
+/* One labelled chip per available container -- see drop_target.js's
+   #resolveContainerChips for what "available" means (an empty slot, or a
+   builder-style component's own left/right-shaped items container).
+   Deliberately not the toolbar button's compact square shape: a chip
+   carries a real word ("Header", "Left"), not a single glyph, so it gets
+   its own wider, left-aligned treatment. */
+.docs-editor-canvas-chip {
+  padding: 0.2rem 0.6rem;
+  font-family: var(--tblr-body-font-family);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  text-align: left;
+  color: var(--tblr-body-color);
+  background: rgba(var(--tblr-primary-rgb), 0.06);
+  border: 1px dashed rgba(var(--tblr-primary-rgb), 0.5);
+  border-radius: 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}

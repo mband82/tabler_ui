@@ -254,6 +254,49 @@ into third-party host apps — a hole here is a hole in every app that mounts it
   column Hash whose keys weren't symbolized the way `ErbGenerator`'s emitted `label:`
   is a real Symbol at runtime — the preview rendered empty cells while the exported
   code worked.
+- **The canvas's drag-and-drop and in-canvas editing add no server-emitted markup.**
+  The rendered preview still carries exactly `data-editor-node-id` and
+  `data-editor-field` — no wrapper elements, no new `data-editor-*` attributes. Two
+  reasons: a wrapper would break Bootstrap's many direct-child selectors (`.row > *`,
+  `.btn-group > .btn`, `.navbar-nav > li`), desyncing the preview from what the export
+  actually produces; and `consistency_spec.rb` hardcodes `EDITOR_ATTRS` as the
+  exhaustive set of preview-only attributes it strips before diffing renderer output
+  against generated ERB, so an attribute added there without updating `EDITOR_ATTRS`
+  silently corrupts that comparison. All drag ghosts, drop-band highlighting, drop
+  chips and the floating toolbar are instead drawn on an overlay layer
+  (`docs/app/javascript/controllers/tabler_ui/docs/editor/overlay.js`) — one
+  `position: fixed`, `pointer-events: none` root appended once to the frame body, a
+  dumb rectangle renderer with no knowledge of the tree or schema. It replaced an
+  earlier approach that mutated the design DOM with `style.outline`, for the same
+  reason: editor chrome must never become part of the rendered design.
+- **Drop validity on the canvas is advisory only — the server remains the sole
+  validator.** `editor/drop_target.js` is a pure resolver that drives the drag cursor
+  and ghost placement; it reads the legal-placement vocabulary from the schema
+  payload's `kinds.placement`, which publishes `Tree::ROOT_KINDS` /
+  `NON_ROW_CONTAINER_KINDS` / `ROW_CONTAINER_KINDS` by reference (guarded by an
+  anti-rot spec in `schema_spec.rb`) rather than a hand-copied client-side vocabulary.
+  Even so, a client-side "yes" is not authoritative: an illegal drop still round-trips
+  through the same validate-and-report path as every other posted design, rather than
+  being silently blocked in the browser.
+- **`_dragState` in `editor_controller.js` is deliberately one object serving two
+  jobs — the drag payload and the repaint lock.** `_paintCanvas()` (which replaces the
+  frame's `innerHTML` with a fresh preview) is a no-op while `_dragState` or
+  `_canvasEditing` (the in-canvas text-edit lock) is set, because replacing
+  `innerHTML` mid-drag destroys the dragged element and silently aborts the browser's
+  own drag. `dragend` — not `drop` — is the only reliable drag terminator: `drop`
+  never fires on Escape, an invalid drop target, or a release outside the window,
+  while `dragend` fires exactly once, always, on the source element. Because a
+  palette drag starts in the parent document and a canvas drag starts inside the
+  frame, both documents need their own `dragend` listener. `_endDrag()` is idempotent
+  and ends by calling `_paintCanvas()` directly, since a cancelled drag scheduled no
+  new preview and nothing else would flush HTML that arrived while the lock was held.
+- **A plain element fires no `dragstart` without `draggable="true"` stamped on it
+  first, and an `img`/`a[href]`/already-`draggable` element nested inside one has to
+  be forced back to `draggable="false"`** — once the browser commits to dragging a
+  nested image or link there is no API to redirect that drag onto the containing
+  node. `_paintCanvas` does both on every repaint. These are DOM mutations of the
+  rendered design, wiped and reapplied on every repaint; they are never read back
+  into the tree and never reach the export.
 - **Adding a node kind, a slot, a builder method, or an enum means updating the
   matching hand-maintained registry** — `contract.rb`'s `KINDS`, `slot_map.rb`,
   `builder_map.rb`, `enum_map.rb` respectively — each of which has its own anti-rot
@@ -302,6 +345,13 @@ docs/                                          second, independently-rooted moun
   app/controllers/tabler_ui/docs/              PagesController, ComponentsController, EditorController, ...
   app/views/tabler_ui/docs/                    docs pages + editor/ (page shell, preview-frame views)
   app/javascript/controllers/tabler_ui/docs/   docs-only Stimulus controllers, incl. editor/ helper ES modules
+                                                (editor/overlay.js, editor/dnd.js, editor/drop_target.js drive the
+                                                canvas's drag-and-drop and in-canvas editing; editor/schema.js,
+                                                editor/tree.js etc. are unchanged)
+  app/assets/stylesheets/tabler_ui/docs/       docs-only stylesheets, incl. editor_canvas.css (the canvas overlay's
+                                                chrome; linked by the frame layout, the one deliberate exception to
+                                                that layout's "no editor chrome in this document" rule, since the
+                                                overlay must live in the same document as what it measures)
   config/importmap.rb, config/routes.rb        docs engine's own pins/routes — never merged into the main engine's
 ```
 
@@ -380,4 +430,18 @@ Current bare partials: `_button`, `_card` (slots: header/body/footer), `_page_he
 - `README.md` documents ~7 of the 35 components and is out of date.
 - `USAGE.md` is the generated, exhaustive alternative -- regenerate it with `rake tabler_ui:usage_doc` after touching a component's doc comments, a demos file, or the design editor's own hand-written section.
 - The design editor's server-side pipeline (`docs/lib/tabler_ui/docs/editor/`) has its
-  own Gotchas-shaped notes -- see rule 9 above rather than duplicating them here.
+  own Gotchas-shaped notes -- see rule 9 above rather than duplicating them here. The
+  client-side canvas pipeline's equivalent notes live as header comments in
+  `editor_controller.js`, `overlay.js` and `drop_target.js`.
+- The canvas's drag-and-drop is native HTML5 DnD, not SortableJS, deliberately --
+  SortableJS cannot span a drag that starts in the parent document and ends inside the
+  preview iframe. SortableJS remains in unchanged use for the Structure and Explorer
+  panes. Both are mouse/pointer-only: touch has no native `DragEvent` story without a
+  polyfill, which is the same reason the SortableJS panes never moved off it either.
+- A `position: fixed` component (a closed modal, offcanvas, toast) renders with a
+  zero-size rect in the static preview, so it can't be selected on the canvas at all.
+  Pre-existing; the Structure pane is the way to reach it.
+- A canvas element that came from an included `partial` node carries ids from that
+  partial's own file, not the file currently open. Clicking one resolves it across the
+  workspace and shows a read-only inspector naming the owning file with a button to
+  open it; dragging one is refused outright.

@@ -4,11 +4,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Design preview</title>
-    <%# Only the compiled component stylesheet -- never stylesheet_link_tag
-        "tabler_ui/docs" (docs.css), which styles editor chrome the design
-        being previewed has no business inheriting. This document shows the
-        design, not the editor around it -- see EditorController#frame. %>
+    <%# The compiled component stylesheet, plus editor_canvas.css -- never
+        stylesheet_link_tag "tabler_ui/docs" (docs.css), which styles editor
+        chrome (toolbar, rails, tabs, ...) the design being previewed has no
+        business inheriting. This document shows the design, not the editor
+        around it -- see EditorController#frame. editor_canvas.css is the
+        deliberate exception to that rule: it styles nothing but the
+        selection/hover overlay editor/overlay.js draws over the design (see
+        that file's and editor_canvas.css's own headers for why the overlay
+        is drawn here, in this document, rather than in the parent page --
+        getBoundingClientRect() coordinates only line up with a position:
+        fixed overlay when both live in the same document), and every one of
+        its selectors is scoped to a class only that overlay's own markup
+        carries, so the design itself is never touched by it. %>
     <%= stylesheet_link_tag "tabler_ui_all" %>
+    <%= stylesheet_link_tag "tabler_ui/docs/editor_canvas" %>
     <%# Same importmap-rails guard as the main docs layout (application.html.erb)
         -- a host without importmap-rails installed (including this gem's
         own Combustion spec harness) gets zero script tags here too. %>

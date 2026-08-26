@@ -82,11 +82,20 @@ RSpec.describe "TablerUi::Docs design editor page", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it "links the compiled component stylesheet, not the docs chrome stylesheet" do
+    it "links the compiled component stylesheet and the overlay's own chrome stylesheet, not the docs chrome stylesheet" do
       hrefs = Nokogiri::HTML5.fragment(response.body).css("link[rel='stylesheet']").map { |l| l["href"] }
 
       expect(hrefs.any? { |href| href.include?("tabler_ui_all") }).to be true
-      expect(hrefs.any? { |href| href.include?("tabler_ui/docs") }).to be false
+      # tabler_ui/docs/editor_canvas.css is the one deliberate exception to
+      # "no docs chrome in this document" -- it styles only the
+      # editor/overlay.js selection/hover chrome, scoped to classes that
+      # chrome alone carries, and needs the same document editor/overlay.js
+      # draws into to make its position: fixed coordinates line up (see
+      # editor_frame.html.erb's own comment). docs.css itself -- the
+      # sidebar/navbar/tabs chrome around the editor, which the design has
+      # no business inheriting -- stays excluded.
+      expect(hrefs.any? { |href| href.end_with?("tabler_ui/docs/editor_canvas.css") }).to be true
+      expect(hrefs.any? { |href| href.end_with?("tabler_ui/docs.css") }).to be false
     end
 
     it "has no docs sidebar, navbar or search box -- it's a chrome-free document" do

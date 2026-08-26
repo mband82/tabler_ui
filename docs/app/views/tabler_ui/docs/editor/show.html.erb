@@ -21,6 +21,13 @@
     content column the layout gives a page with none (col-lg-10, same as
     the index/forms pages -- see application.html.erb's own comment).
 
+    Does call content_for(:wide_layout), just below -- this page's
+    three-pane toolbar layout wants the whole window, not the col-lg-8/10
+    the layout otherwise caps content at, so the sidebar column folds into
+    a collapsed toggle and the outer container drops its max-width (see
+    application.html.erb's own comment on that flag). No other docs page
+    sets this.
+
     Both tab strips below (Explorer/Components, Preview/Structure/Code)
     reuse the tabs component's own Bootstrap-tab markup convention
     (data-bs-toggle="tabs" data-controller="tabler-ui--tab", see
@@ -29,6 +36,7 @@
     component's single nav+content shape, but the Bootstrap Tab lifecycle
     underneath is the same already-registered controller, not a second
     implementation of it (rule 6). %>
+<% content_for :wide_layout, true %>
 <%= tabler_ui.icon icon: "layout-grid-add", class: "me-2" %>
 <%= tabler_ui.page_header title: "Design editor", pretitle: "Editor" %>
 
@@ -89,14 +97,19 @@
                 layout kinds (row/column/heading/text/partial) this loop can't
                 describe. Each item already carries the click action + data
                 attributes #addFromPalette needs, so this listing keeps working
-                even in the moment before the schema fetch resolves. %>
+                even in the moment before the schema fetch resolves. Also
+                draggable, with the same dragstart/dragend actions
+                (#paletteDragStart/#paletteDragEnd) palette.js's own template
+                carries -- see that file's header for why the two copies of
+                this markup must stay in sync by hand. %>
             <% TablerUi::Docs::Navigation.category_names.each do |category| %>
               <h4 class="mt-2"><%= category %></h4>
               <div class="list-group list-group-flush mb-2">
                 <% TablerUi::Docs::Navigation.components_in(category).each do |name| %>
                   <div class="list-group-item list-group-item-action py-1 docs-editor-palette-item"
                        data-component-name="<%= name %>"
-                       data-action="click->tabler-ui--docs-editor#addFromPalette"
+                       draggable="true"
+                       data-action="click->tabler-ui--docs-editor#addFromPalette dragstart->tabler-ui--docs-editor#paletteDragStart dragend->tabler-ui--docs-editor#paletteDragEnd"
                        data-editor-kind="component" data-editor-component="<%= name %>">
                     <%= TablerUi::Docs::Navigation.title_for(name) %>
                   </div>
@@ -113,6 +126,7 @@
         <ul data-bs-toggle="tabs" data-controller="tabler-ui--tab" role="tablist" class="nav nav-tabs">
           <li class="nav-item" role="presentation">
             <a href="#docs-editor-preview" data-bs-toggle="tab" data-tabler-ui--tab-target="toggle"
+               data-action="shown.bs.tab->tabler-ui--docs-editor#repositionOverlay"
                role="tab" aria-selected="true" class="nav-link active">Preview</a>
           </li>
           <li class="nav-item" role="presentation">
@@ -125,7 +139,16 @@
           </li>
         </ul>
         <div class="tab-content docs-editor-rail-body">
-          <div class="tab-pane active show" id="docs-editor-preview" role="tabpanel">
+          <%# .docs-editor-preview-pane (docs.css) carries this pane down the
+              height chain from .docs-editor-rail so the iframe's own
+              height: 100% has something concrete to resolve against --
+              without it, a .tab-pane has no height of its own, and the
+              iframe falls back to its min-height instead of filling the
+              pane (see that rule's own comment for the full chain). A
+              modifier class on this one tab-pane, not .tab-pane itself,
+              since the Structure and Code tab-panes are sized by their
+              content and must not be forced to the rail's full height. %>
+          <div class="tab-pane active show docs-editor-preview-pane" id="docs-editor-preview" role="tabpanel">
             <iframe src="<%= editor_frame_path %>" class="docs-editor-frame" title="Design preview"
                     data-tabler-ui--docs-editor-target="frame"></iframe>
           </div>
