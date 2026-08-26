@@ -179,6 +179,53 @@ This is unrelated to Navbar's own pre-existing `action:`/`subject:` +
 `can?` check -- a separate, older, Navbar-only mechanism; both apply
 independently.
 
+## Design editor
+
+Mounting `TablerUi::Docs::Engine` (see Install, step 4) also mounts an
+in-browser visual editor at `GET <mount>/editor`. It is a way to
+compose a real Rails view out of `tabler_ui.*` components by dragging
+and clicking, with a live preview, without writing ERB by hand.
+
+A design is a Rails-shaped tree -- rows/columns, headings/text, and
+`tabler_ui.*` components with their own options, HTML hooks and (for
+builder-style components) sub-items -- built up on a canvas via
+drag-and-drop or plain move-up/move-down/delete buttons, with in-canvas
+text editing and a property panel driven by each component's own
+documented options. A workspace can hold several files and directories;
+one file can reference another as a partial.
+
+**Where a design lives.** Nowhere on the server. The whole workspace
+(every file's tree) is kept in the browser's own `localStorage` --
+nothing is persisted server-side, and nothing survives clearing that
+browser's site data. The server sees a design only for the length of
+one preview request.
+
+**What comes out.** Copy or download any file's generated `.html.erb`,
+or export the whole workspace as a zip, and paste the result into a
+real Rails app. That generated ERB is exactly what a developer would
+have written by hand -- `<%= tabler_ui.card title: "Invoices" do |slots| %>`
+and so on -- not a runtime dependency on the editor or on anything
+under `docs/`.
+
+**How the preview is produced.** The posted design tree is validated
+and normalized, then walked twice by independent code paths that must
+produce equivalent output: one renders it to real HTML by calling the
+same `tabler_ui.*` dispatcher a hand-written view would, for the live
+preview; the other renders it to the same `.html.erb` text offered for
+export. Neither path ever turns the posted data into an ERB source
+string and evaluates it -- a design is data, walked and dispatched,
+never template source.
+
+**Real limits, not just a demo.** A component option that only Ruby can
+express -- a `Proc`, an opaque object -- cannot be set from the editor;
+the property panel reports it as unsupported. The one exception is a
+table's `:columns`, where the editor takes a declarative column `key:`
+and the value-lookup callable is synthesized from it, on both the
+preview and export paths. A few structured options with no scalar UI
+equivalent (a datagrid's `:items`, a rating's `:choices`, ...) fall
+back to a raw-JSON field in the property panel rather than a purpose-built
+control.
+
 ## Components
 
 ### Layout

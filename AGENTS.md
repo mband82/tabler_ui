@@ -130,6 +130,17 @@ No `<script>` tags in templates, no inline `on*=` handlers, no `javascript:` URL
 - Adding a controller means touching four places: the controller file, the import +
   `app.register` block in `app/assets/javascripts/tabler_ui.js`, the pin in
   `config/importmap.rb`, and the precompile list in `lib/tabler_ui/engine.rb`.
+- The docs engine has its own, parallel set of four places, do not confuse the two:
+  the controller file under `docs/app/javascript/controllers/tabler_ui/docs/`, the
+  import + `window.Stimulus.register` block in
+  `docs/app/assets/javascripts/tabler_ui/docs.js`, the pin in `docs/config/importmap.rb`
+  (keep the `docs/` path segment on the pin name -- `spec/lib/tabler_ui/docs/engine_spec.rb`
+  asserts the two engines' pin sets are disjoint), and the precompile entry in
+  `docs/lib/tabler_ui/docs/engine.rb`. `engine_spec.rb` also asserts every
+  locally-pinned docs asset *and* every stylesheet the docs layout links is in
+  `config.assets.precompile` -- a CDN pin (an `http(s)://` target, e.g. the design
+  editor's SortableJS/JSZip pins) is deliberately excluded from that check, since
+  the browser fetches it directly and there is nothing local to precompile.
 
 ## A component is not finished until it has specs
 
@@ -159,6 +170,71 @@ No `<script>` tags in templates, no inline `on*=` handlers, no `javascript:` URL
 - Unrelated to Navbar's own pre-existing `action:`/`subject:` + `can?` check — a
   separate, older, Navbar-only mechanism; both apply independently.
 
+## The design editor: never render attacker-controlled input
+
+The in-browser design editor (`GET <mount>/editor`, docs engine) lets a visitor build
+a component tree in the browser and posts it back to the server to render a live
+preview and generate `.html.erb`. That tree is untrusted input, and this engine ships
+into third-party host apps — a hole here is a hole in every app that mounts it.
+
+- **Never `render inline:` a value built from posted data**, and never build an ERB
+  source string and `eval`/`render` it. Turning attacker-controlled JSON into an ERB
+  string and rendering it is remote code execution in every host app this engine
+  mounts into. The codebase carries this warning three times — `Renderer`'s class
+  docs (the editor's own case: posted tree data must never become template source),
+  `docs/lib/tabler_ui/docs/parsed_component.rb` (`@example` blocks are illustrative
+  only, lifted verbatim off doc comments and referencing objects — `User.all`,
+  `users_path` — that do not exist in this app; executing them has nothing backing
+  the calls), and `docs/app/views/tabler_ui/docs/components/show.html.erb` (prints
+  those same `@example` blocks as inert, escaped text, never markdown, never
+  `render inline:`) — match their reasoning rather than re-deriving it. `render inline:`
+  is legitimate exactly once, in `spec/lib/tabler_ui/docs/editor/consistency_spec.rb`,
+  and only because its inputs are committed, code-reviewed fixtures
+  (`spec/fixtures/editor/*.json`), never a request body.
+- **A component name is allowlisted against `Navigation.components`** (in `Tree`,
+  the security boundary) before it ever reaches the dispatcher. `Ui#method_missing`
+  answers `respond_to_missing?` for anything, and an unknown name falls through to
+  `render "tabler_ui/#{name}"` — partial-path injection. The allowlist is the real
+  control; `Contract::COMPONENT_NAME`'s regex only rejects obvious junk earlier and
+  more legibly.
+- **A `partial` node's `path` is resolved only inside the posted workspace** (via the
+  `resolve:` callable `Workspace` builds), never handed to Rails' own `render`. Doing
+  so would let a crafted design reach into the host app's own view paths.
+- **`auth:` is stripped from the editor surface everywhere** — `Contract::FORBIDDEN_OPTIONS`,
+  enforced by `Tree` at every nesting level (top-level options, builder sub-item
+  options, `args`). This is a security control, not a product choice: `auth:`'s value
+  is passed to whatever the host configured via `set_auth_method` (see the
+  Authorization rule above) — arbitrary host code — so letting a posted design set it
+  would let that design invoke host-defined authorization logic with attacker-chosen
+  arguments.
+- **`Renderer` (tree -> preview HTML) and `ErbGenerator` (tree -> exported `.html.erb`)
+  walk the same tree and must agree**, or the live preview lies about what the export
+  produces — the worst failure mode this feature has.
+  `spec/lib/tabler_ui/docs/editor/consistency_spec.rb` plus the fixture corpus
+  (`spec/fixtures/editor/*.json`) is the guard, run end-to-end rather than trusting
+  either module's own spec. Real drift has already been caught by it twice: an empty
+  `slots`/`items` collection that emitted an empty `do |slots| ... end` pair in
+  generated ERB where `Renderer` correctly passed no block at all, and a `table`
+  column Hash whose keys weren't symbolized the way `ErbGenerator`'s emitted `label:`
+  is a real Symbol at runtime — the preview rendered empty cells while the exported
+  code worked.
+- **Adding a node kind, a slot, a builder method, or an enum means updating the
+  matching hand-maintained registry** — `contract.rb`'s `KINDS`, `slot_map.rb`,
+  `builder_map.rb`, `enum_map.rb` respectively — each of which has its own anti-rot
+  spec that re-derives the registry from the real components by reflection/grep and
+  asserts equality. A failure in one of those specs means the registry is wrong, not
+  the spec; do not patch around it.
+- `table`/`datagrid` options that are callables (a `value:` Proc, `sort_url:`, ...)
+  cannot be configured from JSON at all. `table`'s `:columns` is the one place this is
+  worked around: a design tree carries a declarative `key:` per column, and both
+  `Renderer#synthesize_table_columns` and `ErbGenerator#format_columns_array`
+  independently build the real `value:` lambda from it — the two agreeing is exactly
+  what `consistency_spec.rb` exists to keep true. Everywhere else, a structured option
+  with no scalar UI equivalent (datagrid's `:items`, rating's `:choices`, ...) falls
+  back to a raw-JSON escape-hatch control in the property panel (`Schema`'s
+  `STRUCTURED_TYPE_SETS`); a genuinely callable/opaque option (`Object`, `#call`,
+  `Proc`) is reported `unsupported` and cannot be set from the editor at all.
+
 ---
 
 # Architecture brief
@@ -181,6 +257,16 @@ app/components/tabler_ui/
 app/javascript/controllers/tabler_ui/          10 Stimulus controllers
 app/assets/                                    Tabler CSS/JS, ApexCharts, ~5700 icons, ~200 illustrations
 config/importmap.rb                            pins shipped to the host app
+docs/                                          second, independently-rooted mountable engine (component docs + editor)
+  lib/tabler_ui/docs/
+    engine.rb                                  Rails::Engine — own root, own asset paths/precompile list (see JavaScript rule)
+    navigation.rb, doc_parser.rb, demo_registry.rb, search_index.rb   docs-page data sources
+    editor/          contract.rb, slot_map.rb, builder_map.rb, enum_map.rb   hand-maintained data contract + registries (see the design editor rule)
+                      schema.rb, tree.rb, workspace.rb, renderer.rb, erb_generator.rb   validate/render/export pipeline
+  app/controllers/tabler_ui/docs/              PagesController, ComponentsController, EditorController, ...
+  app/views/tabler_ui/docs/                    docs pages + editor/ (page shell, preview-frame views)
+  app/javascript/controllers/tabler_ui/docs/   docs-only Stimulus controllers, incl. editor/ helper ES modules
+  config/importmap.rb, config/routes.rb        docs engine's own pins/routes — never merged into the main engine's
 ```
 
 ## The dispatcher — `lib/tabler_ui/ui.rb`
@@ -257,5 +343,8 @@ Current bare partials: `_button`, `_card` (slots: header/body/footer), `_page_he
   naming the field/type and suggesting `as:` or a new `#<type>_input` method.
 - User-facing strings in `form_builder.rb` and `illustration/component.rb` are hardcoded
   German. New strings should not add to that.
-- `README.md` documents ~7 of the 19 components and is out of date.
-- `USAGE.md` is the generated, exhaustive alternative -- regenerate it with `rake tabler_ui:usage_doc` after touching a component's doc comments or a demos file.
+- `README.md` documents ~7 of the 35 components and is out of date.
+- `USAGE.md` is the generated, exhaustive alternative -- regenerate it with `rake tabler_ui:usage_doc` after touching a component's doc comments, a demos file, or the design editor's own hand-written section.
+- The design editor's server-side pipeline (`docs/lib/tabler_ui/docs/editor/`) has its
+  own Gotchas-shaped notes -- see the design editor rule above rather than duplicating
+  them here.
