@@ -67,6 +67,26 @@ RSpec.describe "TablerUi::Docs design editor endpoints", type: :request do
       expect(json["workspace"]["open"]).to eq("index.html.erb")
     end
 
+    # Regression, found live in the showcase rather than here. #preview
+    # responds as JSON, so its lookup context defaults to formats: [:json],
+    # and every component in this gem renders from a `_component.html.erb`
+    # partial -- so every component came back as a "Missing partial" error
+    # marker while the endpoint still returned 200 with a populated `html`
+    # field. The happy-path example above could not catch it: a `heading`
+    # node renders through `content_tag` and resolves no partial at all.
+    # Assert real component markup, not merely that `html` is non-empty.
+    it "renders real component markup, not a missing-partial marker" do
+      tree = fragment("root", [component_node("button", "c1", "text" => "Save")])
+
+      post "/ui/editor/preview", params: preview_body(tree), as: :json
+
+      json = JSON.parse(response.body)
+      expect(json["html"]).to include("btn")
+      expect(json["html"]).to include("Save")
+      expect(json["html"]).not_to include("Missing partial")
+      expect(json["html"]).not_to include("alert-danger")
+    end
+
     it "drops a non-allowlisted component name, reports it, and still renders the rest" do
       tree = fragment("root", [heading("h1", "Still here"), component_node("evil_component", "c1")])
 

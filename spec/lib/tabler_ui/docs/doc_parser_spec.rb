@@ -243,11 +243,19 @@ RSpec.describe TablerUi::Docs::DocParser do
       # description text (and which class it's filed under) tells them
       # apart, which is exactly the collision rule 5's own class-keying
       # exists to prevent.
+      # DropDownProxy#divider additionally documents :html -- its element is
+      # the only one it renders, so that hook was added when the class's
+      # missing HTML-attribute parts were filled in. NavigationGroup#divider
+      # documents only :auth. The two lists differing is itself part of what
+      # class-keying keeps visible.
       expect(nav_divider.map(&:name)).to eq(["auth"])
-      expect(dropdown_divider.map(&:name)).to eq(["auth"])
-      expect(nav_divider.first.description).not_to eq(dropdown_divider.first.description)
-      expect(nav_divider.first.description).to include("this group's own :auth")
-      expect(dropdown_divider.first.description).to include("this dropdown's own :auth")
+      expect(dropdown_divider.map(&:name)).to eq(%w[html auth])
+
+      nav_auth = nav_divider.find { |option| option.name == "auth" }
+      dropdown_auth = dropdown_divider.find { |option| option.name == "auth" }
+      expect(nav_auth.description).not_to eq(dropdown_auth.description)
+      expect(nav_auth.description).to include("this group's own :auth")
+      expect(dropdown_auth.description).to include("this dropdown's own :auth")
     end
 
     it "recovers a simpler builder's options under its bare Component class" do

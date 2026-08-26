@@ -82,7 +82,7 @@ module TablerUi
         return render_missing_path(result, raw["path"]) unless tree
 
         render json: {
-          html: Editor::Renderer.new(view_context, resolve: result.resolve).render(tree),
+          html: Editor::Renderer.new(html_view_context, resolve: result.resolve).render(tree),
           erb: Editor::ErbGenerator.new(tree).call,
           workspace: result.workspace,
           errors: result.errors
@@ -103,6 +103,18 @@ module TablerUi
       end
 
       private
+
+      # #preview responds as JSON, so its lookup context defaults to
+      # `formats: [:json]` -- and every component partial in this gem is
+      # `_component.html.erb`. Rendering the design through the request's own
+      # view context therefore resolves nothing and every component comes back
+      # as a "Missing partial" error marker. The marker is still a String in
+      # the `html:` field, so a spec asserting only that `html` is present
+      # passes while the live editor shows nothing but red boxes -- which is
+      # exactly what happened. Pin the formats to :html for the design render.
+      def html_view_context
+        view_context.tap { |context| context.lookup_context.formats = [:html] }
+      end
 
       # Rejected before JSON.parse ever runs -- parsing a huge body just to
       # then reject it is the DoS this guards against. `content_length` is

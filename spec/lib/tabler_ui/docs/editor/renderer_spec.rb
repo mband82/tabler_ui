@@ -401,17 +401,17 @@ RSpec.describe TablerUi::Docs::Editor::Renderer, type: :component do
       # all three siblings in order.
       expect(doc.at_css(".dropdown-divider")).not_to be_nil
 
-      # NOT a data-editor-node-id assertion on the "Users" link -- a real
-      # rule-5 gap, found via this test, not a Renderer bug: unlike every
+      # This used to assert data-editor-node-id was nil on the "Users" link,
+      # documenting a real HTML-attribute gap this test found: unlike every
       # other builder item, Navbar::Component::NavigationGroup::DropDownProxy#item
-      # (app/components/tabler_ui/navbar/component.rb) only stores
-      # `link_html:` on its Item Struct, no `html:` at all, so there is no
-      # "root" part for #build_html_opts' id stamp to land on -- it's built
-      # and passed through like any other item, DropDownProxy#item just has
-      # nowhere to put it. Documented here rather than silently dropped so
-      # a future rule-5 fix over there turns this into a real assertion.
+      # stored only `link_html:` on its Item Struct and had no root part for
+      # the id stamp to land on. That gap has since been closed in
+      # app/components/tabler_ui/navbar/component.rb (#item, #divider and
+      # #header all take `html:` now), so the placeholder becomes the real
+      # assertion it was left here to become: every nested dropdown item is
+      # selectable in the editor like any other node.
       expect(doc.css(".dropdown-item").map { |a| a.text.strip }).to eq(%w[Users Settings])
-      expect(doc.css(".dropdown-item").first["data-editor-node-id"]).to be_nil
+      expect(doc.css(".dropdown-item").first["data-editor-node-id"]).to eq("dd-item")
     end
   end
 

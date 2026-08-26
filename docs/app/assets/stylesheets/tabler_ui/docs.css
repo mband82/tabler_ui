@@ -120,3 +120,34 @@
   min-height: 20rem;
   border: 0;
 }
+
+/* Palette items (Explorer rail's "Components" tab, both the static
+   server-rendered fallback and the schema-driven replacement -- see
+   docs/app/javascript/controllers/tabler_ui/docs/editor/palette.js) are
+   plain .list-group-item elements clicked to insert a node, not links or
+   buttons, so they need their own pointer cursor. */
+.docs-editor-palette-item {
+  cursor: pointer;
+}
+
+/* The Code tab's generated .html.erb output
+   (docs/app/javascript/controllers/tabler_ui/docs/editor_controller.js#_renderCode)
+   -- a plain <pre><code> block needs to actually look like code, and --
+   unlike a table or a diagram -- read comfortably wrapped inside
+   .docs-editor-rail-body's own scroll region rather than scrolling off its
+   right edge, since it's prose-shaped generated source meant to be read
+   and copied, not tabular data. */
+.docs-editor-code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8125rem;
+}
+
+/* A Structure tab slot pseudo-row (docs/app/javascript/controllers/tabler_ui/
+   docs/editor/structure.js) has no design-tree node behind it -- it exists
+   only as an insertion target for a slot-style component's named slot --
+   so it gets a dashed left border instead of the plain node rows' look,
+   reading as "structural, not a real node" at a glance. */
+.docs-editor-structure-slot {
+  border-left: 2px dashed var(--tblr-border-color, #e6e7e9);
+}

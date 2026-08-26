@@ -11,7 +11,12 @@
  */
 
 import DocsSearchController from "controllers/tabler_ui/docs/search_controller"
+import DocsEditorController from "controllers/tabler_ui/docs/editor_controller"
 
 if (window.Stimulus) {
   window.Stimulus.register("tabler-ui--docs-search", DocsSearchController)
+  // The editor's helper modules under controllers/tabler_ui/docs/editor/ are
+  // plain ES modules imported by the controller itself, not Stimulus
+  // controllers -- only this one gets registered.
+  window.Stimulus.register("tabler-ui--docs-editor", DocsEditorController)
 }

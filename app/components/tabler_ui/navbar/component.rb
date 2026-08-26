@@ -203,12 +203,35 @@ module TablerUi
       #   rendered via `link_to`, or the html_options Hash handed to
       #   `button_to` for a non-GET `method:`. There is no component-level
       #   hook for this part (only #link_attributes' `link_html:` reaches
-      #   the *top-level* nav link) -- just this sub-item's own `link_html:`
-      #   (set via `DropDownProxy#item`), merged over the defaults.
+      #   the *top-level* nav link). Dropdown sub-items render without a
+      #   wrapping `<li>` (unlike NavigationGroup's own :item/:link split),
+      #   so this sub-item's own `html:` (part :item) and `link_html:`
+      #   both target this same `<a>`/`<button>` -- merged in that order,
+      #   `html:` first (the broader, item-level hook), `link_html:` on
+      #   top (the more specific one, set via `DropDownProxy#item`).
       def dropdown_item_link_attributes(item, active: false)
         defaults = { class: dropdown_item_classes(item, active), target: item.target, disabled: item.disabled }
 
-        TablerUi::HtmlOptions.merge_html(defaults, resolve(item.link_html, item))
+        merged = TablerUi::HtmlOptions.merge_html(defaults, resolve(item.html, item))
+        TablerUi::HtmlOptions.merge_html(merged, resolve(item.link_html, item))
+      end
+
+      # @param item [NavigationGroup::DropDownProxy::Item] a dropdown
+      #   divider (type :divider)
+      # @return [Hash] attributes for this divider's `div.dropdown-divider`
+      #   (part :item) -- this sub-item's own `html:` (set via
+      #   `DropDownProxy#divider`), merged over the defaults.
+      def dropdown_divider_attributes(item)
+        TablerUi::HtmlOptions.merge_html({ class: "dropdown-divider" }, resolve(item.html, item))
+      end
+
+      # @param item [NavigationGroup::DropDownProxy::Item] a dropdown
+      #   header (type :header)
+      # @return [Hash] attributes for this header's `h6.dropdown-header`
+      #   (part :item) -- this sub-item's own `html:` (set via
+      #   `DropDownProxy#header`), merged over the defaults.
+      def dropdown_header_attributes(item)
+        TablerUi::HtmlOptions.merge_html({ class: "dropdown-header" }, resolve(item.html, item))
       end
 
       private
@@ -428,14 +451,23 @@ module TablerUi
         class DropDownProxy
           include TablerUi::Base
 
-          # :link_html holds the caller's *raw* per-item hook (Hash or Proc
-          # taking the item), not resolved attributes -- see
-          # Component#dropdown_item_link_attributes. :auth is the item's
-          # resolved (post-inheritance) `auth:` value (CLAUDE.md rule 8) --
-          # stored for completeness, though only authorized items ever make
-          # it into @items in the first place.
+          # :html holds the caller's *raw* per-item hook (Hash or Proc
+          # taking the item), not resolved attributes, for this item's own
+          # rendered element (part :item) -- the `<a>`/`<button>` for an
+          # :item, `<div class="dropdown-divider">` for a :divider,
+          # `<h6 class="dropdown-header">` for a :header. :link_html is a
+          # second, more specific raw hook layered on top of :html, only
+          # used by :item sub-items, targeting that same `<a>`/`<button>`
+          # (dropdown sub-items render without a wrapping `<li>`, unlike
+          # NavigationGroup::Item, so :item and :link never end up on
+          # different elements here) -- see
+          # Component#dropdown_item_link_attributes /
+          # #dropdown_divider_attributes / #dropdown_header_attributes.
+          # :auth is the item's resolved (post-inheritance) `auth:` value
+          # (CLAUDE.md rule 8) -- stored for completeness, though only
+          # authorized items ever make it into @items in the first place.
           Item = Struct.new(:type, :title, :url, :target, :method, :action, :subject,
-                             :icon, :disabled, :active, :link_html, :auth, keyword_init: true)
+                             :icon, :disabled, :active, :html, :link_html, :auth, keyword_init: true)
 
           attr_reader :items
 
@@ -457,10 +489,17 @@ module TablerUi
           # @option options [Boolean] :disabled
           # @option options [Boolean] :active Explicit active override. When nil (default), the
           #   template auto-detects via `current_page?(url)`.
+          # @option options [Hash, #call] :html HTML attributes for this sub-item's rendered
+          #   element (part :item) -- the `<a>`, or the `<button>` inside `button_to`'s
+          #   `<form>` for a non-GET `method:`. There is no wrapping `<li>` here (unlike
+          #   NavigationGroup's own :item/:link split), so :html and :link_html both land on
+          #   this same element -- :html is merged first, :link_html on top -- see
+          #   Component#dropdown_item_link_attributes.
           # @option options [Hash, #call] :link_html HTML attributes for this sub-item's link
           #   itself (not routed through a component-level option -- see
           #   Component#dropdown_item_link_attributes) -- the `<a>`, or the `<button>` inside
-          #   `button_to`'s `<form>` for a non-GET `method:`.
+          #   `button_to`'s `<form>` for a non-GET `method:`. Merged on top of this same
+          #   item's own :html.
           # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
           #   -- checked against the globally configured auth_method. Defaults to this
           #   dropdown's own :auth (its resolved value from NavigationGroup#dropdown) when
@@ -484,6 +523,7 @@ module TablerUi
               icon: options[:icon],
               disabled: options[:disabled],
               active: options[:active],
+              html: options[:html],
               link_html: options[:link_html],
               auth: effective_auth
             )
@@ -493,6 +533,8 @@ module TablerUi
 
           # Adds a divider line between dropdown items.
           # @param options [Hash]
+          # @option options [Hash, #call] :html HTML attributes for this divider's
+          #   `div.dropdown-divider` (part :item) -- see Component#dropdown_divider_attributes.
           # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
           #   -- defaults to this dropdown's own :auth when omitted.
           # @return [String, nil] empty string, to avoid stray output in a capture
@@ -501,13 +543,15 @@ module TablerUi
             effective_auth = options.key?(:auth) ? options[:auth] : auth
             return unless TablerUi::Authorization.authorized?(effective_auth)
 
-            @items << Item.new(type: :divider, auth: effective_auth)
+            @items << Item.new(type: :divider, html: options[:html], auth: effective_auth)
             ""
           end
 
           # Adds a header label between dropdown items.
           # @param title [String] Header text
           # @param options [Hash]
+          # @option options [Hash, #call] :html HTML attributes for this header's
+          #   `h6.dropdown-header` (part :item) -- see Component#dropdown_header_attributes.
           # @option options [Object] :auth Per-item authorization value (CLAUDE.md rule 8)
           #   -- defaults to this dropdown's own :auth when omitted.
           # @return [String, nil] empty string, to avoid stray output in a capture
@@ -518,7 +562,7 @@ module TablerUi
 
             builder_argument!(title, :title, builder: :header)
 
-            @items << Item.new(type: :header, title: title, auth: effective_auth)
+            @items << Item.new(type: :header, title: title, html: options[:html], auth: effective_auth)
             ""
           end
         end

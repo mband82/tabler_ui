@@ -43,6 +43,15 @@ module TablerUi
           tabler_ui/docs.css
           tabler_ui/docs.js
           controllers/tabler_ui/docs/search_controller.js
+          controllers/tabler_ui/docs/editor_controller.js
+          controllers/tabler_ui/docs/editor/explorer.js
+          controllers/tabler_ui/docs/editor/html_escape.js
+          controllers/tabler_ui/docs/editor/inspector.js
+          controllers/tabler_ui/docs/editor/palette.js
+          controllers/tabler_ui/docs/editor/schema.js
+          controllers/tabler_ui/docs/editor/structure.js
+          controllers/tabler_ui/docs/editor/tree.js
+          controllers/tabler_ui/docs/editor/workspace.js
         ]
       end
 

@@ -27,9 +27,9 @@
         <% visible_items.each do |sub| %>
           <% case sub.type %>
           <% when :divider %>
-            <div class="dropdown-divider"></div>
+            <%= tag.div(**navbar.dropdown_divider_attributes(sub)) %>
           <% when :header %>
-            <h6 class="dropdown-header"><%= sub.title %></h6>
+            <%= tag.h6(sub.title, **navbar.dropdown_header_attributes(sub)) %>
           <% when :item %>
             <% sub_active = item_active.call(sub) %>
             <%

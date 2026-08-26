@@ -1,11 +1,20 @@
 <%# locals: none.
 
     Design editor page shell: toolbar, Explorer/Components rail, Preview/
-    Structure/Code centre pane, Inspector rail. Static markup only -- the
-    tabler-ui--docs-editor Stimulus controller (another agent's work) reads
-    the values on the root element below and wires up drag/drop, the
-    property panel and the toolbar buttons; nothing here calls into it yet,
-    so this page has to render sensibly with no JS at all.
+    Structure/Code centre pane, Inspector rail. The tabler-ui--docs-editor
+    Stimulus controller (docs/app/javascript/controllers/tabler_ui/docs/
+    editor_controller.js) reads the values on the root element below,
+    populates every data-tabler-ui--docs-editor-target below from
+    localStorage + GET editor/schema on connect(), and wires up every
+    data-action button. Every target starts with plain server-rendered
+    placeholder content (a "loading"/explanatory <p>, or -- for the
+    Components tab -- the same static, non-interactive category listing
+    the old placeholder used), so this page still renders sensibly with no
+    JS at all; the controller simply never gets a chance to overwrite that
+    content in that case. Structural add/move/delete controls are real
+    buttons throughout (never drag-and-drop only) per this repo's CLAUDE.md
+    -- SortableJS is a separate, purely additive enhancement another agent
+    adds later.
 
     Deliberately does NOT call content_for(:contents) -- there is no
     per-page "Contents" rail to link to here, so the editor keeps the full
@@ -30,15 +39,20 @@
      data-tabler-ui--docs-editor-csrf-token-value="<%= form_authenticity_token %>">
 
   <div class="docs-editor-toolbar d-flex align-items-center gap-2 mb-3">
-    <select class="form-select form-select-sm w-auto" disabled>
-      <option>index.html.erb</option>
-    </select>
+    <span class="badge bg-secondary-lt text-secondary" data-tabler-ui--docs-editor-target="filename">
+      index.html.erb
+    </span>
     <div class="ms-auto btn-list">
-      <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Copy ERB</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Download</button>
-      <button type="button" class="btn btn-sm btn-outline-secondary" disabled>Export all</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              data-action="click->tabler-ui--docs-editor#copyErb">Copy ERB</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              data-action="click->tabler-ui--docs-editor#download">Download</button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+              data-action="click->tabler-ui--docs-editor#exportAll">Export all</button>
     </div>
   </div>
+
+  <div data-tabler-ui--docs-editor-target="errors"></div>
 
   <div class="row docs-editor-panes">
     <div class="col-12 col-lg-3 mb-3">
@@ -55,17 +69,35 @@
         </ul>
         <div class="tab-content card-body docs-editor-rail-body">
           <div class="tab-pane active show" id="docs-editor-explorer" role="tabpanel">
-            <p class="text-secondary small mb-0">
-              The workspace's file tree renders here once a workspace is loaded.
-            </p>
+            <div class="btn-list mb-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary"
+                      data-action="click->tabler-ui--docs-editor#newFile">New file</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary"
+                      data-action="click->tabler-ui--docs-editor#newFolder">New folder</button>
+            </div>
+            <div data-tabler-ui--docs-editor-target="explorer">
+              <p class="text-secondary small mb-0">
+                The workspace's file tree renders here once a workspace is loaded.
+              </p>
+            </div>
           </div>
-          <div class="tab-pane" id="docs-editor-components" role="tabpanel">
+          <div class="tab-pane" id="docs-editor-components" role="tabpanel"
+               data-tabler-ui--docs-editor-target="palette">
+            <%# Static fallback + no-JS content -- the controller replaces this
+                with the schema-driven palette (docs/app/javascript/controllers/
+                tabler_ui/docs/editor/palette.js), which additionally offers the
+                layout kinds (row/column/heading/text/partial) this loop can't
+                describe. Each item already carries the click action + data
+                attributes #addFromPalette needs, so this listing keeps working
+                even in the moment before the schema fetch resolves. %>
             <% TablerUi::Docs::Navigation.category_names.each do |category| %>
               <h4 class="mt-2"><%= category %></h4>
               <div class="list-group list-group-flush mb-2">
                 <% TablerUi::Docs::Navigation.components_in(category).each do |name| %>
                   <div class="list-group-item list-group-item-action py-1 docs-editor-palette-item"
-                       data-component-name="<%= name %>">
+                       data-component-name="<%= name %>"
+                       data-action="click->tabler-ui--docs-editor#addFromPalette"
+                       data-editor-kind="component" data-editor-component="<%= name %>">
                     <%= TablerUi::Docs::Navigation.title_for(name) %>
                   </div>
                 <% end %>
@@ -94,12 +126,15 @@
         </ul>
         <div class="tab-content docs-editor-rail-body">
           <div class="tab-pane active show" id="docs-editor-preview" role="tabpanel">
-            <iframe src="<%= editor_frame_path %>" class="docs-editor-frame" title="Design preview"></iframe>
+            <iframe src="<%= editor_frame_path %>" class="docs-editor-frame" title="Design preview"
+                    data-tabler-ui--docs-editor-target="frame"></iframe>
           </div>
-          <div class="tab-pane p-3" id="docs-editor-structure" role="tabpanel">
+          <div class="tab-pane p-3" id="docs-editor-structure" role="tabpanel"
+               data-tabler-ui--docs-editor-target="structure">
             <p class="text-secondary small mb-0">The current file's view tree renders here.</p>
           </div>
-          <div class="tab-pane p-3" id="docs-editor-code" role="tabpanel">
+          <div class="tab-pane p-3" id="docs-editor-code" role="tabpanel"
+               data-tabler-ui--docs-editor-target="code">
             <p class="text-secondary small mb-0">Generated .html.erb source renders here.</p>
           </div>
         </div>
@@ -111,7 +146,7 @@
         <div class="card-header">
           <h3 class="card-title">Inspector</h3>
         </div>
-        <div class="card-body docs-editor-rail-body">
+        <div class="card-body docs-editor-rail-body" data-tabler-ui--docs-editor-target="inspector">
           <p class="text-secondary small mb-0">
             Select a node in the preview or the structure tree to edit its properties.
           </p>
