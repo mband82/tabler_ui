@@ -17,9 +17,9 @@
     <%= tag.div(**settings_page.content_attributes) do %>
       <div class="tab-content">
         <% settings_page.items.each do |item| %>
-          <div class="tab-pane<%= ' active show' if item.active %>" id="<%= item.id %>">
+          <%= tag.div(id: item.id, **settings_page.pane_attributes(item)) do %>
             <%= capture(&item.content) if item.content %>
-          </div>
+          <% end %>
         <% end %>
       </div>
     <% end %>

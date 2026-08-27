@@ -31,18 +31,19 @@ module TablerUi
     #                       nav_html: { class: "mb-0" },
     #                       content_html: { class: "p-2" }) do |tabs| %>
     #     <% tabs.tab("First", html: { class: "fw-bold" }) %>
-    #     <% tabs.tab("Second", html: ->(tab) { { class: "text-danger" } if tab.title == "Second" }) %>
+    #     <% tabs.tab("Second", html: ->(tab) { { class: "text-danger" } if tab.title == "Second" },
+    #                 pane_html: { class: "p-3" }) %>
     #   <% end %>
     class Component
       include TablerUi::Base
       builder_style!
 
-      # :html holds the caller's *raw* per-tab hook (Hash or Proc taking the
-      # tab), not resolved attributes -- see #tab_attributes. :auth is the
-      # tab's resolved (post-inheritance) `auth:` value (CLAUDE.md rule 8) --
-      # stored for completeness, though only authorized tabs ever make it
-      # into @tabs in the first place.
-      Tab = Struct.new(:id, :title, :icon, :badge, :active, :content, :html, :auth, keyword_init: true)
+      # :html/:pane_html hold the caller's *raw* per-tab hooks (Hash or Proc
+      # taking the tab), not resolved attributes -- see #tab_attributes /
+      # #pane_attributes. :auth is the tab's resolved (post-inheritance)
+      # `auth:` value (CLAUDE.md rule 8) -- stored for completeness, though
+      # only authorized tabs ever make it into @tabs in the first place.
+      Tab = Struct.new(:id, :title, :icon, :badge, :active, :content, :html, :pane_html, :auth, keyword_init: true)
 
       STYLES = %i[tabs pills card underline bordered segmented].freeze
 
@@ -92,6 +93,9 @@ module TablerUi
       #   explicitly marked active: true)
       # @option options [Hash, #call] :html HTML attributes for this tab's
       #   `a.nav-link` (part :tab) -- a plain Hash, or a callable taking the tab
+      # @option options [Hash, #call] :pane_html HTML attributes for this
+      #   tab's own `.tab-pane` content panel (part :pane) -- a plain Hash,
+      #   or a callable taking the tab, same mechanism as :html -- see #pane_attributes
       # @option options [Object] :auth Per-tab authorization value (CLAUDE.md
       #   rule 8) -- checked against the globally configured auth_method.
       #   Defaults to tabs' own :auth when omitted. An unauthorized tab is not
@@ -120,6 +124,7 @@ module TablerUi
           active: is_active,
           content: block,
           html: options[:html],
+          pane_html: options[:pane_html],
           auth: effective_auth
         )
 
@@ -165,6 +170,16 @@ module TablerUi
       end
 
       # @param tab [Tab] the tab being rendered
+      # @return [Hash] attributes for this tab's `.tab-pane` content panel
+      #   (part :pane). Same per-tab mechanism as #tab_attributes -- the
+      #   tab's own :pane_html (Hash or Proc taking the tab) is loaded into
+      #   the shared html_for storage just before resolving.
+      def pane_attributes(tab)
+        @tabler_ui_html_options[:pane] = tab.pane_html
+        html_for(:pane, { class: pane_classes(tab) }, tab)
+      end
+
+      # @param tab [Tab] the tab being rendered
       # @return [Hash] options forwarded to the badge component for this
       #   tab's badge -- a String becomes { text: ... }, a Hash passes
       #   straight through.
@@ -195,6 +210,12 @@ module TablerUi
       def tab_link_classes(tab)
         classes = ["nav-link"]
         classes << "active" if tab.active
+        classes.join(" ")
+      end
+
+      def pane_classes(tab)
+        classes = ["tab-pane"]
+        classes << "active" << "show" if tab.active
         classes.join(" ")
       end
 

@@ -85,6 +85,26 @@ export function findContainer(tree, id) {
   return null
 }
 
+// @param schema [Object, null] the /ui/editor/schema payload (or any subset
+//   exposing `.components`) -- see docs/lib/tabler_ui/docs/editor/schema.rb's
+//   "builder" shape.
+// @param context [{componentName, level}, null] as returned by
+//   #findNodeContext, or tracked by a caller doing its own tree walk (see
+//   editor/structure.js, which needs this same lookup mid-walk rather than
+//   for one targeted id).
+// @param methodName [String] a builder_item's own `method`
+// @return [Object, null] that method's descriptor
+//   (schema.components[name].builder[level][method] -- `arg`/`block`/`nests`,
+//   see schema.rb's own doc), or null when `context` is null (a builder_item
+//   somehow reached outside any known component -- defensive, shouldn't
+//   happen for a real tree) or the schema hasn't loaded yet.
+export function builderMethodDescriptor(schema, context, methodName) {
+  if (!context) return null
+  const component = schema && schema.components && schema.components[context.componentName]
+  const levelDef = component && component.builder && component.builder[context.level]
+  return (levelDef && levelDef[methodName]) || null
+}
+
 // Walks the tree tracking which component (and, inside a builder-style
 // component, which BuilderMap "level") owns each builder_item -- needed by
 // the property panel to look up a builder_item's own method definition in
@@ -92,9 +112,7 @@ export function findContainer(tree, id) {
 // `schema` only needs `.components[name].builder` -- see
 // docs/lib/tabler_ui/docs/editor/schema.rb's "builder" shape.
 function nestedLevelFor(schema, ctx, methodName) {
-  const component = schema && schema.components && schema.components[ctx.componentName]
-  const levelDef = component && component.builder && component.builder[ctx.level]
-  const methodDef = levelDef && levelDef[methodName]
+  const methodDef = builderMethodDescriptor(schema, ctx, methodName)
   return methodDef && methodDef.nests ? methodDef.nests : null
 }
 

@@ -374,7 +374,8 @@
 
 /* A Structure tab slot pseudo-row (docs/app/javascript/controllers/tabler_ui/
    docs/editor/structure.js) has no design-tree node behind it -- it exists
-   only as an insertion target for a slot-style component's named slot --
+   only as an insertion target for a slot-style component's named slot, or
+   (childrenRowHtml, that same file) a builder item's own children block --
    so it gets a dashed left border instead of the plain node rows' look,
    reading as "structural, not a real node" at a glance. */
 .docs-editor-structure-slot {

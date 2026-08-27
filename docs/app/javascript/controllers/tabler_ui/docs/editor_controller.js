@@ -1828,6 +1828,7 @@ export default class extends Controller {
       hoveredNodeId: hit ? hit.id : null,
       hoveredRect: hit ? hit.rect : null,
       hoveredSlotName: hit ? hit.slotName : null,
+      hoveredBuilderContent: hit ? hit.builderContent : false,
       pointerX: event.clientX,
       pointerY: event.clientY,
       draggedKind: this._dragState.kind,
@@ -1888,12 +1889,20 @@ export default class extends Controller {
   // (alert, avatar, badge_list, card_group, ribbon) resolving through the
   // chip path exactly as before.
   //
-  // @return {id, rect, slotName} for the stamped element under the point,
-  //   or null. `slotName` is null whenever the matched element carries no
-  //   `data-editor-slot` -- guides off (the attribute doesn't exist in the
-  //   DOM at all then, Renderer's own `if @decorate` gate), the matched
-  //   element is a component's plain root, or it's some other kind
-  //   entirely (row/column/fragment/leaf).
+  // @return {id, rect, slotName, builderContent} for the stamped element
+  //   under the point, or null. `slotName` is null whenever the matched
+  //   element carries no `data-editor-slot` -- guides off (the attribute
+  //   doesn't exist in the DOM at all then, Renderer's own `if @decorate`
+  //   gate), the matched element is a component's plain root, or it's some
+  //   other kind entirely (row/column/fragment/leaf). `builderContent`
+  //   mirrors `slotName` for the OTHER marker Renderer's own `decorate:`
+  //   gate stamps -- `data-editor-builder-content`, present only on a
+  //   builder item's own content pane (Renderer#stamp_builder_content /
+  //   #synthesize_datagrid_content_marker, docs/lib/tabler_ui/docs/editor/
+  //   builder_parts.rb) -- `true` when the matched element carries it,
+  //   `false` otherwise; see drop_target.js's own header on
+  //   `hoveredBuilderContent` for what that unlocks (the middle band
+  //   resolving straight "into" that item's own `children`).
   _hitTestDragTarget(x, y) {
     if (!this._frameDoc || !this._frameDoc.elementFromPoint) return null
     const el = this._frameDoc.elementFromPoint(x, y)
@@ -1914,7 +1923,8 @@ export default class extends Controller {
     return {
       id: target.getAttribute("data-editor-node-id"),
       rect: target.getBoundingClientRect(),
-      slotName: target.getAttribute("data-editor-slot")
+      slotName: target.getAttribute("data-editor-slot"),
+      builderContent: target.hasAttribute("data-editor-builder-content")
     }
   }
 
@@ -1938,8 +1948,10 @@ export default class extends Controller {
   //
   // @param target the direct-child container's own stamped element (its
   //   `[data-editor-node-id]` matched `.closest()`'s own hit).
-  // @return the same {id, rect, slotName} shape #_hitTestDragTarget already
-  //   returns for a real hit, or null when this container isn't a
+  // @return the same {id, rect, slotName, builderContent} shape
+  //   #_hitTestDragTarget already returns for a real hit (`builderContent`
+  //   always false here -- a direct-child container's own child is never a
+  //   builder item's content pane), or null when this container isn't a
   //   `directChildContainers` member (not a container at all, this file's
   //   own #_isDirectChildContainerNode) or has no child yet to aim beside
   //   (an empty container -- falls through to the container's own "into"
@@ -1960,7 +1972,7 @@ export default class extends Controller {
       const distance = Math.hypot(dx, dy)
       if (distance < nearestDistance) {
         nearestDistance = distance
-        nearest = { id: el.getAttribute("data-editor-node-id"), rect, slotName: null }
+        nearest = { id: el.getAttribute("data-editor-node-id"), rect, slotName: null, builderContent: false }
       }
     })
     return nearest
@@ -2003,11 +2015,13 @@ export default class extends Controller {
   // levels down) is not this method's concern -- that space sits inside an
   // element #_hitTestDragTarget already matches directly.
   //
-  // @return the same {id, rect, slotName} shape as #_hitTestDragTarget, or
-  //   null when the tree is empty or unavailable, or open, or none of its
-  //   root children still have a stamped element on screen -- the caller
-  //   falls through to #resolveAgainstRoot's plain append in that case,
-  //   same as before this method existed.
+  // @return the same {id, rect, slotName, builderContent} shape as
+  //   #_hitTestDragTarget (`builderContent` always false here -- a
+  //   root-level child's own bare margin is never a builder item's content
+  //   pane), or null when the tree is empty or unavailable, or open, or
+  //   none of its root children still have a stamped element on screen --
+  //   the caller falls through to #resolveAgainstRoot's plain append in
+  //   that case, same as before this method existed.
   _hitTestRootFallback(x, y) {
     const tree = this._currentTree()
     if (!tree || !this._frameDoc) return null
@@ -2028,7 +2042,7 @@ export default class extends Controller {
       const distance = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
       if (distance < nearestDistance) {
         nearestDistance = distance
-        nearest = { id: child.id, rect, slotName: null }
+        nearest = { id: child.id, rect, slotName: null, builderContent: false }
       }
     })
     return nearest
@@ -2866,21 +2880,26 @@ export default class extends Controller {
   }
 
   // Builds this tick's full rect list -- see #_repositionGuides' own doc
-  // for when this runs. Two sources, per this feature's own task note:
+  // for when this runs. Three sources, per this feature's own task note:
   //
   //   1. Server markers -- every [data-editor-slot] (the PRECISE case: a
   //      slot with its own dedicated wrapper part, labelled with the slot
-  //      name) and every [data-editor-slot-shared] (the COARSE case: a
+  //      name), every [data-editor-slot-shared] (the COARSE case: a
   //      component whose slot content renders straight into its own root
   //      with no wrapper of its own -- alert, avatar, badge_list,
   //      card_group, ribbon -- labelled from every shared slot name
-  //      together, see the loop below for why). Both only ever exist in
-  //      the DOM at all when this preview was rendered with `decorate:
-  //      true` (Renderer's own gate) -- if a stale, undecorated response
-  //      is still painted when this runs (the toggle flipped on but the
-  //      new preview hasn't landed yet), these two queries simply find
-  //      nothing, and the guide set catches up the moment #_paintCanvas
-  //      repaints with the decorated response.
+  //      together, see the loop below for why), and every
+  //      [data-editor-builder-content] (a builder item's own content pane
+  //      -- accordion's body, tabs'/settings_page's pane, timeline's card,
+  //      datagrid's content, carousel's own root -- see Renderer#stamp_
+  //      builder_content's doc and docs/lib/tabler_ui/docs/editor/
+  //      builder_parts.rb). All three only ever exist in the DOM at all
+  //      when this preview was rendered with `decorate: true` (Renderer's
+  //      own gate) -- if a stale, undecorated response is still painted
+  //      when this runs (the toggle flipped on but the new preview hasn't
+  //      landed yet), these queries simply find nothing, and the guide set
+  //      catches up the moment #_paintCanvas repaints with the decorated
+  //      response.
   //   2. The tree -- every row/column node, resolved to its own stamped
   //      element and labelled with its own kind. These need no server
   //      help to exist as real elements (see this feature's own task
@@ -2933,6 +2952,20 @@ export default class extends Controller {
       const nodeId = el.getAttribute("data-editor-node-id")
       const names = el.getAttribute("data-editor-slot-shared").split(",")
       rects.push(this._guideRectFor(el, `slot-shared:${nodeId}`, names.join(" + ")))
+    })
+
+    // A builder item's own content pane -- always real DOM, decorated or
+    // not (see Renderer#stamp_builder_content's own doc: unlike a slot,
+    // there is no empty-placeholder mechanism here at all), so unlike the
+    // [data-editor-slot] query above there is nothing to dedup against.
+    // Labelled with a fixed, deliberately slot-name-proof string --
+    // "builder content", never a bare part name like "content" or "body"
+    // -- so this never reads identically to a genuine slot guide sharing
+    // the same word (dimmer's own `content` slot is exactly the collision
+    // this avoids).
+    this._frameDoc.querySelectorAll("[data-editor-builder-content]").forEach((el) => {
+      const nodeId = el.getAttribute("data-editor-node-id")
+      rects.push(this._guideRectFor(el, `builder-content:${nodeId}`, "builder content"))
     })
 
     this._collectContainerNodes(this._currentTree(), []).forEach((node) => {
@@ -3223,12 +3256,41 @@ export default class extends Controller {
     const selectedId = this._selectedNodeId
     if (!selectedId) return Tree.insertNode(tree, tree.id, node)
 
-    const target = Tree.findNode(tree, selectedId)
+    // Tree.findNodeContext (rather than the plain Tree.findNode every other
+    // caller here uses) also hands back the builder-map context
+    // ({componentName, level}) the selected node sits inside -- needed just
+    // below to look up a selected builder_item's own method descriptor.
+    const found = Tree.findNodeContext(this._schema, tree, selectedId)
+    const target = found && found.node
     if (!target) return Tree.insertNode(tree, tree.id, node)
 
     if (["fragment", "row", "column"].includes(target.kind)) {
       return Tree.insertNode(tree, target.id, node)
     }
+
+    // A selected builder item whose own method takes a content block
+    // (`block: "children"` -- tabs.tab, accordion.item, settings_page.item,
+    // ...) is a second kind of "select me to target my own content",
+    // exactly like a plain row/column just above: a design tree already
+    // lets one of these hold child nodes (see the "children" array
+    // Editor::Tree#normalize_builder_item seeds for one), the palette was
+    // just never wired to land there -- it fell through to the plain
+    // sibling-insert below instead, landing a new component as the item's
+    // own SIBLING in its parent's `items` array rather than inside it. A
+    // bare builder_item with no block at all (breadcrumb.item,
+    // dropdown.divider) still falls through to that same sibling-insert
+    // default, matching every kind this function has never treated as a
+    // container. The descriptor is read straight off the schema payload
+    // (Tree.builderMethodDescriptor, the same lookup editor/structure.js
+    // uses to decide whether to draw this item's own children container),
+    // never a hardcoded method-name list.
+    if (target.kind === "builder_item") {
+      const descriptor = Tree.builderMethodDescriptor(this._schema, found.context, target.method)
+      if (descriptor && descriptor.block === "children") {
+        return Tree.insertNode(tree, target.id, node)
+      }
+    }
+
     return Tree.insertAfter(tree, selectedId, node)
   }
 

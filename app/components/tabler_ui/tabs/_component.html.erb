@@ -23,9 +23,9 @@
 
   <%= tag.div(**tabs.content_attributes) do %>
     <% tabs.tabs.each do |tab| %>
-      <div class="tab-pane<%= ' active show' if tab.active %>" id="<%= tab.id %>" role="tabpanel">
+      <%= tag.div(id: tab.id, role: "tabpanel", **tabs.pane_attributes(tab)) do %>
         <%= capture(&tab.content) if tab.content %>
-      </div>
+      <% end %>
     <% end %>
   <% end %>
 <% end %>

@@ -23,7 +23,8 @@ module TablerUi
     #                                sidebar_html: { class: "bg-dark" },
     #                                content_html: { class: "p-0" }) do |sp| %>
     #     <% sp.item("General", html: { class: "fw-bold" }) do %>Content<% end %>
-    #     <% sp.item("Security", html: ->(item) { { class: "text-danger" if item.title == "Security" } }) do %>
+    #     <% sp.item("Security", html: ->(item) { { class: "text-danger" if item.title == "Security" } },
+    #                 pane_html: { class: "p-3" }) do %>
     #       Content
     #     <% end %>
     #   <% end %>
@@ -33,7 +34,7 @@ module TablerUi
 
       attr_reader :id, :title, :items
 
-      Item = Struct.new(:id, :title, :icon, :active, :content, :html, :auth, keyword_init: true)
+      Item = Struct.new(:id, :title, :icon, :active, :content, :html, :pane_html, :auth, keyword_init: true)
 
       # @param id [String] Unique ID for the settings container, used to
       #   namespace each item's list-group-item / tab-pane anchor pair.
@@ -62,6 +63,9 @@ module TablerUi
       # @option options [Hash, Proc] :html HTML attributes for this item's own
       #   `a.list-group-item` (part :item). May be a plain Hash, or a callable
       #   taking the item and returning a Hash -- see #item_attributes.
+      # @option options [Hash, Proc] :pane_html HTML attributes for this item's
+      #   own `.tab-pane` content panel (part :pane) -- a plain Hash, or a
+      #   callable taking the item, same mechanism as :html -- see #pane_attributes.
       # @option options [Object] :auth Per-item authorization value (CLAUDE.md
       #   rule 8) -- checked against the globally configured auth_method.
       #   Defaults to settings_page's own :auth when omitted. An unauthorized
@@ -90,6 +94,7 @@ module TablerUi
           active: is_active,
           content: block,
           html: options[:html],
+          pane_html: options[:pane_html],
           auth: effective_auth
         )
 
@@ -126,7 +131,22 @@ module TablerUi
         html_for(:item, { class: item_classes(item) }, item)
       end
 
+      # @return [Hash] attributes for a single item's `.tab-pane` content
+      #   panel (part :pane). Same per-item mechanism as #item_attributes --
+      #   the item's own :pane_html (Hash or Proc taking the item) is loaded
+      #   into the shared html_for storage just before resolving.
+      def pane_attributes(item)
+        @tabler_ui_html_options[:pane] = item.pane_html
+        html_for(:pane, { class: pane_classes(item) }, item)
+      end
+
       private
+
+      def pane_classes(item)
+        classes = ["tab-pane"]
+        classes << "active" << "show" if item.active
+        classes.join(" ")
+      end
 
       def item_classes(item)
         classes = "list-group-item list-group-item-action d-flex align-items-center"

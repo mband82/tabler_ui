@@ -112,6 +112,30 @@ RSpec.describe "TablerUi::SettingsPage", type: :component do
     expect(list_items[1]["class"].split(/\s+/)).not_to include("callable-class-general")
   end
 
+  it "applies per-item pane_html: to that item's .tab-pane only, via a plain Hash" do
+    fragment = component_fragment(:settings_page, "my-settings") do |sp|
+      sp.item("General", pane_html: { class: "hook-extra-class" }) { "Content" }
+      sp.item("Security") { "Content" }
+    end
+
+    panes = fragment.css(".tab-pane")
+
+    expect(panes[0]["class"].split(/\s+/)).to include("hook-extra-class")
+    expect(panes[1]["class"].split(/\s+/)).not_to include("hook-extra-class")
+  end
+
+  it "applies per-item pane_html: via a callable taking the item" do
+    fragment = component_fragment(:settings_page, "my-settings") do |sp|
+      sp.item("General", pane_html: ->(item) { { class: "callable-#{item.title.downcase}" } }) { "Content" }
+      sp.item("Security") { "Content" }
+    end
+
+    panes = fragment.css(".tab-pane")
+
+    expect(panes[0]["class"].split(/\s+/)).to include("callable-general")
+    expect(panes[1]["class"].split(/\s+/)).not_to include("callable-general")
+  end
+
   it "renders title: above the sidebar navigation" do
     fragment = component_fragment(:settings_page, "my-settings", title: "Preferences") do |sp|
       sp.item("General") { "Content" }

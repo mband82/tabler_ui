@@ -901,7 +901,8 @@ are added via #item.
                              sidebar_html: { class: "bg-dark" },
                              content_html: { class: "p-0" }) do |sp| %>
   <% sp.item("General", html: { class: "fw-bold" }) do %>Content<% end %>
-  <% sp.item("Security", html: ->(item) { { class: "text-danger" if item.title == "Security" } }) do %>
+  <% sp.item("Security", html: ->(item) { { class: "text-danger" if item.title == "Security" } },
+              pane_html: { class: "p-3" }) do %>
     Content
   <% end %>
 <% end %>
@@ -1324,7 +1325,8 @@ forwarded badge options
                     nav_html: { class: "mb-0" },
                     content_html: { class: "p-2" }) do |tabs| %>
   <% tabs.tab("First", html: { class: "fw-bold" }) %>
-  <% tabs.tab("Second", html: ->(tab) { { class: "text-danger" } if tab.title == "Second" }) %>
+  <% tabs.tab("Second", html: ->(tab) { { class: "text-danger" } if tab.title == "Second" },
+              pane_html: { class: "p-3" }) %>
 <% end %>
 ```
 

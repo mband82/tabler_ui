@@ -158,6 +158,30 @@ RSpec.describe "TablerUi::Tabs", type: :component do
     expect(links[1]["class"].split(/\s+/)).not_to include("callable-class-first")
   end
 
+  it "applies per-tab pane_html: to that tab's .tab-pane only, via a plain Hash" do
+    fragment = component_fragment(:tabs, "my-tabs") do |tabs|
+      tabs.tab("First", pane_html: { class: "hook-extra-class" }) { "Content" }
+      tabs.tab("Second") { "Content" }
+    end
+
+    panes = fragment.css(".tab-pane")
+
+    expect(panes[0]["class"].split(/\s+/)).to include("hook-extra-class")
+    expect(panes[1]["class"].split(/\s+/)).not_to include("hook-extra-class")
+  end
+
+  it "applies per-tab pane_html: via a callable taking the tab" do
+    fragment = component_fragment(:tabs, "my-tabs") do |tabs|
+      tabs.tab("First", pane_html: ->(tab) { { class: "callable-#{tab.title.downcase}" } }) { "Content" }
+      tabs.tab("Second") { "Content" }
+    end
+
+    panes = fragment.css(".tab-pane")
+
+    expect(panes[0]["class"].split(/\s+/)).to include("callable-first")
+    expect(panes[1]["class"].split(/\s+/)).not_to include("callable-first")
+  end
+
   it "adds nav-tabs for the default style: (and for style: :tabs explicitly)" do
     fragment = component_fragment(:tabs, "my-tabs")
     classes = fragment.css("ul.nav").first["class"].split(/\s+/)

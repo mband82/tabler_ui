@@ -49,6 +49,7 @@
 // element mid-edit steals focus/caret, the same lesson
 // search_controller.js's own header documents).
 import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
+import { builderMethodDescriptor } from "controllers/tabler_ui/docs/editor/tree"
 
 export function labelFor(node) {
   switch (node.kind) {
@@ -136,8 +137,37 @@ function containerHtml(containerId, innerHtml) {
   `
 }
 
-function renderArray(schema, nodes, depth, selectedId, selectedSlot) {
-  return nodes.map((child) => renderNode(schema, child, depth, selectedId, selectedSlot)).join("")
+// @param context [{componentName, level}, null] the current builder-map
+//   context -- needed to look up a builder_item's own method descriptor
+//   (schema.components[name].builder[level][method]) mid-walk. Mirrors
+//   editor/tree.js#findNodeContext, which does the same lookup but for one
+//   targeted id rather than threaded through a whole-tree walk like this
+//   one -- both share the actual lookup (Tree.builderMethodDescriptor) so
+//   the two can never disagree about what a method's descriptor says.
+function renderArray(schema, nodes, depth, selectedId, selectedSlot, context) {
+  return nodes.map((child) => renderNode(schema, child, depth, selectedId, selectedSlot, context)).join("")
+}
+
+// The empty-children pseudo-row for a builder item whose own method takes a
+// content block (`block: "children"` in the schema payload -- tabs.tab,
+// accordion.item, settings_page.item, ...). Same shape/purpose as
+// slotRowHtml just above -- a non-draggable placeholder that keeps the
+// (currently empty) children container selectable/droppable as an insertion
+// target -- but labeled generically ("content") rather than by a slot name,
+// since a builder item has exactly one children container, never several
+// named ones the way a slot-style component does.
+function childrenRowHtml(nodeId, depth, selectedId) {
+  const active = nodeId === selectedId ? " active" : ""
+  const indent = (depth * 0.9).toFixed(2)
+
+  return `
+    <div class="list-group-item list-group-item-action py-1 docs-editor-structure-row docs-editor-structure-slot${active}"
+         style="padding-left: ${indent}rem"
+         data-action="click->tabler-ui--docs-editor#selectStructureNode"
+         data-editor-node-id="${nodeId}" role="button">
+      <span class="text-secondary small">content</span>
+    </div>
+  `
 }
 
 // Renders one node: its own row (skipped for the root fragment, which has
@@ -148,14 +178,32 @@ function renderArray(schema, nodes, depth, selectedId, selectedSlot) {
 // `draggable: "[data-editor-item-id]"` option treats as one draggable
 // unit, so dragging a node moves its whole subtree at once. @return an
 // HTML string.
-function renderNode(schema, node, depth, selectedId, selectedSlot) {
+function renderNode(schema, node, depth, selectedId, selectedSlot, context) {
   if (node.kind === "fragment") {
     const containerId = `structure:${node.id}:children`
-    return containerHtml(containerId, renderArray(schema, node.children || [], depth, selectedId, selectedSlot))
+    return containerHtml(containerId, renderArray(schema, node.children || [], depth, selectedId, selectedSlot, context))
   }
 
   let html = rowHtml(node, depth, selectedId)
   const nextDepth = depth + 1
+
+  // Advances the builder-map context for this node's own descendants --
+  // entering a `component` node always resets to that component's own
+  // :root level, and entering a nested builder_item (one whose own method
+  // descriptor carries `nests`, e.g. navbar's left -> dropdown) advances
+  // one level further. Mirrors editor/tree.js#visitWithContext exactly,
+  // which the property panel already relies on for the same lookup against
+  // one target id at a time.
+  let childContext = context
+  let descriptor = null
+  if (node.kind === "component") {
+    childContext = { componentName: node.name, level: "root" }
+  } else if (node.kind === "builder_item") {
+    descriptor = builderMethodDescriptor(schema, context, node.method)
+    if (descriptor && descriptor.nests) {
+      childContext = { componentName: context.componentName, level: descriptor.nests }
+    }
+  }
 
   if (node.kind === "component" && node.slots) {
     const meta = schema && schema.components && schema.components[node.name]
@@ -165,17 +213,38 @@ function renderNode(schema, node, depth, selectedId, selectedSlot) {
       const containerId = `structure:${node.id}:slot__${slotName}`
       const inner = children.length === 0
         ? slotRowHtml(node.id, slotName, nextDepth, selectedSlot)
-        : renderArray(schema, children, nextDepth + 1, selectedId, selectedSlot)
+        : renderArray(schema, children, nextDepth + 1, selectedId, selectedSlot, childContext)
       html += containerHtml(containerId, inner)
     })
   }
 
-  if (Array.isArray(node.children)) {
-    html += containerHtml(`structure:${node.id}:children`, renderArray(schema, node.children, nextDepth, selectedId, selectedSlot))
+  // A builder item whose own method takes a content block (`block:
+  // "children"`) gets a real "children" container the exact same way a
+  // row/column/fragment already does below -- EVEN WHEN the node itself
+  // carries no `children` array yet: a freshly-added item
+  // (editor_controller.js#addBuilderItem) has no `children` key at all
+  // until the server's own Tree#normalize_builder_item adds one on the
+  // first preview round-trip (docs/lib/tabler_ui/docs/editor/tree.rb) --
+  // without this fallback the container silently disappeared from the
+  // Structure pane until some unrelated edit happened to trigger a rebuild
+  // against the by-then-normalized tree, which is the "no way to add
+  // content" bug this whole fix exists for. `descriptor` is read straight
+  // off the schema payload's own `block` field -- never a hardcoded list of
+  // method names -- so this covers every current and future block:children
+  // builder method (tabs.tab, accordion.item, settings_page.item, ...)
+  // with the same code path.
+  const acceptsChildren = !!(descriptor && descriptor.block === "children")
+  if (Array.isArray(node.children) || acceptsChildren) {
+    const kids = Array.isArray(node.children) ? node.children : []
+    const containerId = `structure:${node.id}:children`
+    const inner = acceptsChildren && kids.length === 0
+      ? childrenRowHtml(node.id, nextDepth, selectedId)
+      : renderArray(schema, kids, nextDepth, selectedId, selectedSlot, childContext)
+    html += containerHtml(containerId, inner)
   }
 
   if (Array.isArray(node.items)) {
-    html += containerHtml(`structure:${node.id}:items`, renderArray(schema, node.items, nextDepth, selectedId, selectedSlot))
+    html += containerHtml(`structure:${node.id}:items`, renderArray(schema, node.items, nextDepth, selectedId, selectedSlot, childContext))
   }
 
   return `<div class="docs-editor-structure-node" data-editor-item-id="${node.id}">${html}</div>`

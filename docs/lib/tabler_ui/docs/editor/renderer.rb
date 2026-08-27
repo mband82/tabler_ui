@@ -5,6 +5,7 @@ require "tabler_ui/docs/editor/builder_map"
 require "tabler_ui/docs/editor/sort_url"
 require "tabler_ui/docs/editor/slot_map"
 require "tabler_ui/docs/editor/slot_parts"
+require "tabler_ui/docs/editor/builder_parts"
 
 module TablerUi
   module Docs
@@ -73,6 +74,34 @@ module TablerUi
       # in-canvas text editing. `contenteditable` is never emitted here -- the
       # editor's own JS applies/removes it at runtime.
       #
+      # A builder item whose method takes a `block: :children` (BuilderMap's
+      # own vocabulary -- `accordion.item`, `tabs.tab`, ...) ALSO gets its
+      # own content pane stamped -- `data-editor-builder-content="true"`
+      # alongside a second `data-editor-node-id` naming that same item, on
+      # whichever part BuilderParts.part_for resolves for that (component,
+      # method) pair (#stamp_builder_content / #synthesize_datagrid_
+      # content_marker). Unlike the plain id/field stamps just above, this
+      # IS gated behind `decorate:` -- same mechanism, same reason, as the
+      # slot markers described in "Decoration" below: a builder item's
+      # content pane always renders as real DOM regardless (there's no
+      # placeholder to synthesize the way an empty PRECISE slot needs one),
+      # so gating isn't needed to avoid a divergence risk the way it is
+      # there, but it IS needed to keep consistency_spec.rb green --
+      # EDITOR_ATTRS there is a small, fixed, hand-typed allowlist of
+      # attributes stripped before comparing Renderer's output against
+      # ErbGenerator's (`data-editor-node-id`, `data-editor-field`; that
+      # spec is deliberately never touched by this feature -- see its own
+      # regression guard pinning every fixture render to `decorate: false`),
+      # and it does not cover this new attribute. Gating it the same way
+      # the slot markers already are keeps it out of every `decorate: false`
+      # render path -- consistency_spec.rb's corpus included -- with no
+      # change to that spec at all. Distinct attribute name from
+      # `data-editor-slot` on purpose: this addresses a (component, builder
+      # method) pair, not a (component, slot) one, and the client resolves
+      # a hit on it to `{parentId: <the builder item's id>, container:
+      # "children"}` rather than a named slot.
+      #
+
       # ## `table`'s :columns is declarative, not callable
       #
       # `table`'s real :columns option needs a `value:` Proc per column
@@ -223,6 +252,7 @@ module TablerUi
           opts = component_opts(node)
 
           if klass.respond_to?(:builder_style?) && klass.builder_style?
+            opts = synthesize_datagrid_content_marker(name, opts, node["items"])
             @view.tabler_ui.public_send(name, **opts) do |builder|
               emit_items(builder, node["items"], name, :root, depth + 1)
             end
@@ -299,7 +329,7 @@ module TablerUi
 
           meth = builder.method(method_name)
           call_args = descriptor[:arg] ? [item.dig("args", descriptor[:arg].to_s)] : []
-          call_args << builder_item_opts(item) unless meth.arity.zero?
+          call_args << builder_item_opts(item, component_name, method_name) unless meth.arity.zero?
 
           case descriptor[:block]
           when :items
@@ -670,9 +700,99 @@ module TablerUi
         # `html:`/`header_html:`/`body_html:` on itself, same part-keying as
         # a component. `args` is NOT merged in here (unlike #component_opts):
         # a builder item's required value is passed positionally by
-        # #emit_item, never inside its options Hash.
-        def builder_item_opts(item)
-          symbolize(item["options"]).merge(build_html_opts(item["html"], item["id"]))
+        # #emit_item, never inside its options Hash. `component_name`/
+        # `method_name` are only used to resolve #stamp_builder_content's
+        # own marker -- see that method's doc.
+        def builder_item_opts(item, component_name, method_name)
+          opts = symbolize(item["options"]).merge(build_html_opts(item["html"], item["id"]))
+          stamp_builder_content(opts, component_name, method_name, item["id"])
+        end
+
+        # --- Builder-item content-pane stamping (see class docs' "Stamping") --
+
+        # Merges the builder-content marker into whichever `<part>_html:`
+        # (or, for BuilderParts::ROOT... see below, plain `:html`) key
+        # BuilderParts resolves for this (component_name, method_name) pair
+        # -- a no-op for a pair BuilderParts doesn't know about at all
+        # (UNMAPPED: not a `block: :children` method, or a component this
+        # registry hasn't been told about), for COMPONENT_LEVEL (handled
+        # entirely separately, before dispatch -- see
+        # #synthesize_datagrid_content_marker -- because the real hook
+        # lives on the component, not reachable through a builder item's
+        # own options Hash at all), and whenever `@decorate` is false -- see
+        # the class docs' "Stamping" section for why this one marker is
+        # gated when the id/field stamps around it are not.
+        #
+        # @return [Hash] opts with zero or one `:html` / `:<part>_html`
+        #   entry augmented; every other key untouched.
+        def stamp_builder_content(opts, component_name, method_name, id)
+          return opts unless @decorate
+
+          part = BuilderParts.part_for(component_name, method_name)
+          return opts if part == BuilderParts::UNMAPPED || part == BuilderParts::COMPONENT_LEVEL
+
+          key = part == :root ? :html : :"#{part}_html"
+          opts.merge(key => stamp_builder_marker(opts[key], id))
+        end
+
+        # A dedicated part (:body, :card, :pane, ...) carries no id of its
+        # own otherwise -- unlike the item's own :root/:html part, which
+        # #stamp_editor_id already stamps unconditionally -- so this adds
+        # BOTH the id and the marker flag, the same "dedicated part needs
+        # its own id repeated" reasoning Renderer#stamp_slot_marker already
+        # documents for the slot case. For the :root case (carousel), `id`
+        # here is the SAME id #stamp_editor_id already wrote into this same
+        # Hash moments earlier (both ultimately read item["id"]) -- merging
+        # it again is redundant but harmless, and keeps this method's own
+        # shape identical regardless of which part it's merging into.
+        def stamp_builder_marker(html_hash, id)
+          html_hash = symbolize(html_hash)
+          html_hash.merge(data: symbolize(html_hash[:data]).merge(editor_node_id: id, editor_builder_content: true))
+        end
+
+        # datagrid's `item` is the one BuilderParts::COMPONENT_LEVEL case
+        # today (see that constant's own doc for the full reasoning) --
+        # Datagrid::Component#item never reads a `content_html:` kwarg at
+        # all, so the ordinary per-item route above is a guaranteed no-op
+        # for it. Its real `content_html:` hook lives on the component,
+        # accepting a Hash (applied identically to every item) or a #call
+        # taking the rendered item Hash (`{title:, content:, block:,
+        # auth:}` -- no design-tree id of its own). This builds that Proc
+        # fresh, right before dispatch, closing over the design tree's own
+        # ordered item id list with a monotonically-advancing index --
+        # correct because Datagrid::Component#content_attributes(item) is
+        # called exactly once per item, in the SAME order @items were
+        # appended, which is the SAME order `node["items"]` lists them in:
+        # every item posted through the editor is authorized by
+        # construction (`auth:` is stripped from the whole editor surface --
+        # see the class docs' RCE section's sibling concern, rule 8/9's
+        # `auth:` strip), so there is no filtering discrepancy that could
+        # desync the two orderings. Mirrors #synthesize_table_columns'/
+        # #synthesize_sort_url's own "build the real callable the component
+        # needs, right before dispatch, scoped to exactly one (component,
+        # option) pair" shape.
+        #
+        # Gated on `@decorate`, same as #stamp_builder_content -- see the
+        # class docs' "Stamping" section.
+        #
+        # @return [Hash] opts unchanged for any component other than
+        #   datagrid, or whenever `@decorate` is false; opts with
+        #   :content_html set to the synthesized Proc otherwise
+        #   (overwriting any :content_html a design's own component-level
+        #   options carried -- a design posted through the editor has no
+        #   way to author a real Proc there in the first place, so there is
+        #   nothing legitimate to preserve).
+        def synthesize_datagrid_content_marker(name, opts, items)
+          return opts unless @decorate && BuilderParts.component_level?(name, "item")
+
+          ids = Array(items).map { |item| item["id"] }
+          index = -1
+          marker = lambda do |_item|
+            index += 1
+            id = ids[index]
+            id ? { data: { editor_node_id: id, editor_builder_content: true } } : {}
+          end
+          opts.merge(content_html: marker)
         end
 
         # `html_by_part` is keyed by PART ("root", "header", ...), the

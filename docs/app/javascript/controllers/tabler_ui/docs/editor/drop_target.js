@@ -421,6 +421,22 @@ export function isEmptyRootSharedComponent(node) {
 //   through the chip path below exactly as it always has. When set, the
 //   middle band resolves straight into that named slot instead of
 //   offering a chip for it -- see #resolveDirectSlot.
+// @param hoveredBuilderContent whether the EXACT matched element carries
+//   `data-editor-builder-content` (editor_controller.js#_hitTestDragTarget)
+//   -- the builder-item counterpart of `hoveredSlotName` just above,
+//   stamped by Renderer#stamp_builder_content /
+//   #synthesize_datagrid_content_marker (docs/lib/tabler_ui/docs/editor/
+//   builder_parts.rb is the registry behind it) on whichever part is a
+//   given builder item's own content pane (accordion's `.accordion-body`,
+//   tabs'/settings_page's `.tab-pane`, timeline's `.timeline-event-card`,
+//   datagrid's `.datagrid-content`, carousel's own `.carousel-item` root).
+//   Also only ever true under decoration -- same `@decorate` gate as
+//   `data-editor-slot`. When true, the middle band resolves straight
+//   "into" that builder item's own `children` instead of falling through
+//   to the ordinary edge-band/chip logic a bare builder_item hit would
+//   otherwise get (builder_item is not one of #resolveInto's row/column/
+//   fragment kinds, and #legalChips only ever offers chips for a
+//   `component`-kind node) -- see #resolveDirectBuilderContent.
 // @param pointerX the drag's current clientX, in the same (frame-viewport)
 //   coordinate space as hoveredRect -- feeds #edgeBandFor's left/right
 //   edge test alongside pointerY's top/bottom one (this file's header,
@@ -498,7 +514,7 @@ export function isEmptyRootSharedComponent(node) {
 //                                       "chips", true iff at least one
 //                                       chip is valid.
 // }
-export function resolveDropTarget({ tree, schema, hoveredNodeId, hoveredRect, hoveredSlotName = null, pointerX, pointerY, draggedKind, draggedNodeId = null }) {
+export function resolveDropTarget({ tree, schema, hoveredNodeId, hoveredRect, hoveredSlotName = null, hoveredBuilderContent = false, pointerX, pointerY, draggedKind, draggedNodeId = null }) {
   if (!tree) {
     return {
       parentId: null, container: null, index: 0, position: "append",
@@ -515,7 +531,7 @@ export function resolveDropTarget({ tree, schema, hoveredNodeId, hoveredRect, ho
   // #resolveAgainstElement from ever being asked to find "the root's own
   // container", which doesn't mean anything.
   if (hoveredNodeId && hoveredRect && hoveredNodeId !== tree.id) {
-    target = resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hoveredSlotName, pointerX, pointerY, draggedKind, draggedNodeId)
+    target = resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hoveredSlotName, hoveredBuilderContent, pointerX, pointerY, draggedKind, draggedNodeId)
   }
   if (!target) target = resolveAgainstRoot(tree)
 
@@ -600,7 +616,7 @@ function edgeBandFor(rect, pointerX, pointerY) {
   return nearest.fraction <= nearest.bandFraction ? nearest.edge : "into"
 }
 
-function resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hoveredSlotName, pointerX, pointerY, draggedKind, draggedNodeId) {
+function resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hoveredSlotName, hoveredBuilderContent, pointerX, pointerY, draggedKind, draggedNodeId) {
   const container = findContainer(tree, hoveredNodeId)
   const parent = findParent(tree, hoveredNodeId)
   if (!container || !parent) return null
@@ -682,6 +698,16 @@ function resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hovered
     // say why (editor_controller.js's errors banner), not to quietly
     // redirect it into a sibling insert the user never asked for.
     //
+    // The matched element carries the builder-content marker instead (see
+    // this file's header on `hoveredBuilderContent`) -- a second, equally
+    // specific answer, checked right after the slot case and for the same
+    // reason: the pointer already committed to one specific builder item's
+    // own content pane, so that wins over both
+    // #resolveDirectChildContainerCentreSibling and #resolveInto's
+    // chip-menu path (which, for a `builder_item`-kind hoveredNode, would
+    // never offer a legal "into" target of its own anyway -- see
+    // #resolveDirectBuilderContent's own header).
+    //
     // No slot named -- the pointer is over the hovered element's own bare
     // root -- and that element's own PARENT is a direct-child container
     // (badge_list/card_group): nesting is never the meaning of a drop
@@ -693,6 +719,8 @@ function resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hovered
     if (hoveredSlotName) {
       into = resolveDirectSlot(hoveredNode, hoveredSlotName, hoveredRect, draggedNodeId)
       if (into && into.refused) return buildRefusedTarget(into.reason, hoveredRect)
+    } else if (hoveredBuilderContent) {
+      into = resolveDirectBuilderContent(hoveredNode, hoveredRect)
     } else {
       into = resolveDirectChildContainerCentreSibling(schema, parent, key, container, hoveredRect, pointerX)
       if (!into) into = resolveInto(tree, schema, hoveredNode, hoveredRect, draggedKind, draggedNodeId)
@@ -1015,6 +1043,42 @@ function resolveDirectSlot(hoveredNode, slotName, hoveredRect, draggedNodeId) {
     parentId: hoveredNode.id,
     container: `slot__${slotName}`,
     index: occupant.length,
+    position: "into",
+    anchorRect: hoveredRect,
+    insertionRect: null,
+    chips: null
+  }
+}
+
+// The pointer is over a builder item's own dedicated content pane (a real,
+// stamped, measurable node -- Renderer stamps `data-editor-builder-content`
+// unconditionally onto that pane whenever it stamps anything at all under
+// decoration, with no placeholder mechanism involved: unlike a slot, a
+// builder item's content pane is never gated on presence -- see
+// docs/lib/tabler_ui/docs/editor/builder_parts.rb and Renderer#stamp_
+// builder_content's own doc). Lands directly INSIDE that item's own
+// `children`, no chip menu, no edge-band fallback -- mirrors
+// #resolveDirectSlot immediately above, but keyed to `hoveredNode.id`
+// itself (a builder_item's content pane always shares its OWN item's id,
+// never a separate id of its own -- see Renderer#stamp_builder_marker) and
+// `container: "children"` (never `slot__<name>`, which addresses a
+// component + slot pair, not a component + builder-method one). No
+// SINGLE_OCCUPANT_SLOTS-style refusal exists for a builder item's own
+// children -- nothing caps how many nodes one holds.
+//
+// @return the same {parentId, container, index, position: "into", ...}
+//   shape #resolveInto's row/column/fragment branch returns, appending
+//   after whatever the item's `children` already holds; or null if the
+//   hovered element isn't found in the tree at all (defensive -- the
+//   marker only ever exists on a real, currently-rendered builder item).
+function resolveDirectBuilderContent(hoveredNode, hoveredRect) {
+  if (!hoveredNode) return null
+
+  const children = Array.isArray(hoveredNode.children) ? hoveredNode.children : []
+  return {
+    parentId: hoveredNode.id,
+    container: "children",
+    index: children.length,
     position: "into",
     anchorRect: hoveredRect,
     insertionRect: null,
