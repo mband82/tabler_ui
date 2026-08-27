@@ -16,6 +16,31 @@
 //                                    never has to JSON.parse every file's
 //                                    whole design tree just to draw the
 //                                    file list.
+//   tabler-ui-docs-editor:guides     "true"/"false" -- whether the canvas
+//                                    requests decorated (layout-guide)
+//                                    previews. Default on (a missing key
+//                                    reads as enabled, not disabled -- see
+//                                    editor_controller.js's own loader).
+//                                    A single boolean has no shape worth a
+//                                    load/save pair of its own the way the
+//                                    workspace document has above, so
+//                                    editor_controller.js reads/writes this
+//                                    key directly with plain
+//                                    localStorage.getItem/setItem rather
+//                                    than through a helper here -- GUIDES_KEY
+//                                    is exported below purely so that
+//                                    direct read/write still goes through
+//                                    one named constant instead of a
+//                                    string literal repeated at each call
+//                                    site.
+//   tabler-ui-docs-editor:inspector-width  the Inspector rail's user-chosen
+//                                    width in px, read/written by
+//                                    editor_inspector_resize_controller.js
+//                                    (not this module -- same one-value,
+//                                    no-load/save-pair reasoning as
+//                                    GUIDES_KEY just above). A missing or
+//                                    unparseable value falls back to that
+//                                    controller's own DEFAULT_WIDTH.
 //
 // ## localStorage is the source of truth
 //
@@ -44,6 +69,8 @@ import * as Tree from "controllers/tabler_ui/docs/editor/tree"
 const PREFIX = "tabler-ui-docs-editor:"
 export const WORKSPACE_KEY = `${PREFIX}workspace`
 export const INDEX_KEY = `${PREFIX}index`
+export const GUIDES_KEY = `${PREFIX}guides`
+export const INSPECTOR_WIDTH_KEY = `${PREFIX}inspector-width`
 
 const DEFAULT_PATH = "index.html.erb"
 

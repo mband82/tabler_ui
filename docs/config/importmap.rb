@@ -19,6 +19,7 @@ pin "controllers/tabler_ui/docs/search_controller", to: "controllers/tabler_ui/d
 # is registered with Stimulus (docs/app/assets/javascripts/tabler_ui/docs.js);
 # the rest are imported by it.
 pin "controllers/tabler_ui/docs/editor_controller", to: "controllers/tabler_ui/docs/editor_controller.js"
+pin "controllers/tabler_ui/docs/editor_inspector_resize_controller", to: "controllers/tabler_ui/docs/editor_inspector_resize_controller.js"
 pin "controllers/tabler_ui/docs/editor/dnd", to: "controllers/tabler_ui/docs/editor/dnd.js"
 pin "controllers/tabler_ui/docs/editor/drop_target", to: "controllers/tabler_ui/docs/editor/drop_target.js"
 pin "controllers/tabler_ui/docs/editor/explorer", to: "controllers/tabler_ui/docs/editor/explorer.js"

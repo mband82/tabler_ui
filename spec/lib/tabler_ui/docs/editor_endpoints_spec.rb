@@ -34,8 +34,10 @@ RSpec.describe "TablerUi::Docs design editor endpoints", type: :request do
     { "version" => TablerUi::Docs::Editor::Contract::VERSION, "files" => files, "directories" => [], "open" => open }
   end
 
-  def preview_body(tree, path: "index.html.erb")
-    { path: path, workspace: workspace_payload(files: { path => { "tree" => tree } }, open: path) }
+  def preview_body(tree, path: "index.html.erb", decorate: nil)
+    body = { path: path, workspace: workspace_payload(files: { path => { "tree" => tree } }, open: path) }
+    body[:decorate] = decorate unless decorate.nil?
+    body
   end
 
   describe "GET /ui/editor/schema" do
@@ -85,6 +87,66 @@ RSpec.describe "TablerUi::Docs design editor endpoints", type: :request do
       expect(json["html"]).to include("Save")
       expect(json["html"]).not_to include("Missing partial")
       expect(json["html"]).not_to include("alert-danger")
+    end
+
+    # `decorate:` (Renderer's "layout guide" flag, see that class's own
+    # "Decoration" docs) is off by default and only ever turned on by a
+    # literal JSON `true` in the request body -- see EditorController
+    # #decorate_flag's own doc for why anything else (absent, a String
+    # "true", 1, ...) must be treated as off. `erb:` never carries any of
+    # this markup at all, decorate: true or not -- ErbGenerator has no
+    # decoration concept (see erb_generator_spec.rb's own coverage).
+    describe "decorate:" do
+      # Built by hand rather than via #component_node above -- that helper
+      # has no way to carry a top-level `slots` key (only `options`), and
+      # this needs a real slot-style component with an EMPTY slot to prove
+      # decoration adds a placeholder there at all.
+      def card_with_empty_body
+        { "kind" => "component", "id" => "c1", "name" => "card",
+          "options" => { "title" => "Card title" }, "slots" => { "body" => [] } }
+      end
+
+      it "adds no layout-guide markup by default (decorate: omitted)" do
+        tree = fragment("root", [card_with_empty_body])
+
+        post "/ui/editor/preview", params: preview_body(tree), as: :json
+
+        json = JSON.parse(response.body)
+        expect(json["html"]).not_to include("data-editor-slot")
+      end
+
+      it "adds layout-guide markup -- a marker and a placeholder -- for an empty slot when decorate: true" do
+        tree = fragment("root", [card_with_empty_body])
+
+        post "/ui/editor/preview", params: preview_body(tree, decorate: true), as: :json
+
+        json = JSON.parse(response.body)
+        expect(json["html"]).to include('data-editor-slot="body"')
+        expect(json["html"]).to include('aria-hidden="true"')
+      end
+
+      it "treats a truthy-but-not-boolean decorate: (a String \"true\") as off" do
+        tree = fragment("root", [card_with_empty_body])
+
+        post "/ui/editor/preview", params: preview_body(tree, decorate: "true"), as: :json
+
+        json = JSON.parse(response.body)
+        expect(json["html"]).not_to include("data-editor-slot")
+      end
+
+      it "never lets decorate: true change the erb: field at all" do
+        tree = fragment("root", [card_with_empty_body])
+
+        post "/ui/editor/preview", params: preview_body(tree, decorate: false), as: :json
+        erb_undecorated = JSON.parse(response.body)["erb"]
+
+        post "/ui/editor/preview", params: preview_body(tree, decorate: true), as: :json
+        json = JSON.parse(response.body)
+
+        expect(json["erb"]).to eq(erb_undecorated)
+        expect(json["erb"]).not_to include("data-editor-slot")
+        expect(json["html"]).to include("data-editor-slot") # sanity: decoration really was on for this request
+      end
     end
 
     it "drops a non-allowlisted component name, reports it, and still renders the rest" do

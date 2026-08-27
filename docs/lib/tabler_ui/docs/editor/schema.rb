@@ -8,6 +8,7 @@ require "tabler_ui/docs/editor/slot_map"
 require "tabler_ui/docs/editor/builder_map"
 require "tabler_ui/docs/editor/enum_map"
 require "tabler_ui/docs/editor/tree"
+require "tabler_ui/docs/editor/slot_parts"
 
 module TablerUi
   module Docs
@@ -164,6 +165,60 @@ module TablerUi
         # gains or removes a kind.
         LAYOUT_KINDS = (Contract::KINDS - %w[fragment component builder_item]).freeze
 
+        # Components whose CSS genuinely breaks if a `row` lands directly
+        # between them and their slot's own root wrapper -- i.e. a
+        # container the canvas must never offer to WRAP into on a left/
+        # right edge drop, only ever a plain sibling insert. A strict
+        # SUBSET of SlotParts::ROOT_SHARED (only a component whose slot
+        # content renders straight into its own root element even HAS this
+        # "no wrapper in between" shape for a wrap to threaten in the first
+        # place -- see SlotParts' own module doc), further narrowed by
+        # hand, one component at a time, against the real, bundled
+        # stylesheet:
+        #
+        #   * card_group -- tabler.css's `.card-group > .card` is a literal
+        #     direct-child combinator (plus the `:not(:first-child)`/
+        #     `:not(:last-child)` corner-rounding rules keyed off the same
+        #     relationship): a card one level deeper than that, inside an
+        #     inserted row/column, simply matches none of those selectors
+        #     any more.
+        #   * badge_list -- `.badges-list` (tabler.css) is `display: flex;
+        #     flex-wrap: wrap; gap: ...`, no combinator, but the hazard is
+        #     just as real: Contract::CONTAINER_KINDS' `row` is ITSELF
+        #     `display: flex; flex-wrap: wrap` with negative side margins,
+        #     so as a lone flex-item child it claims a full line on its
+        #     own and forces a hard break instead of sitting inline beside
+        #     the other badges the way a bare badge would.
+        #
+        # Deliberately NOT the other three ROOT_SHARED entries -- each was
+        # checked and rejected on its own merits, not just left off:
+        #
+        #   * alert's `body` / ribbon's `body` -- free-form content with no
+        #   child-combinator or flex-layout contract on either `.alert` or
+        #   `.ribbon` in tabler.css (verified: neither selector appears
+        #   there at all). A two-column row inside an alert's body is a
+        #   normal, supported layout, not a hazard -- disallowing wrap
+        #   there would remove a real capability for no CSS reason.
+        #   * avatar's `overlay` -- holds at most one small, absolutely
+        #   positioned status dot/chip; there is no second sibling a wrap
+        #   could ever apply beside in the first place.
+        #
+        # A blanket "does every ROOT_SHARED component's own class appear in
+        # a flex/gap or child-combinator rule" auto-derivation was
+        # considered and rejected: plenty of unrelated Tabler classes
+        # (`.btn-list`, `.avatar-list`) share that same `display: flex;
+        # gap: ...` shape without a direct-children hazard at all -- it is
+        # a common, ordinary layout pattern here, not a reliable signal on
+        # its own -- so a mechanical sweep over ALL components would both
+        # under- and over-match. What schema_spec.rb's anti-rot spec DOES
+        # verify, per listed entry, is that this judgement still holds: the
+        # entry is really in SlotParts::ROOT_SHARED, and the bundled
+        # stylesheet still contains the specific selector text cited above
+        # for it -- a regression (a Tabler upgrade dropping the
+        # `.card-group > .card` rule, say) fails that spec rather than
+        # silently going stale here.
+        DIRECT_CHILD_CONTAINERS = %w[badge_list card_group].freeze
+
         # Type sets (already comma-split, "nil" dropped, SafeBuffer folded
         # into String, and sorted) that resolve to the "json" advanced
         # escape-hatch control -- see the module doc's rule 7. Explicit and
@@ -202,8 +257,18 @@ module TablerUi
         # :items or rating's :choices, which share :columns' own
         # "Array<Hash>" type string but have no `key:`/callable concept at
         # all.
+        #
+        # table's :sort_url joined this table once a declarative
+        # representation for it existed (SortUrl.pattern_for, and
+        # Tree#normalize_declarative_sort_url validating the two-mode Hash
+        # shape a design tree carries instead of a real callable -- see
+        # that method's own doc). Before that, :sort_url's real type is
+        # "#call", which rule 6 (module doc) would otherwise classify
+        # straight to "unsupported" -- this entry is what intercepts it
+        # first, the same way it already intercepts :columns/:data ahead of
+        # their own would-be "json"/"unsupported" classification.
         DECLARATIVE_CONTROLS = {
-          "table" => { "columns" => "columns", "data" => "rows" }
+          "table" => { "columns" => "columns", "data" => "rows", "sort_url" => "sort_url" }
         }.freeze
 
         # Declarative sub-fields a "columns" control's UI can build one
@@ -227,23 +292,32 @@ module TablerUi
         #     modules' own doc comments on this) -- so there is no field
         #     for it at all, declarative or otherwise; `key` is the only
         #     way to make a cell render something.
-        #   * `sort` -- a column's `sort:` is only meaningful alongside the
-        #     table-level `sort_url:`, and `sort_url:` is itself a callable
-        #     (`#call`, reported in `unsupported`, same as `value` would
-        #     be) that a design tree can never supply. Offering a per-column
-        #     sort field with no way to ever give it a working `sort_url:`
-        #     would just be a control that always breaks the table
-        #     (Table::Component#guard_sort_url! raises ArgumentError,
-        #     caught only as a whole-node error marker -- see Renderer's
-        #     error-isolation doc) the moment it's used. Left out until the
-        #     editor has some other way to wire up sort_url:.
-        #   * `sort_url` -- table-level, not per-column, and itself a
-        #     callable -- already correctly reported as `unsupported`
-        #     (reason: "callable") via the ordinary #control_for path.
+        #   * `sort` -- WAS left out here: a column's `sort:` is only
+        #     meaningful alongside the table-level `sort_url:`, and
+        #     `sort_url:` was itself a plain callable a design tree had no
+        #     way to supply at all, so offering a per-column sort field
+        #     would only ever have produced a table that breaks the moment
+        #     it's used (Table::Component#guard_sort_url! raises
+        #     ArgumentError, caught only as a whole-node error marker -- see
+        #     Renderer's error-isolation doc). That's no longer true: a
+        #     declarative sort_url: now exists (see DECLARATIVE_CONTROLS'
+        #     own doc on the "table" => { "sort_url" => "sort_url" } entry,
+        #     and SortUrl.pattern_for/Tree#normalize_declarative_sort_url),
+        #     so `sort` is included below -- the editor's inspector pairs it
+        #     with a "Sortable" checkbox, pre-filled from the column's own
+        #     `key`. It is a plain String like `label`/`class`: Table::
+        #     Component compares it against the table-level `sort[:key]` as
+        #     a String regardless of what the cell itself renders (see
+        #     Table::Component#sorted?), so it is never required to match
+        #     `key` and the editor never assumes it does.
+        #   * `sort_url` -- table-level, not per-column, so it has no place
+        #     in a single column's own field list; see DECLARATIVE_CONTROLS'
+        #     own "sort_url" entry for its dedicated control instead.
         COLUMN_FIELDS = [
           { "name" => "key", "control" => "text", "required" => true },
           { "name" => "label", "control" => "text", "required" => false },
-          { "name" => "class", "control" => "text", "required" => false }
+          { "name" => "class", "control" => "text", "required" => false },
+          { "name" => "sort", "control" => "text", "required" => false }
         ].freeze
 
         # `/(default: ...)/ ` inside an option's description -- a lossy,
@@ -314,6 +388,15 @@ module TablerUi
         # copy of a vocabulary that can quietly drift out from under the one
         # that actually matters.
         #
+        # `directChildContainers` is the same UX-hint idea again, for
+        # DIRECT_CHILD_CONTAINERS above: it tells the canvas which
+        # components' left/right edge drops must resolve to a plain sibling
+        # insert rather than drop_target.js's ordinary wrap. Also advisory
+        # only, same as `placement` -- Tree still accepts a `row` posted
+        # into one of these components' slots from anywhere else (a hand-
+        # crafted design, an older export); this only changes what the
+        # canvas itself offers to build.
+        #
         # @api private
         def kinds_payload
           {
@@ -325,7 +408,8 @@ module TablerUi
               "rootKinds" => Tree::ROOT_KINDS,
               "nonRowContainerKinds" => Tree::NON_ROW_CONTAINER_KINDS,
               "rowContainerKinds" => Tree::ROW_CONTAINER_KINDS
-            }
+            },
+            "directChildContainers" => DIRECT_CHILD_CONTAINERS
           }
         end
 

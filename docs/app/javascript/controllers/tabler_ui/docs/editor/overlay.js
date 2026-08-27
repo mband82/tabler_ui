@@ -1,7 +1,9 @@
 // Draws non-DOM chrome over the design being previewed in the editor's
 // sandboxed <iframe> -- a selection box, a hover box, a floating action
-// toolbar, and (added for native drag-and-drop) a drag ghost box, an
-// insertion line, and a floating "drop into..." chip menu. None of it may
+// toolbar, (added for native drag-and-drop) a drag ghost box, an
+// insertion line, and a floating "drop into..." chip menu, and (added for
+// design-editor layout guides) an unbounded, id-keyed set of labelled
+// container outlines. None of it may
 // ever become part of the design's own DOM: Bootstrap leans hard on direct-child selectors
 // (.row > *, .btn-group > .btn, .navbar-nav > li), so inserting so much as
 // one wrapper or marker element into the design would visibly change what
@@ -22,7 +24,12 @@
 // setChips below need no more tree/schema knowledge than setSelection/
 // setHover always have -- each draws into its own child of the same root,
 // shown and hidden the same way, and this file stays exactly as ignorant
-// of the tree as it always was.
+// of the tree as it always was. setGuides is the same contract stretched
+// to an unbounded N: editor_controller.js resolves every server slot
+// marker and every row/column tree node to a {id, left, top, width,
+// height, label} rect itself -- this module still never learns what a
+// "slot" or a "row" is, only that it was handed a rect with that id and
+// that string to draw this time.
 //
 // One root element, created here and appended to the frame document's
 // <body> as a sibling of #tabler-ui-editor-canvas -- never a descendant of
@@ -52,15 +59,31 @@ const LABEL_GAP = 4
 const TOOLBAR_GAP = 6
 const CHIPS_GAP = 6
 
+// How close (px, both axes) two guides' own top-left corners have to be
+// for #setGuides to treat them as landing "in the same spot" and hide the
+// second label rather than let it overlap the first -- see that method's
+// own comment for the two ways this happens (a row whose lone column
+// fills it exactly -- an EXACT match -- and a column's own child starting
+// a few px further in for its own border -- a NEAR match) and why a small
+// tolerance, not exact equality, is what this actually needs. Close to,
+// but not measured from, the guide label's own rendered height (~15.6px
+// at this file's 0.65rem/1.4 line-height, confirmed by hand against the
+// running editor) -- rounded up on the theory that two corners closer
+// together than one label's own height are certain to have overlapping
+// labels, not read off the DOM every call to confirm it precisely.
+const GUIDE_LABEL_COLLISION_TOLERANCE = 16
+
 // @param doc the frame document (contentDocument of the Preview iframe) --
 //   never the outer editor page's own document; see this file's header.
 // @return {
 //   setSelection(rect, label), clearSelection(),
 //   setHover(rect, label), clearHover(),
 //   setToolbar(rect, buttons), clearToolbar(),
-//   setGhost(rect, label, valid), clearGhost(),
-//   setInsertionLine(rect), clearInsertionLine(),
+//   setGhost(rect, label, valid, wrap), clearGhost(),
+//   setInsertionLine(rect, orientation), clearInsertionLine(),
+//   setWrapOutline(rect, label), clearWrapOutline(),
 //   setChips(rect, chips), clearChips(),
+//   setGuides(rects), clearGuides(), setGuidesMuted(muted),
 //   destroy()
 // }
 export function createOverlay(doc) {
@@ -69,15 +92,36 @@ export function createOverlay(doc) {
   root.className = "docs-editor-canvas-overlay-root"
   doc.body.appendChild(root)
 
+  // Guides are appended first so every other piece of chrome below (which
+  // all share this same root) paints on top of them -- a selection or
+  // hover box landing on the same element a guide also outlines must never
+  // read as ambiguous about which one is "in front".
+  const guidesRoot = doc.createElement("div")
+  guidesRoot.className = "docs-editor-canvas-guides"
+  root.appendChild(guidesRoot)
+  // id => {box, label} -- see #setGuides below for why this is a
+  // long-lived Map diffed in place rather than rebuilt from scratch like
+  // #showChips/#showToolbar's much smaller (five-ish items) button lists.
+  const guideBoxes = new Map()
+
   const selection = buildBox(doc, "selection")
   const hover = buildBox(doc, "hover")
   const toolbar = buildToolbar(doc)
   const ghost = buildBox(doc, "ghost")
   const insertionLine = buildLine(doc)
+  // The wrap outline (see #setWrapOutline below) shares .buildBox's shape
+  // with selection/hover/ghost -- a box + its own label -- but is
+  // APPENDED BEFORE the ghost, not after: a wrap outline covers the whole
+  // hovered element while the ghost drawn for that same drag tick sits
+  // INSIDE half of it (editor_controller.js#_paintDragGhost's "wrap"
+  // case), and the ghost has to paint on top of the outline it's nested
+  // inside of for that to read correctly, not the other way around.
+  const wrapOutline = buildBox(doc, "wrap")
   const chipsMenu = buildChips(doc)
   root.appendChild(selection.box)
   root.appendChild(hover.box)
   root.appendChild(toolbar.box)
+  root.appendChild(wrapOutline.box)
   root.appendChild(ghost.box)
   root.appendChild(insertionLine)
   root.appendChild(chipsMenu.box)
@@ -107,9 +151,16 @@ export function createOverlay(doc) {
     // (see drop_target.js's ROOT_GHOST_HEIGHT). `valid` toggles the
     // -invalid modifier class (editor_canvas.css) -- see this file's
     // header on why validity is advisory only: it changes how the ghost
-    // LOOKS, never whether the drop is allowed to happen.
-    setGhost(rect, label, valid) {
+    // LOOKS, never whether the drop is allowed to happen. `wrap` (new,
+    // optional -- every existing caller before the wrap feature omits it,
+    // which is falsy the same as explicit `false`) toggles the distinct
+    // -wrap modifier class editor_controller.js#_paintDragGhost's "wrap"
+    // case sets, so a compound "build a new row" drop reads as visibly
+    // different chrome from an ordinary insert rather than the same dashed
+    // primary-hue box in a different position.
+    setGhost(rect, label, valid, wrap) {
       ghost.box.classList.toggle("docs-editor-canvas-box-ghost-invalid", valid === false)
+      ghost.box.classList.toggle("docs-editor-canvas-box-ghost-wrap", !!wrap)
       showBox(ghost, rect, label)
     },
 
@@ -117,26 +168,59 @@ export function createOverlay(doc) {
       hideBox(ghost)
     },
 
-    // `rect` is {left, top, width} -- a thin band, not a full box (see
-    // #buildLine below for why this is a separate element shape from
-    // every other piece of chrome here, all of which are 4-bordered
-    // boxes). `top` is already the exact insertion y-coordinate
-    // (drop_target.js's insertionRect: the hovered rect's own top edge for
-    // a "before" drop, its bottom edge for "after") -- this function does
-    // no further offsetting, it only draws the line where it's told.
-    setInsertionLine(rect) {
+    // `rect` is {left, top, width} for a HORIZONTAL line (the original
+    // top/bottom-edge case) or {left, top, height} for a VERTICAL one (the
+    // new left/right-edge case, drop_target.js's horizontal bands) -- a
+    // thin band, not a full box (see #buildLine below for why this is a
+    // separate element shape from every other piece of chrome here, all of
+    // which are 4-bordered boxes). `top`/`left` are already the exact
+    // insertion coordinate (drop_target.js's insertionRect) -- this
+    // function does no further offsetting, it only draws the line where
+    // it's told, in the axis `orientation` says. `orientation` defaults to
+    // "horizontal" -- every caller from before the wrap feature passes no
+    // third argument at all, and must keep drawing exactly the bar it
+    // always has.
+    setInsertionLine(rect, orientation = "horizontal") {
       if (!rect) {
         insertionLine.hidden = true
         return
       }
+      const vertical = orientation === "vertical"
+      insertionLine.classList.toggle("docs-editor-canvas-insertion-line-vertical", vertical)
       insertionLine.style.left = `${rect.left}px`
       insertionLine.style.top = `${rect.top}px`
-      insertionLine.style.width = `${rect.width}px`
+      // Only the dimension THIS orientation actually uses is set -- the
+      // other is left as whatever it was (editor_canvas.css's own
+      // vertical-modifier rule overrides the fixed one CSS alone would
+      // otherwise apply), so a horizontal line never carries a stale
+      // inline height from a previous vertical tick or vice versa.
+      if (vertical) {
+        insertionLine.style.height = `${rect.height}px`
+      } else {
+        insertionLine.style.width = `${rect.width}px`
+      }
       insertionLine.hidden = false
     },
 
     clearInsertionLine() {
       insertionLine.hidden = true
+    },
+
+    // The "this whole element is about to become one half of a new row"
+    // outline drawn for a `position: "wrap"` descriptor -- see editor_
+    // controller.js#_paintDragGhost's own comment for why this needs to be
+    // visually distinct from the ordinary ghost box it's drawn alongside
+    // (a wrap is a bigger structural change than a plain insert). `rect`
+    // is the hovered element's own full rect, unlike the ghost drawn at
+    // the same tick (that one is sized to half of it) -- see #buildBox's
+    // shared shape for why this reuses the same box+label construction
+    // selection/hover/ghost already use rather than inventing a new one.
+    setWrapOutline(rect, label) {
+      showBox(wrapOutline, rect, label)
+    },
+
+    clearWrapOutline() {
+      hideBox(wrapOutline)
     },
 
     // `chips` is [{ label, onDrop }] in display order -- one chip per
@@ -184,6 +268,147 @@ export function createOverlay(doc) {
       toolbar.box.hidden = true
     },
 
+    // `rects` is [{id, left, top, width, height, label}] -- one entry per
+    // container editor_controller.js#_collectGuideRects found this tick
+    // (every server-decorated slot marker, plus every row/column node in
+    // the current tree), in no particular order. Diffed against the guide
+    // boxes already on screen BY ID, reusing a box/label pair across calls
+    // for any id that survives from one recompute to the next -- this is
+    // the one place in this file that deliberately does NOT follow
+    // #setChips/#setToolbar's "rebuild from scratch" pattern: that pattern
+    // is fine for five buttons rebuilt on a user action, but guides can
+    // number in the dozens and recompute on every scroll/resize tick (see
+    // editor_controller.js#_repositionGuides), so tearing down and
+    // rebuilding every box every time would be real, avoidable DOM churn
+    // on the hot path this feature is most likely to make slow.
+    //
+    // No flip-and-clamp here (contrast #_positionLabel/#showToolbar/
+    // #showChips, all of which call #flipAndClamp) -- a guide's label is
+    // pinned to its own box's top-left corner by CSS alone
+    // (.docs-editor-canvas-guide-label, editor_canvas.css), so nothing
+    // here ever reads label.offsetWidth/offsetHeight. That is a
+    // deliberate trade, not an oversight: flipAndClamp's synchronous
+    // layout read is affordable once per selection/hover/toolbar change,
+    // but not fifty times on every animation frame a scroll produces.
+    //
+    // Two nested containers routinely resolve to top-left corners that are
+    // the same or close enough to read as the same -- a row whose one,
+    // full-span column fills it precisely (Bootstrap's row/column
+    // negative-margin-vs-padding cancelling out to a BYTE-for-byte
+    // identical rect) is one case, but confirmed live against a real
+    // nested design, a column's own child (a card, its own slot markers
+    // starting a few px further in for the card's own border) lands only a
+    // few px off the column's corner, not exactly on it -- and every guide
+    // label pinned to "its own box's top-left corner" still overlaps
+    // there, because two ~16px-tall labels a few px apart overlap just as
+    // unreadably as two pinned to the identical pixel. `claimedCorners`
+    // below finds every guide whose corner lands within
+    // GUIDE_LABEL_COLLISION_TOLERANCE of one already claimed this call and
+    // hides ONLY that guide's LABEL, never its box -- the box stays drawn
+    // (so the container is still outlined and still a visible drop
+    // target), only the caption that would have overlapped disappears.
+    // This was tried first the other way, offsetting every colliding label
+    // downward by a fixed step instead of hiding it, and that approach has
+    // a real correctness hole a suppress-only fix does not: nudging a
+    // label down by a fixed distance from ITS OWN box's top ignores
+    // whatever ELSE already sits just below that box, so clearing one
+    // collision can silently create a new one against an unrelated
+    // neighbour (confirmed live: pushing "column"'s label clear of "row"
+    // landed it on top of the next slot guide's own "body" label two rows
+    // away). Suppression cannot do that -- a hidden label renders nowhere,
+    // so fixing one collision can never create another. The trade this
+    // accepts is real (a corner with three coinciding guides shows only
+    // one caption, not three), but guides are chrome, not data -- the tree
+    // itself, the Structure tab, and the Inspector are all still there for
+    // "what nested inside what" -- and every guide's own BOX is still
+    // drawn and still distinguishable by size even when its label is not,
+    // so nothing about the design's actual structure becomes unreadable,
+    // only one redundant caption at a shared corner does. Which guide
+    // keeps its label is simply whichever reaches this loop first --
+    // #_collectGuideRects' own fixed collection order (slot markers, then
+    // shared-slot markers, then a tree walk), not a deliberately ranked
+    // "more specific wins" rule -- because ranking arbitrary guide kinds
+    // by specificity is exactly the kind of tree/schema knowledge this
+    // file's header says it deliberately never has. Still no text
+    // measurement: every compare is arithmetic against `rect.left`/
+    // `rect.top`, numbers this function already has. Worst case this is
+    // one pass over the corners claimed so far per guide (O(n) guides x
+    // O(n) corners), not the single Map lookup exact-match would have
+    // been, but guides top out in the dozens for any design this editor
+    // can build (see guideBoxes' own doc above), so even the worst case
+    // here is a few hundred cheap number comparisons, not a cost this hot
+    // path needs to fear. Recomputed from scratch on every call (never
+    // carried over from the previous one) so a collision that stops
+    // applying -- a sibling gains real content, the tree changes shape --
+    // un-hides itself the very next tick rather than leaving a label
+    // hidden for no reason still in effect.
+    setGuides(rects) {
+      const seen = new Set()
+      const claimedCorners = [] // [{left, top}], this call only
+      rects.forEach((rect) => {
+        seen.add(rect.id)
+        let entry = guideBoxes.get(rect.id)
+        if (!entry) {
+          entry = buildGuideBox(doc)
+          guideBoxes.set(rect.id, entry)
+          guidesRoot.appendChild(entry.box)
+        }
+        entry.box.style.left = `${rect.left}px`
+        entry.box.style.top = `${rect.top}px`
+        entry.box.style.width = `${rect.width}px`
+        entry.box.style.height = `${rect.height}px`
+        entry.label.textContent = rect.label || ""
+
+        const collides = claimedCorners.some((c) => (
+          Math.abs(c.left - rect.left) < GUIDE_LABEL_COLLISION_TOLERANCE && Math.abs(c.top - rect.top) < GUIDE_LABEL_COLLISION_TOLERANCE
+        ))
+        if (!collides) claimedCorners.push({ left: rect.left, top: rect.top })
+        entry.label.hidden = collides
+      })
+
+      // Anything left over from a previous call that isn't in THIS set no
+      // longer has a container to outline (its node was deleted, its slot
+      // just gained real content that supplied its own wrapper elsewhere,
+      // or guides were toggled off entirely) -- remove it rather than
+      // leave a stale box drawn over whatever now occupies that position.
+      guideBoxes.forEach((entry, id) => {
+        if (seen.has(id)) return
+        entry.box.remove()
+        guideBoxes.delete(id)
+      })
+    },
+
+    // Removes every guide box currently on screen. Called when guides are
+    // toggled off (editor_controller.js#toggleGuides/#_repositionGuides) --
+    // NOT for the duration of a native drag any more. A drag used to clear
+    // guides outright on the theory that they'd visually compete with the
+    // drag's own dashed ghost box, insertion line and chip menu; that made
+    // guides vanish exactly when they earn their keep most, since an empty
+    // container being dragged into is invisible without one. #setGuidesMuted
+    // below is what a drag reaches for instead -- it recedes the same boxes
+    // this method would have torn down, rather than tearing them down.
+    clearGuides() {
+      guideBoxes.forEach(({ box }) => box.remove())
+      guideBoxes.clear()
+    },
+
+    // Toggled at drag start/end (editor_controller.js#paletteDragStart,
+    // #_onFrameDragStart, #_endDrag) -- a single class on the shared
+    // guides layer rather than a per-box change, so every box AND its
+    // label recede together with one rule (editor_canvas.css's
+    // .docs-editor-canvas-guides-muted) and can never drift out of sync
+    // with each other the way toggling something on each box individually
+    // could. Purely a look: it draws nothing and measures nothing, so
+    // calling it does not count as a guide recompute -- #_repositionGuides'
+    // own doc in editor_controller.js is the place that claim is load-
+    // bearing, since a per-dragover-tick recompute is exactly what this
+    // feature avoids. Safe to call with no guides on screen at all (the
+    // toggle switched off, so guidesRoot has no children right now) -- it
+    // still only sets a class, so there is nothing for it to make appear.
+    setGuidesMuted(muted) {
+      guidesRoot.classList.toggle("docs-editor-canvas-guides-muted", muted)
+    },
+
     // Removes the root and, with it, every element createOverlay appended
     // to the frame document -- including the toolbar's and chip menu's
     // own button listeners, which go with their (now detached) elements.
@@ -209,6 +434,25 @@ function buildBox(doc, kind) {
 
   const label = doc.createElement("div")
   label.className = `docs-editor-canvas-label docs-editor-canvas-label-${kind}`
+  box.appendChild(label)
+
+  return { box, label }
+}
+
+// One guide box + corner-label pair. Deliberately NOT built on #buildBox
+// above despite the superficial similarity (a bordered box with a label
+// child) -- a guide's label is positioned by plain CSS (top: 0; left: 0
+// inside its own box, editor_canvas.css) rather than through
+// #positionLabel/#flipAndClamp, so giving it #buildBox's shared shape
+// would invite a future edit to wire it through that path by reflex and
+// reintroduce the exact synchronous-layout-read cost #setGuides' own
+// comment explains this box was built to avoid.
+function buildGuideBox(doc) {
+  const box = doc.createElement("div")
+  box.className = "docs-editor-canvas-guide"
+
+  const label = doc.createElement("div")
+  label.className = "docs-editor-canvas-guide-label"
   box.appendChild(label)
 
   return { box, label }

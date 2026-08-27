@@ -6,6 +6,7 @@ require "tabler_ui/docs/editor/contract"
 require "tabler_ui/docs/editor/slot_map"
 require "tabler_ui/docs/editor/builder_map"
 require "tabler_ui/docs/editor/tree"
+require "tabler_ui/docs/editor/slot_parts"
 require "tabler_ui/docs/navigation"
 require "tabler_ui/docs/doc_parser"
 
@@ -124,6 +125,57 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
     end
   end
 
+  # Schema::DIRECT_CHILD_CONTAINERS tells the canvas which components a
+  # left/right edge drop must never wrap into a new row for (drop_target.js
+  # would otherwise nest a row/column between the component and its own
+  # children, breaking a CSS contract that depends on direct-child status --
+  # see that constant's own doc comment for the full reasoning per entry).
+  # This section is the "verify against the real sources" half of that
+  # doc comment's promise -- a hand-picked list, not a mechanically derived
+  # one (the doc comment explains why a blanket derivation was rejected),
+  # but every entry's citation is checked against the actual, bundled
+  # stylesheet here rather than trusted blind.
+  describe "kinds -- directChildContainers" do
+    it "publishes Schema::DIRECT_CHILD_CONTAINERS verbatim" do
+      expect(payload["kinds"]["directChildContainers"]).to eq(described_class::DIRECT_CHILD_CONTAINERS)
+    end
+
+    it "is exactly badge_list and card_group -- regression guard for a silent addition/removal" do
+      expect(described_class::DIRECT_CHILD_CONTAINERS).to eq(%w[badge_list card_group])
+    end
+
+    it "every entry is a genuine SlotParts::ROOT_SHARED component -- only a component with no dedicated slot " \
+       "wrapper of its own even has the shape this hazard threatens" do
+      described_class::DIRECT_CHILD_CONTAINERS.each do |name|
+        slots = TablerUi::Docs::Editor::SlotParts::PARTS.fetch(name)
+        expect(slots.values).to all(eq(TablerUi::Docs::Editor::SlotParts::ROOT_SHARED)),
+                                 "#{name.inspect}'s slots are not all ROOT_SHARED"
+      end
+    end
+
+    it "deliberately excludes alert, avatar and ribbon -- reviewed and rejected on their own CSS/semantics, " \
+       "not merely left off (see DIRECT_CHILD_CONTAINERS' own doc comment)" do
+      expect(described_class::DIRECT_CHILD_CONTAINERS).not_to include("alert", "avatar", "ribbon")
+    end
+
+    it "card_group's cited evidence -- a real .card-group > .card direct-child combinator -- " \
+       "is still present in the bundled stylesheet" do
+      bundle = TablerUi::CssBundle.generate
+
+      expect(bundle).to match(/\.card-group\s*>\s*\.card\b/)
+    end
+
+    it "badge_list's cited evidence -- .badges-list is still display: flex with a gap -- " \
+       "is still present in the bundled stylesheet" do
+      bundle = TablerUi::CssBundle.generate
+      rule = bundle[/\.badges-list\s*\{[^}]*\}/m]
+
+      expect(rule).not_to be_nil
+      expect(rule).to match(/display:\s*flex/)
+      expect(rule).to match(/gap:/)
+    end
+  end
+
   describe "categories" do
     it "matches Navigation's category_names/components_in exactly, in order" do
       expected = Navigation.category_names.map do |label|
@@ -238,11 +290,12 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
   end
 
   describe "callables land in unsupported, never in options" do
-    it "table's sort_url (#call)" do
-      expect(payload["components"]["table"]["options"].map { |o| o["name"] }).not_to include("sort_url")
-      expect(payload["components"]["table"]["unsupported"]).to include(
-        { "name" => "sort_url", "type" => "#call", "reason" => "callable" }
-      )
+    it "table's sort_url is intercepted by its declarative control before the callable rule would apply" do
+      expect(payload["components"]["table"]["unsupported"].map { |u| u["name"] }).not_to include("sort_url")
+
+      option = payload["components"]["table"]["options"].find { |o| o["name"] == "sort_url" }
+      expect(option["control"]).to eq("sort_url")
+      expect(option["type"]).to eq("#call") # unchanged -- only the derived control differs
     end
 
     it "pagination's url (#call)" do
@@ -296,6 +349,26 @@ RSpec.describe TablerUi::Docs::Editor::Schema do
           expect(o).not_to have_key("fields")
         end
       end
+    end
+  end
+
+  describe "table's :sort_url gets a dedicated declarative control, not the generic 'unsupported' classification" do
+    it "table's sort_url is control: 'sort_url'" do
+      option = payload["components"]["table"]["options"].find { |o| o["name"] == "sort_url" }
+
+      expect(option["control"]).to eq("sort_url")
+      expect(option["type"]).to eq("#call") # unchanged -- only the derived control differs
+    end
+
+    it "carries no fields: (that's :columns' own thing, not :sort_url's)" do
+      option = payload["components"]["table"]["options"].find { |o| o["name"] == "sort_url" }
+
+      expect(option).not_to have_key("fields")
+    end
+
+    it "no other component's #call-typed option is affected -- pagination's url stays unsupported" do
+      expect(payload["components"]["pagination"]["options"].map { |o| o["name"] }).not_to include("url")
+      expect(payload["components"]["pagination"]["unsupported"].map { |u| u["name"] }).to include("url")
     end
   end
 

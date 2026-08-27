@@ -14,6 +14,15 @@
 // docs/app/views/tabler_ui/docs/editor/show.html.erb's own no-JS fallback
 // palette item -- see that view's comment for why the two must stay in
 // sync by hand.
+//
+// Each category/section's items sit in a .docs-editor-palette-list wrapper
+// (alongside the usual list-group/list-group-flush classes), which docs.css
+// turns into a wrapping flex row instead of Bootstrap's default
+// one-item-per-line list-group column -- see that rule's own comment. Only
+// the wrapper needs the extra class; docs.css targets
+// .docs-editor-palette-item as a descendant of it, so a category heading
+// (a plain <h4>, not inside the wrapper) still breaks the flow onto its own
+// line the way a section heading should.
 import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
 
 const LAYOUT_LABELS = {
@@ -51,7 +60,7 @@ function layoutSectionHtml(schema) {
   // one called Layout (accordion, card, table, ...), and rendering both under
   // the same heading put two identical "Layout" headings in one scrolling
   // list with unrelated contents under each.
-  return `<h4 class="mt-2">Structure &amp; text</h4><div class="list-group list-group-flush mb-2">${items}</div>`
+  return `<h4 class="mt-2">Structure &amp; text</h4><div class="list-group list-group-flush docs-editor-palette-list mb-2">${items}</div>`
 }
 
 function categoryHtml(schema, category) {
@@ -63,6 +72,6 @@ function categoryHtml(schema, category) {
 
   return `
     <h4 class="mt-2">${escapeHtml(category.label)}</h4>
-    <div class="list-group list-group-flush mb-2">${items}</div>
+    <div class="list-group list-group-flush docs-editor-palette-list mb-2">${items}</div>
   `
 }

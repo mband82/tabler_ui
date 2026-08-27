@@ -295,4 +295,36 @@ RSpec.describe "Renderer/ErbGenerator consistency" do
       expect(generated).to include('tabs.tab "Probe"')
     end
   end
+
+  # --- (e) Decoration must stay off in this file ---------------------------
+  #
+  # This file's whole reason to exist is comparing Renderer's preview HTML
+  # against the rendered generated ERB -- and Renderer's `decorate:` flag
+  # (see its own "Decoration" class docs) adds design-editor-only guide
+  # markup that ErbGenerator has, and must keep, no concept of at all (see
+  # erb_generator_spec.rb's own "decoration-free output" coverage). If any
+  # of this file's `Renderer.new(view_context)` calls ever started passing
+  # `decorate: true`, every fixture comparison above would start failing for
+  # the wrong reason -- not "the two walkers disagree" but "one of them
+  # draws layout guides and the other doesn't" -- which would make this file
+  # useless as the consistency guard it exists to be. A source-level check,
+  # not a render-level one, on purpose: by the time a render-level
+  # assertion could observe decoration leaking in here, every fixture
+  # comparison above would already be red for a confusing reason instead of
+  # this clear one.
+  describe "decoration stays off in this file" do
+    it "never constructs a Renderer with decorate: true" do
+      # Matches a `decorate:` keyword argument inside a `Renderer.new(...)`
+      # call specifically -- not a bare scan for the word "decorate" itself,
+      # which this very example (and the surrounding comment) necessarily
+      # contains and would otherwise always self-match.
+      source = File.read(__FILE__)
+      offending = source.scan(/Renderer\.new\([^)]*\)/).select { |call| call.include?("decorate:") }
+
+      expect(offending).to be_empty,
+        "this file must never enable Renderer decoration -- it exists to prove Renderer and ErbGenerator " \
+        "agree on real markup, and decoration-only guide attributes are not real markup either walker's " \
+        "output should be judged against. Offending call(s): #{offending.join(', ')}"
+    end
+  end
 end

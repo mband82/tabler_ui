@@ -52,6 +52,7 @@ module TablerUi
           controllers/tabler_ui/docs/search_controller.js
           controllers/tabler_ui/docs/editor_controller.js
           controllers/tabler_ui/docs/editor_sortable_controller.js
+          controllers/tabler_ui/docs/editor_inspector_resize_controller.js
           controllers/tabler_ui/docs/editor/dnd.js
           controllers/tabler_ui/docs/editor/drop_target.js
           controllers/tabler_ui/docs/editor/explorer.js

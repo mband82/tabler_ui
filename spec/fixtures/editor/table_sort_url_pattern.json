@@ -1,0 +1,46 @@
+{
+  "kind": "fragment",
+  "id": "root",
+  "children": [
+    {
+      "kind": "component",
+      "id": "table1",
+      "name": "table",
+      "args": {},
+      "options": {
+        "columns": [
+          {
+            "label": "Name",
+            "key": "name",
+            "sort": "name"
+          },
+          {
+            "label": "Role",
+            "key": "role",
+            "sort": "role"
+          }
+        ],
+        "data": [
+          {
+            "name": "Ada Lovelace",
+            "role": "Mathematician"
+          },
+          {
+            "name": "Grace Hopper",
+            "role": "Rear Admiral"
+          }
+        ],
+        "sort": {
+          "key": "role",
+          "dir": "asc"
+        },
+        "sort_url": {
+          "mode": "pattern",
+          "pattern": "/reports/sorted/{key}/{dir}?scope=active&limit=25"
+        }
+      },
+      "html": {},
+      "slots": {}
+    }
+  ]
+}

@@ -316,6 +316,19 @@ function builderAddButtons(node, levelDef, level) {
 function optionAware(node, option, currentValue, readOnly) {
   if (option.control === "columns") return columnsControlHtml(node, option, currentValue, readOnly)
   if (option.control === "rows") return rowsControlHtml(node, option, currentValue, readOnly)
+  if (option.control === "sort_url") return sortUrlControlHtml(node, option, currentValue, readOnly)
+  // table's own :sort ("{key:, dir:}") is a plain Hash -- Schema.control_for
+  // resolves it to the generic "json" escape hatch same as any other Hash
+  // option (STRUCTURED_TYPE_SETS), so this isn't a dedicated
+  // DECLARATIVE_CONTROLS entry the way :columns/:data/:sort_url are; it's
+  // narrowed by (component name, option name) right here instead, the way
+  // #columnSortFieldHtml's own "Sortable" checkbox is. table's :filter is
+  // the same "Hash" type string and deliberately NOT special-cased here --
+  // it has no declarative shape this control could build a form from, so
+  // it stays on the raw-JSON fallback.
+  if (option.control === "json" && node.name === "table" && option.name === "sort") {
+    return sortControlHtml(node, option, currentValue, readOnly)
+  }
   return optionControlHtml(node, option, ["options"], currentValue, readOnly)
 }
 
@@ -428,10 +441,17 @@ function columnsControlHtml(node, option, currentValue, readOnly) {
   `
 }
 
+// `sort` is rendered separately from the other COLUMN_FIELDS entries
+// (below) rather than through the same plain-text-input loop: it's a
+// checkbox-plus-conditional-text-field pairing, not a bare text box, so it
+// needs its own markup. Every OTHER field (key/label/class today) stays on
+// the generic loop -- this function has no opinion about what those are,
+// it just knows to skip whichever one is named "sort".
 function columnRowHtml(node, optionName, fields, col, index, readOnly) {
   const disabled = readOnly ? "disabled" : ""
   const action = readOnly ? "" : `data-action="change->tabler-ui--docs-editor#updateColumnField"`
-  const inputs = fields.map((f) => {
+  const plainFields = fields.filter((f) => f.name !== "sort")
+  const inputs = plainFields.map((f) => {
     const value = col && col[f.name] != null ? col[f.name] : ""
     return `
       <input type="text" class="form-control form-control-sm mb-1" ${disabled}
@@ -441,6 +461,10 @@ function columnRowHtml(node, optionName, fields, col, index, readOnly) {
              data-editor-index="${index}" data-editor-field="${escapeHtml(f.name)}">
     `
   }).join("")
+
+  const sortField = fields.some((f) => f.name === "sort")
+    ? columnSortFieldHtml(node, optionName, col, index, readOnly)
+    : ""
 
   const removeButton = readOnly ? "" : `
     <button type="button" class="btn btn-sm btn-outline-danger"
@@ -453,7 +477,217 @@ function columnRowHtml(node, optionName, fields, col, index, readOnly) {
   return `
     <div class="border rounded p-2 mb-2">
       ${inputs}
+      ${sortField}
       ${removeButton}
+    </div>
+  `
+}
+
+// A "Sortable" checkbox plus, only while checked, a text field carrying
+// the actual sort key -- pre-filled with the column's own `key` the
+// moment the box is ticked (see editor_controller.js#toggleColumnSort),
+// but freely editable afterward: Table::Component compares `sort:`
+// against the table-level `sort[:key]` as a plain String (#sorted?), with
+// no requirement that it equal the column's own `key` -- a column can
+// render one field and sort by another. The checkbox itself fires
+// #toggleColumnSort (a dedicated action, not #updateColumnField -- it
+// has to decide what value to seed, not just copy `el.value` across),
+// while the text field, once shown, is an ordinary #updateColumnField
+// input exactly like `label`/`class` above.
+function columnSortFieldHtml(node, optionName, col, index, readOnly) {
+  const disabled = readOnly ? "disabled" : ""
+  const checkboxAction = readOnly ? "" : `data-action="change->tabler-ui--docs-editor#toggleColumnSort"`
+  const textAction = readOnly ? "" : `data-action="change->tabler-ui--docs-editor#updateColumnField"`
+  const sortKey = col && col.sort != null ? col.sort : null
+  const checkboxId = `docs-editor-col-sort-${node.id}-${index}`
+
+  const keyInput = sortKey != null ? `
+    <input type="text" class="form-control form-control-sm mb-1" ${disabled} ${textAction}
+           placeholder="sort key" value="${escapeHtml(sortKey)}"
+           data-editor-node-id="${node.id}" data-editor-option="${escapeHtml(optionName)}"
+           data-editor-index="${index}" data-editor-field="sort">
+  ` : ""
+
+  return `
+    <div class="form-check mb-1">
+      <input type="checkbox" class="form-check-input" id="${checkboxId}" ${disabled} ${checkboxAction}
+             data-editor-node-id="${node.id}" data-editor-option="${escapeHtml(optionName)}"
+             data-editor-index="${index}" ${sortKey != null ? "checked" : ""}>
+      <label class="form-check-label" for="${checkboxId}">Sortable</label>
+    </div>
+    ${keyInput}
+  `
+}
+
+// --- table-level :sort ("{key:, dir:}") --------------------------------
+
+// The dropdown lists only columns the table itself just made sortable
+// (col.sort present, via #columnSortFieldHtml's checkbox above) -- pulled
+// straight from this same node's own `columns` option, already in hand as
+// `node.options.columns`, rather than a second server round-trip; see this
+// file's #optionAware for why this is narrowed to exactly (table, sort)
+// rather than a generic Hash-typed control. Selecting "(unsorted)" clears
+// only the `key` sub-field (a plain #applyField write, same mechanism as
+// every other nested path in this file) -- Table::Component#normalize_sort
+// already treats a keyless sort: Hash as unsorted, so that alone is enough
+// to reach the default state; "Clear sort" (#clearTableSort) goes further
+// and drops the whole `sort:` option, for a clean export with no stray
+// Hash left behind.
+function sortControlHtml(node, option, currentValue, readOnly) {
+  const columns = (node.options && Array.isArray(node.options.columns)) ? node.options.columns : []
+  const sortableColumns = columns.filter((c) => c && c.sort != null && c.sort !== "")
+  const value = (currentValue && typeof currentValue === "object") ? currentValue : {}
+  const disabled = readOnly ? "disabled" : ""
+  const action = readOnly ? "" : `data-action="change->tabler-ui--docs-editor#applyField"`
+
+  if (sortableColumns.length === 0) {
+    return fieldWrap(option, `
+      <p class="text-secondary small mb-0">Mark a column "Sortable" above to enable sorting here.</p>
+    `)
+  }
+
+  const keyOptions = sortableColumns.map((col) => {
+    const label = col.label || col.key || col.sort
+    return `<option value="${escapeHtml(col.sort)}" ${String(value.key) === String(col.sort) ? "selected" : ""}>${escapeHtml(label)}</option>`
+  }).join("")
+
+  const dir = value.dir === "desc" ? "desc" : "asc"
+
+  const clearButton = readOnly ? "" : `
+    <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+            data-action="click->tabler-ui--docs-editor#clearTableSort"
+            data-editor-node-id="${node.id}" data-editor-option="${escapeHtml(option.name)}">
+      Clear sort
+    </button>
+  `
+
+  return fieldWrap(option, `
+    <select class="form-select form-select-sm mb-1" ${action} ${disabled}
+            data-editor-node-id="${node.id}" data-editor-path='${JSON.stringify(["options", option.name, "key"])}'
+            data-editor-control="text">
+      <option value="">(unsorted)</option>
+      ${keyOptions}
+    </select>
+    <select class="form-select form-select-sm" ${action} ${disabled}
+            data-editor-node-id="${node.id}" data-editor-path='${JSON.stringify(["options", option.name, "dir"])}'
+            data-editor-control="text">
+      <option value="asc" ${dir === "asc" ? "selected" : ""}>ascending</option>
+      <option value="desc" ${dir === "desc" ? "selected" : ""}>descending</option>
+    </select>
+    ${clearButton}
+  `)
+}
+
+// --- table-level :sort_url (declarative, two modes) ---------------------
+
+// Mode is a pair of buttons, not a passive <select> defaulted to "simple"
+// -- a <select> already showing "simple" without the user ever touching it
+// would look configured while `options.sort_url` stays entirely unset,
+// which is exactly the gap #setSortUrlMode exists to avoid: clicking EITHER
+// button (even the one that already looks active) is what actually writes
+// a real value -- `{mode:, sortParam: "sort", dirParam: "dir", ...}` -- into
+// the tree, and only that write makes the fields below appear at all.
+// Once set, switching modes preserves both sides' fields (see
+// #setSortUrlMode's own comment) so bouncing back and forth never loses
+// what was typed on either one.
+function sortUrlControlHtml(node, option, currentValue, readOnly) {
+  const value = (currentValue && typeof currentValue === "object") ? currentValue : null
+  const mode = value && value.mode === "pattern" ? "pattern" : "simple"
+  const disabled = readOnly ? "disabled" : ""
+  const action = readOnly ? "" : `data-action="change->tabler-ui--docs-editor#applyField"`
+
+  const modeButton = (targetMode, label) => {
+    const active = value && mode === targetMode
+    const classes = active ? "btn-primary" : "btn-outline-secondary"
+    if (readOnly) return `<button type="button" class="btn btn-sm ${classes}" disabled>${label}</button>`
+    return `
+      <button type="button" class="btn btn-sm ${classes}"
+              data-action="click->tabler-ui--docs-editor#setSortUrlMode"
+              data-editor-node-id="${node.id}" data-editor-option="${escapeHtml(option.name)}"
+              data-editor-mode="${targetMode}">
+        ${label}
+      </button>
+    `
+  }
+  const modeButtons = `<div class="btn-group mb-2" role="group">${modeButton("simple", "Simple")}${modeButton("pattern", "Custom pattern")}</div>`
+
+  if (!value) {
+    return fieldWrap(option, `
+      ${modeButtons}
+      <p class="text-secondary small mb-0">Not configured -- pick a mode to build sortable header links.</p>
+    `)
+  }
+
+  const fields = mode === "pattern"
+    ? patternSortUrlFieldsHtml(node, option.name, value, disabled, action)
+    : simpleSortUrlFieldsHtml(node, option.name, value, disabled, action)
+
+  const clearButton = readOnly ? "" : `
+    <button type="button" class="btn btn-sm btn-outline-danger mt-1"
+            data-action="click->tabler-ui--docs-editor#clearSortUrl"
+            data-editor-node-id="${node.id}" data-editor-option="${escapeHtml(option.name)}">
+      Clear
+    </button>
+  `
+
+  return fieldWrap(option, `${modeButtons}${fields}${clearButton}`)
+}
+
+// Three plain text fields -- path, sort parameter name, direction
+// parameter name -- matching SortUrl.pattern_for's own simple-mode formula
+// exactly (`"#{path}?#{sortParam}={key}&#{dirParam}={dir}"`).
+// `sortParam`/`dirParam` default to "sort"/"dir", the conventional names,
+// and `path` defaults to "/" -- all three pre-written into the tree the
+// moment simple mode is picked (see #setSortUrlMode /
+// DEFAULT_SIMPLE_SORT_URL in editor_controller.js) rather than merely shown
+// as an input placeholder: a placeholder is never actually submitted, and
+// Tree#valid_simple_sort_url? requires all three fields present AND
+// non-empty, so leaving any one of them blank until the user typed
+// something would silently fail validation the moment "Simple" was picked
+// -- the exact self-undoing-control failure this whole feature had to be
+// fixed for once already (see #toggleColumnSort's header in
+// editor_controller.js). `path` is a placeholder value in the ordinary
+// sense -- a stand-in a user is expected to replace with their own route --
+// but it is real, present data as far as Tree is concerned from the
+// instant this field renders.
+function simpleSortUrlFieldsHtml(node, optionName, value, disabled, action) {
+  const field = (key, label, placeholder) => `
+    <div class="mb-2">
+      <label class="form-label small mb-1">${label}</label>
+      <input type="text" class="form-control form-control-sm" ${disabled} ${action}
+             data-editor-node-id="${node.id}" data-editor-path='${JSON.stringify(["options", optionName, key])}'
+             data-editor-control="text" placeholder="${placeholder}" value="${escapeHtml(value[key] || "")}">
+    </div>
+  `
+
+  return `
+    ${field("path", "path", "/users")}
+    ${field("sortParam", "sort parameter", "sort")}
+    ${field("dirParam", "direction parameter", "dir")}
+  `
+}
+
+// One text field taking a raw "{key}"/"{dir}" pattern -- the exact string
+// SortUrl.pattern_for passes straight through unchanged for pattern mode.
+// Tree#valid_pattern_sort_url? rejects (with a visible error -- see this
+// file's own header on #_renderErrors surfacing the preview response's
+// `errors`) a pattern missing either placeholder -- which is exactly why
+// #setSortUrlMode / DEFAULT_PATTERN_SORT_URL pre-writes "/{key}/{dir}" the
+// moment "Custom pattern" is picked, rather than leaving this field's HTML
+// `placeholder` attribute (below) as the only thing showing the required
+// shape: an attribute placeholder is never actually submitted, so an empty
+// real value would fail that same validation on the very first round-trip.
+// No client-side validation is duplicated here beyond what the input's own
+// placeholder text hints at for whatever the user types next.
+function patternSortUrlFieldsHtml(node, optionName, value, disabled, action) {
+  return `
+    <div class="mb-2">
+      <label class="form-label small mb-1">pattern</label>
+      <input type="text" class="form-control form-control-sm" ${disabled} ${action}
+             data-editor-node-id="${node.id}" data-editor-path='${JSON.stringify(["options", optionName, "pattern"])}'
+             data-editor-control="text" placeholder="/reports/sorted/{key}/{dir}"
+             value="${escapeHtml(value.pattern || "")}">
+      <div class="text-secondary small">Must contain both {key} and {dir}.</div>
     </div>
   `
 }

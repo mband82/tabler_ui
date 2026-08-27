@@ -4,6 +4,7 @@ require "cgi"
 require "tabler_ui/docs/editor/contract"
 require "tabler_ui/docs/editor/builder_map"
 require "tabler_ui/docs/editor/enum_map"
+require "tabler_ui/docs/editor/sort_url"
 
 module TablerUi
   module Docs
@@ -86,6 +87,18 @@ module TablerUi
       # whole point (consistency_spec.rb is the guard). The `key:` string
       # itself is never emitted as, or treated as, executable code -- only
       # ever read as a plain identifier to build a Symbol/String literal.
+      #
+      # ## `table`'s :sort_url is declarative too
+      #
+      # Same problem, same fix: `table`'s real :sort_url option needs a
+      # callable (`sort_url.call(key, dir)`), so a design tree carries a
+      # declarative Hash instead (see SortUrl's own doc for both modes) and
+      # #format_sort_url_value emits the real lambda as literal Ruby
+      # source, built via the exact same SortUrl.pattern_for conversion
+      # Renderer#synthesize_sort_url uses to build the real Proc -- see
+      # that method's doc for why routing both sides through one shared
+      # conversion, rather than each re-deriving simple mode's pattern
+      # independently, is what keeps them from drifting apart.
       class ErbGenerator
         INDENT = "  "
         WRAP_WIDTH = 100
@@ -321,6 +334,8 @@ module TablerUi
         def format_value(component_name, key, value)
           if component_name == "table" && key == "columns" && value.is_a?(Array)
             format_columns_array(value)
+          elsif component_name == "table" && key == "sort_url" && value.is_a?(Hash)
+            format_sort_url_value(value)
           elsif key && TablerUi::Docs::Editor::EnumMap.symbol?(component_name, key)
             format_symbol(value)
           else
@@ -376,6 +391,33 @@ module TablerUi
           end
 
           "->(row) { row[#{key.match?(RUBY_LABEL) ? ":#{key}" : key.inspect}] }"
+        end
+
+        # --- table :sort_url -> literal Ruby lambda -----------------------
+
+        # The export-side counterpart to Renderer#synthesize_sort_url --
+        # see that method's doc, and SortUrl's, for the shared story. Where
+        # the Renderer builds a real Proc to call immediately, this builds
+        # the identical lambda as *source text*. The pattern is only ever
+        # interpolated through String#inspect (never raw string
+        # interpolation into the generated source) -- a crafted pattern
+        # containing, say, a stray `"` or `#{}` must not be able to break
+        # out of the string literal it's emitted into and become part of
+        # the surrounding Ruby source. The two ".sub" calls are written
+        # here as fixed literal Ruby, identical to Renderer's own
+        # `.sub("{key}", key.to_s).sub("{dir}", dir.to_s)` -- see this
+        # class's "Two hard constraints" doc for the same never-interpolate
+        # rule applied to :columns' `key:`.
+        #
+        # @param hash [Hash] the tree's declarative sort_url value,
+        #   String-keyed like every other value ErbGenerator reads (it
+        #   never deep-symbolizes -- see the class doc comment)
+        # @return [String] literal Ruby source for the synthesized lambda,
+        #   e.g. `->(key, dir) { "/users?sort={key}&dir={dir}".sub("{key}",
+        #   key.to_s).sub("{dir}", dir.to_s) }`
+        def format_sort_url_value(hash)
+          pattern = TablerUi::Docs::Editor::SortUrl.pattern_for(hash)
+          "->(key, dir) { #{pattern.inspect}.sub(\"{key}\", key.to_s).sub(\"{dir}\", dir.to_s) }"
         end
 
         def format_symbol(value)

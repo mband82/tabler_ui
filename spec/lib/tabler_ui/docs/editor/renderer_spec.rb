@@ -140,6 +140,74 @@ RSpec.describe TablerUi::Docs::Editor::Renderer, type: :component do
     end
   end
 
+  # --- table :sort_url synthesis ------------------------------------------
+
+  # A design tree is JSON, so table's real `sort_url:` callable can't
+  # survive the trip either -- the tree carries a declarative Hash instead
+  # (simple or pattern mode, see SortUrl's own doc) and
+  # Renderer#synthesize_sort_url builds the real Proc from it right before
+  # dispatch. See erb_generator_spec.rb's mirror-image coverage of the
+  # export side, and consistency_spec.rb's fixtures for the end-to-end
+  # (preview == rendered export) guarantee.
+  describe "table :sort_url synthesis" do
+    def sortable_table_node(sort_url_value, sort_value: nil, sort_reset: nil)
+      options = {
+        "columns" => [{ "label" => "Name", "key" => "name", "sort" => "name" }],
+        "data" => [{ "name" => "Ada Lovelace" }],
+        "sort_url" => sort_url_value
+      }
+      options["sort"] = sort_value if sort_value
+      options["sort_reset"] = sort_reset unless sort_reset.nil?
+      component_node("table", "t1", options: options)
+    end
+
+    it "builds a working sort link href from simple mode's path/sortParam/dirParam" do
+      node = sortable_table_node(
+        { "mode" => "simple", "path" => "/users", "sortParam" => "sort", "dirParam" => "dir" }
+      )
+
+      doc = frag(renderer.render(node))
+
+      expect(doc.at_css("a.table-sort")["href"]).to eq("/users?sort=name&dir=asc")
+    end
+
+    it "builds a working sort link href from pattern mode's own {key}/{dir} placeholders, " \
+       "including any extra literal query parameters the pattern carries" do
+      node = sortable_table_node(
+        { "mode" => "pattern", "pattern" => "/reports/sorted/{key}/{dir}?scope=active&limit=25" }
+      )
+
+      doc = frag(renderer.render(node))
+
+      expect(doc.at_css("a.table-sort")["href"]).to eq("/reports/sorted/name/asc?scope=active&limit=25")
+    end
+
+    it "calls the synthesized lambda with a nil dir (sort_reset: cycling desc -> unsorted) without raising, " \
+       "matching plain Ruby's nil.to_s == \"\" on both this side and ErbGenerator's" do
+      node = sortable_table_node(
+        { "mode" => "simple", "path" => "/users", "sortParam" => "sort", "dirParam" => "dir" },
+        sort_value: { "key" => "name", "dir" => "desc" }, sort_reset: true
+      )
+
+      doc = frag(renderer.render(node))
+
+      expect(doc.at_css("a.table-sort")["href"]).to eq("/users?sort=name&dir=")
+    end
+
+    it "leaves :sort_url alone (never present) when the tree carries none -- no column is sortable" do
+      node = component_node("table", "t1",
+                            options: { "columns" => [{ "label" => "Name", "key" => "name" }], "data" => [] })
+
+      expect { renderer.render(node) }.not_to raise_error
+    end
+
+    it "does nothing to a non-table component's own Hash option (no other component has a :sort_url concept)" do
+      node = component_node("card", "c1", options: { "title" => { "mode" => "simple" } })
+
+      expect { renderer.render(node) }.not_to raise_error
+    end
+  end
+
   def builder_item(id, method, args: {}, options: {}, items: nil, children: nil, html: {})
     node = { "kind" => "builder_item", "id" => id, "method" => method, "args" => args, "options" => options,
              "html" => html }

@@ -391,6 +391,8 @@ module TablerUi
           meta = component_option_metadata(name)
           options_out = normalize_options(raw["options"], meta: meta, owner: "component '#{name}'", path: path)
           normalize_declarative_columns(options_out, name: name, path: path)
+          normalize_declarative_sort_url(options_out, name: name, path: path)
+          guard_sort_requires_sort_url(options_out, name: name, path: path)
           html_out = normalize_html(raw["html"], allowed_parts: meta[:html_parts], path: "#{path}.html")
 
           result = { "kind" => "component", "id" => id, "name" => name, "args" => args_out,
@@ -427,6 +429,11 @@ module TablerUi
         # it here, once, is what keeps the two downstream walkers on trees they
         # both accept -- the same reason every other cross-module invariant
         # lives in this class rather than in either of them.
+        #
+        # Reused below by #normalize_declarative_sort_url and
+        # #guard_sort_requires_sort_url -- :sort_url is table's OTHER
+        # declarative-instead-of-callable option, and is scoped to the same
+        # set of components for the same reason.
         DECLARATIVE_COLUMN_COMPONENTS = %w[table].freeze
 
         def normalize_declarative_columns(options, name:, path:)
@@ -445,6 +452,110 @@ module TablerUi
             options.delete("columns")
           else
             options["columns"] = kept
+          end
+        end
+
+        # table's real :sort_url wants a callable too (`sort_url.call(key,
+        # dir)`) -- JSON cannot carry one, so a design tree carries a
+        # declarative Hash instead (see SortUrl's own doc for both modes)
+        # and Renderer#synthesize_sort_url / ErbGenerator#format_sort_url_value
+        # each build the real lambda from it, independently, via the same
+        # SortUrl.pattern_for conversion. This method validates only the
+        # declarative Hash's SHAPE -- mode is one of the two known values,
+        # simple mode carries all three of its string fields, pattern
+        # mode's pattern actually varies by both key and dir -- and drops
+        # it (reporting why) when that shape is wrong, the same "drop and
+        # report, don't fail the whole tree" contract #normalize_declarative_columns
+        # already applies to :columns. It does NOT itself convert simple
+        # mode to a pattern -- that conversion happens once, in
+        # SortUrl.pattern_for, so there is exactly one place a future
+        # change to the simple-mode formula needs to land (see that
+        # module's doc for the whole story).
+        def normalize_declarative_sort_url(options, name:, path:)
+          return unless DECLARATIVE_COLUMN_COMPONENTS.include?(name)
+
+          sort_url = options["sort_url"]
+          return if sort_url.nil?
+
+          options.delete("sort_url") unless valid_declarative_sort_url?(sort_url, path: "#{path}.options.sort_url")
+        end
+
+        def valid_declarative_sort_url?(value, path:)
+          unless value.is_a?(Hash)
+            add_error("#{path}: must be an object carrying a mode:, got #{value.class}")
+            return false
+          end
+
+          case value["mode"]
+          when "simple" then valid_simple_sort_url?(value, path: path)
+          when "pattern" then valid_pattern_sort_url?(value, path: path)
+          else
+            add_error("#{path}.mode: must be 'simple' or 'pattern', got #{value['mode'].inspect}")
+            false
+          end
+        end
+
+        # All three fields are required -- a simple-mode sort_url missing
+        # any one of them has no way to build a working per-column,
+        # per-direction URL, so it is rejected wholesale rather than
+        # partially honored. Every missing/blank field is reported, not
+        # just the first one, so a caller fixing this doesn't have to
+        # resubmit repeatedly to discover the next problem.
+        def valid_simple_sort_url?(value, path:)
+          ok = true
+          %w[path sortParam dirParam].each do |key|
+            next if value[key].is_a?(String) && !value[key].empty?
+
+            add_error("#{path}.#{key}: simple sort_url needs a non-empty string #{key}")
+            ok = false
+          end
+          ok
+        end
+
+        # A pattern that never varies by key or dir (e.g. a hardcoded
+        # "/users?sort=name") is a silently broken sort UI -- every column
+        # would link to the exact same href, so clicking a header would
+        # never actually change the sort. Requiring both placeholders to
+        # appear at least once is the cheapest check that catches that
+        # without trying to parse the pattern as a real URL template.
+        def valid_pattern_sort_url?(value, path:)
+          pattern = value["pattern"]
+          unless pattern.is_a?(String)
+            add_error("#{path}.pattern: must be a string, got #{pattern.class}")
+            return false
+          end
+
+          ok = pattern.include?("{key}") && pattern.include?("{dir}")
+          add_error("#{path}.pattern: must contain both {key} and {dir} placeholders, got #{pattern.inspect}") unless ok
+          ok
+        end
+
+        # A column's `sort:` is only meaningful alongside the table's own
+        # `sort_url:`, which Table::Component#guard_sort_url! makes
+        # mandatory the moment any column carries one -- reaching that
+        # guard with none configured (never set, or dropped just above for
+        # failing shape validation) would blow the whole node up into an
+        # inline error marker at render time, and raise outright from
+        # ErbGenerator (see Renderer's error-isolation doc). Catching it
+        # here instead keeps the same "drop the offending piece, report
+        # why, everything else still renders" contract every other
+        # validation failure in this class gets: only the dangling `sort:`
+        # is dropped from each affected column -- its `label:`/`key:`
+        # and every other column are untouched, so the table itself still
+        # renders, just without a sortable header on that one column.
+        def guard_sort_requires_sort_url(options, name:, path:)
+          return unless DECLARATIVE_COLUMN_COMPONENTS.include?(name)
+          return if options.key?("sort_url")
+
+          columns = options["columns"]
+          return unless columns.is_a?(Array)
+
+          columns.each_with_index do |column, index|
+            next unless column.is_a?(Hash) && !column["sort"].nil?
+
+            add_error("#{path}.options.columns[#{index}].sort: dropped -- add the table's own sort_url: " \
+                       "before making a column sortable")
+            column.delete("sort")
           end
         end
 

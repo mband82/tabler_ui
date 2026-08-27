@@ -266,17 +266,48 @@ into third-party host apps — a hole here is a hole in every app that mounts it
   `builder_map.rb`, `enum_map.rb` respectively — each of which has its own anti-rot
   spec that re-derives the registry from the real components by reflection/grep and
   asserts equality. A failure in one of those specs means the registry is wrong, not
-  the spec; do not patch around it.
+  the spec; do not patch around it. `docs/lib/tabler_ui/docs/editor/slot_parts.rb` is a
+  fifth: `SlotParts::PARTS` maps each `(component, slot)` to the `html_for` part whose
+  attributes wrap that slot's content — or the `ROOT_SHARED` sentinel, for the handful
+  of slots (alert, avatar, badge_list, card_group, ribbon) with no dedicated wrapper of
+  their own. Its own anti-rot spec, `slot_parts_spec.rb`, re-derives the mapping from
+  each template's actual element nesting and separately asserts `PARTS` covers exactly
+  the same components/slots `SlotMap::SLOTS` does.
+- **Layout guides are a deliberate, gated divergence from "the tree is what renders."**
+  `Renderer` takes a `decorate:` keyword (default `false`); the only caller that can
+  ever pass `decorate: true` is `EditorController#preview`, and only from a real JSON
+  `true` in the posted body — every other caller (`ErbGenerator`, the consistency
+  fixture corpus, any future caller) keeps getting back exactly the undecorated output
+  it always did. Decoration merges a marker into a slot's `<part>_html:` hook and, for
+  an *empty* slot, renders an inert placeholder so the component emits its real wrapper
+  — the ghost outline the canvas draws over a container so a half-built design (an
+  empty card, an empty row) stays legible instead of collapsing to a couple of pixels.
+  `Renderer::FALLBACK_GUARDED_SLOTS` vetoes decoration on slots — card/modal/toast/
+  offcanvas header, `empty`'s img/icon/header — where a placeholder would silently
+  replace real fallback content (an offcanvas's default close button) rather than
+  filling genuine emptiness. Three guards keep the divergence bounded: `decoration_spec.rb`
+  asserts decorated output equals undecorated output plus exactly the deltas `SlotParts`
+  declares, nothing more; `consistency_spec.rb` asserts it never constructs a `Renderer`
+  with `decorate: true` itself; and `erb_generator_spec.rb` asserts `ErbGenerator` has no
+  `decorate:` concept at all, so the export path can never emit guide markup.
 - `table`/`datagrid` options that are callables (a `value:` Proc, `sort_url:`, ...)
-  cannot be configured from JSON at all. `table`'s `:columns` is the one place this is
-  worked around: a design tree carries a declarative `key:` per column, and both
+  cannot be configured from JSON at all — two options work around it, both the same
+  way: the tree carries a declarative stand-in, and `Renderer` and `ErbGenerator`
+  independently rebuild the identical real callable from it. `table`'s `:columns` was
+  first: a design tree carries a declarative `key:` per column, and both
   `Renderer#synthesize_table_columns` and `ErbGenerator#format_columns_array`
-  independently build the real `value:` lambda from it — the two agreeing is exactly
-  what `consistency_spec.rb` exists to keep true. Everywhere else, a structured option
-  with no scalar UI equivalent (datagrid's `:items`, rating's `:choices`, ...) falls
-  back to a raw-JSON escape-hatch control in the property panel (`Schema`'s
-  `STRUCTURED_TYPE_SETS`); a genuinely callable/opaque option (`Object`, `#call`,
-  `Proc`) is reported `unsupported` and cannot be set from the editor at all.
+  independently build the real `value:` lambda from it. `table`'s `:sort_url` is the
+  second: the tree carries a declarative Hash (`{mode: "simple", path:, sortParam:,
+  dirParam:}` or `{mode: "pattern", pattern:}`); `Editor::SortUrl.pattern_for` converts
+  simple mode to a `{key}`/`{dir}` pattern in the one place that conversion is written
+  down, and `Renderer#synthesize_sort_url` / `ErbGenerator#format_sort_url_value` each
+  build their own real lambda from that single pattern — a Proc on the preview side, a
+  `String#inspect`-escaped literal (never interpolated) on the export side. Both
+  agreements are exactly what `consistency_spec.rb` exists to keep true. Everywhere
+  else, a structured option with no scalar UI equivalent (datagrid's `:items`, rating's
+  `:choices`, ...) falls back to a raw-JSON escape-hatch control in the property panel
+  (`Schema`'s `STRUCTURED_TYPE_SETS`); a genuinely callable/opaque option (`Object`,
+  `#call`, `Proc`) is reported `unsupported` and cannot be set from the editor at all.
 
 ---
 
@@ -304,8 +335,8 @@ docs/                                          second, independently-rooted moun
   lib/tabler_ui/docs/
     engine.rb                                  Rails::Engine — own root, own asset paths/precompile list (see JavaScript rule)
     navigation.rb, doc_parser.rb, demo_registry.rb, search_index.rb   docs-page data sources
-    editor/          contract.rb, slot_map.rb, builder_map.rb, enum_map.rb   hand-maintained data contract + registries (see the design editor rule)
-                      schema.rb, tree.rb, workspace.rb, renderer.rb, erb_generator.rb   validate/render/export pipeline
+    editor/          contract.rb, slot_map.rb, builder_map.rb, enum_map.rb, slot_parts.rb   hand-maintained data contract + registries (see the design editor rule)
+                      schema.rb, tree.rb, workspace.rb, renderer.rb, erb_generator.rb, sort_url.rb   validate/render/export pipeline
   app/controllers/tabler_ui/docs/              PagesController, ComponentsController, EditorController, ...
   app/views/tabler_ui/docs/                    docs pages + editor/ (page shell, preview-frame views)
   app/javascript/controllers/tabler_ui/docs/   docs-only Stimulus controllers, incl. editor/ helper ES modules

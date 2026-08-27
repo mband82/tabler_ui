@@ -211,6 +211,12 @@ a partial -- can't be edited or dragged from the file that includes it;
 selecting it names the file it actually lives in and offers a button
 to open that file instead.
 
+**Layout guides.** A switch in the toolbar shows light outlines and
+labels ("header", "body", "footer", "row", "column") over a design's
+containers, including ones that are currently empty and would
+otherwise render as a couple of pixels with nothing to see or aim a
+drop at. On by default, and remembered per browser between visits.
+
 **Where a design lives.** Nowhere on the server. The whole workspace
 (every file's tree) is kept in the browser's own `localStorage` --
 nothing is persisted server-side, and nothing survives clearing that
@@ -233,14 +239,28 @@ export. Neither path ever turns the posted data into an ERB source
 string and evaluates it -- a design is data, walked and dispatched,
 never template source.
 
+**Sortable table columns.** Tick a column's "Sortable" checkbox in the
+property panel to let visitors sort a table by it, with a text field
+to set the sort key if the column's own key isn't what you want sent.
+At the table level, pick which column starts out sorted and in which
+direction. The links a sortable column header uses are built one of
+two ways: "Simple" fills in a page path plus the query parameter names
+for the sort key and direction, or "Custom pattern" lets you write the
+URL yourself with `{key}` and `{dir}` placeholders that get filled in
+per click. Marking a column sortable for the first time fills in a
+starting simple-style URL automatically if the table doesn't have one
+configured yet, so there's always something in place to refine
+afterward.
+
 **Real limits, not just a demo.** A component option that only Ruby can
 express -- a `Proc`, an opaque object -- cannot be set from the editor;
-the property panel reports it as unsupported. The one exception is a
-table's `:columns`, where the editor takes a declarative column `key:`
-and the value-lookup callable is synthesized from it, on both the
-preview and export paths. A few structured options with no scalar UI
-equivalent (a datagrid's `:items`, a rating's `:choices`, ...) fall
-back to a raw-JSON field in the property panel rather than a purpose-built
+the property panel reports it as unsupported. Two exceptions exist for
+table: its `:columns` values, where the editor takes a declarative
+column `key:` and the value-lookup callable is synthesized from it, and
+its sort links (see above) -- both on the preview and export paths
+alike. A few structured options with no scalar UI equivalent (a
+datagrid's `:items`, a rating's `:choices`, ...) fall back to a
+raw-JSON field in the property panel rather than a purpose-built
 control.
 
 ## Components

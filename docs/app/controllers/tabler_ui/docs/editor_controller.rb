@@ -55,8 +55,22 @@ module TablerUi
         render json: Editor::Schema.as_json
       end
 
-      # POST { path:, workspace: } -> { html:, erb:, workspace:, errors: [] }
-      # on success, { errors: [...] } with a 422 on any kind of rejection.
+      # POST { path:, workspace:, decorate: } -> { html:, erb:, workspace:,
+      # errors: [] } on success, { errors: [...] } with a 422 on any kind of
+      # rejection.
+      #
+      # `decorate:` is optional and, absent or anything other than the
+      # literal JSON `true`, off -- see Editor::Renderer's own "Decoration"
+      # class docs for what it turns on (design-editor canvas "layout
+      # guide" markup) and why a stray truthy-but-not-`true` value (a
+      # String `"true"`, `1`, ...) must never be treated as opting in: this
+      # `== true` check, plus Renderer's own `decorate: false` default, is
+      # the entire reachability story for that feature -- there is no other
+      # path to `decorate: true` anywhere in this codebase. It only ever
+      # affects `html:` below; `erb:` goes through Editor::ErbGenerator,
+      # which has no decoration concept at all and never will (see that
+      # class's own docs) -- so the export a developer copies out of this
+      # endpoint is never contaminated by editor-only guide markup.
       #
       # Response is ALWAYS JSON, on every path -- success, a fatal
       # workspace, a path that doesn't resolve, malformed JSON, an
@@ -82,7 +96,8 @@ module TablerUi
         return render_missing_path(result, raw["path"]) unless tree
 
         render json: {
-          html: Editor::Renderer.new(html_view_context, resolve: result.resolve).render(tree),
+          html: Editor::Renderer.new(html_view_context, resolve: result.resolve,
+                                                          decorate: decorate_flag(raw)).render(tree),
           erb: Editor::ErbGenerator.new(tree).call,
           workspace: result.workspace,
           errors: result.errors
@@ -114,6 +129,14 @@ module TablerUi
       # exactly what happened. Pin the formats to :html for the design render.
       def html_view_context
         view_context.tap { |context| context.lookup_context.formats = [:html] }
+      end
+
+      # @return [Boolean] see #preview's own doc for why only a literal
+      #   JSON `true` counts -- `raw["decorate"]` is `nil` on an absent
+      #   key, so this also covers "the client never sent one at all"
+      #   without a separate `key?` check.
+      def decorate_flag(raw)
+        raw["decorate"] == true
       end
 
       # Rejected before JSON.parse ever runs -- parsing a huge body just to

@@ -235,6 +235,144 @@ RSpec.describe TablerUi::Docs::Editor::Tree do
     end
   end
 
+  # --- table's declarative sort_url ------------------------------------------
+
+  # table's real :sort_url wants a callable too (`sort_url.call(key, dir)`),
+  # which JSON can never carry -- see sort_url.rb's own doc. Tree validates
+  # only the declarative Hash's SHAPE (mode is one of two known values,
+  # simple mode's three fields are all present, pattern mode's own pattern
+  # actually varies by both {key} and {dir}) and drops it, reporting why,
+  # when that shape is wrong -- Renderer/ErbGenerator build the real
+  # lambda from whatever survives here and never re-check any of this.
+  describe "table's declarative sort_url" do
+    def table_with(sort_url:, columns: [{ "label" => "Name", "key" => "name" }])
+      fragment("f1", [component("c1", "table", "options" => { "columns" => columns, "sort_url" => sort_url })])
+    end
+
+    it "keeps a well-formed simple-mode sort_url untouched" do
+      sort_url = { "mode" => "simple", "path" => "/users", "sortParam" => "sort", "dirParam" => "dir" }
+      result = call(table_with(sort_url: sort_url))
+
+      expect(result.errors).to eq([])
+      expect(result.node["children"].first["options"]["sort_url"]).to eq(sort_url)
+    end
+
+    it "keeps a well-formed pattern-mode sort_url untouched" do
+      sort_url = { "mode" => "pattern", "pattern" => "/users/sorted/{key}/{dir}" }
+      result = call(table_with(sort_url: sort_url))
+
+      expect(result.errors).to eq([])
+      expect(result.node["children"].first["options"]["sort_url"]).to eq(sort_url)
+    end
+
+    it "drops an unrecognised mode:, reporting why" do
+      result = call(table_with(sort_url: { "mode" => "bogus" }))
+
+      expect(result.node["children"].first["options"]).not_to have_key("sort_url")
+      expect(result.errors).to include(a_string_matching(/sort_url\.mode.*simple.*pattern/))
+    end
+
+    it "drops simple mode missing one of its three required fields, naming the missing one" do
+      result = call(table_with(sort_url: { "mode" => "simple", "path" => "/users", "sortParam" => "sort" }))
+
+      expect(result.node["children"].first["options"]).not_to have_key("sort_url")
+      expect(result.errors).to include(a_string_matching(/sort_url\.dirParam/))
+    end
+
+    it "drops simple mode missing every field, reporting all three -- not just the first" do
+      result = call(table_with(sort_url: { "mode" => "simple" }))
+
+      expect(result.errors).to include(a_string_matching(/sort_url\.path/), a_string_matching(/sort_url\.sortParam/),
+                                        a_string_matching(/sort_url\.dirParam/))
+    end
+
+    it "drops pattern mode whose pattern never varies by {key} or {dir} -- a sort UI that would silently " \
+       "link every column's header to the exact same href" do
+      result = call(table_with(sort_url: { "mode" => "pattern", "pattern" => "/users?sort=name" }))
+
+      expect(result.node["children"].first["options"]).not_to have_key("sort_url")
+      expect(result.errors).to include(a_string_matching(/sort_url\.pattern.*\{key\}.*\{dir\}/))
+    end
+
+    it "drops pattern mode missing {dir} even though {key} is present" do
+      result = call(table_with(sort_url: { "mode" => "pattern", "pattern" => "/users/{key}" }))
+
+      expect(result.node["children"].first["options"]).not_to have_key("sort_url")
+    end
+
+    it "drops a sort_url: that isn't even an object" do
+      result = call(table_with(sort_url: "not-a-hash"))
+
+      expect(result.node["children"].first["options"]).not_to have_key("sort_url")
+      expect(result.errors).to include(a_string_matching(/sort_url.*object/))
+    end
+  end
+
+  # --- a column's sort: with no table-level sort_url: ------------------------
+
+  # Table::Component#guard_sort_url! raises ArgumentError the moment any
+  # column carries sort: while sort_url: is absent -- reaching that guard
+  # from the editor would blow the whole node up into an inline error
+  # marker in Renderer and raise outright from ErbGenerator (a failed
+  # preview request, not a rendered design). This tree is rejected -- in
+  # the "drop the offending piece, report why" sense, not a fatal Result --
+  # by Tree itself, so neither downstream walker ever sees a column
+  # advertising a sort it cannot actually perform. This is why the case
+  # belongs here rather than in the consistency_spec.rb fixture corpus:
+  # every fixture there must already be a fixed point under Tree.call, and
+  # a tree carrying sort: with no sort_url: is not one -- Tree changes it.
+  describe "a column's sort: with no table-level sort_url:" do
+    it "drops the dangling sort: and reports why, while the column's other fields and the table survive" do
+      tree = fragment("f1", [component("c1", "table", "options" => {
+                                         "columns" => [{ "label" => "Name", "key" => "name", "sort" => "name" }]
+                                       })])
+      result = call(tree)
+
+      expect(result.fatal?).to be false
+      expect(result.node["children"].first["options"]["columns"])
+        .to eq([{ "label" => "Name", "key" => "name" }])
+      expect(result.errors).to include(a_string_matching(/columns\[0\]\.sort.*sort_url/))
+    end
+
+    it "reports one error per offending column, by index, leaving non-sortable columns untouched" do
+      tree = fragment("f1", [component("c1", "table", "options" => {
+                                         "columns" => [{ "label" => "Name", "key" => "name", "sort" => "name" },
+                                                       { "label" => "Role", "key" => "role" },
+                                                       { "label" => "Team", "key" => "team", "sort" => "team" }]
+                                       })])
+      result = call(tree)
+
+      columns = result.node["children"].first["options"]["columns"]
+      expect(columns).to eq([{ "label" => "Name", "key" => "name" }, { "label" => "Role", "key" => "role" },
+                              { "label" => "Team", "key" => "team" }])
+      expect(result.errors.grep(/\.sort:/).size).to eq(2)
+    end
+
+    it "does not fire when sort_url: is present and valid -- the column keeps its sort:" do
+      tree = fragment("f1", [component("c1", "table", "options" => {
+                                         "columns" => [{ "label" => "Name", "key" => "name", "sort" => "name" }],
+                                         "sort_url" => { "mode" => "simple", "path" => "/users",
+                                                          "sortParam" => "sort", "dirParam" => "dir" }
+                                       })])
+      result = call(tree)
+
+      expect(result.errors).to eq([])
+      expect(result.node["children"].first["options"]["columns"].first["sort"]).to eq("name")
+    end
+
+    it "still fires when sort_url: was supplied but dropped for failing its own shape validation" do
+      tree = fragment("f1", [component("c1", "table", "options" => {
+                                         "columns" => [{ "label" => "Name", "key" => "name", "sort" => "name" }],
+                                         "sort_url" => { "mode" => "bogus" }
+                                       })])
+      result = call(tree)
+
+      expect(result.node["children"].first["options"]).not_to have_key("sort_url")
+      expect(result.node["children"].first["options"]["columns"].first).not_to have_key("sort")
+      expect(result.errors).to include(a_string_matching(/sort_url\.mode/), a_string_matching(/columns\[0\]\.sort/))
+    end
+  end
+
   # --- auth stripped everywhere -----------------------------------------------
 
   describe "'auth' is forbidden everywhere, always reported as an error (never silently dropped)" do

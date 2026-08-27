@@ -1,7 +1,8 @@
 /* Chrome drawn over the design editor's Preview iframe by editor/overlay.js
    -- a selection box, a hover box, a floating action toolbar, a
-   drag-and-drop ghost box and an insertion line (see overlay.js's own
-   header). Every rule in this file is scoped to a
+   drag-and-drop ghost box, an insertion line, and (added for design-editor
+   layout guides) an unbounded set of labelled container outlines (see
+   overlay.js's own header). Every rule in this file is scoped to a
    .docs-editor-canvas-* class that only overlay.js's own markup ever
    carries -- NEVER `body`, `html`, or any other bare element selector, and
    NEVER an unscoped class some ordinary Tabler markup might also use. This
@@ -21,6 +22,63 @@
    properties (--tblr-primary, --tblr-primary-rgb, ...) are available here
    too -- used throughout instead of hardcoded colours so this chrome
    follows dark mode the same way the design around it does. */
+
+/* The editor's own wrapper around the previewed design (see
+   editor_frame.html.erb's own comment: the frame's JS writes the
+   rendered design INTO this div -- it is editor chrome that happens to
+   sit in the same document as the design, never a piece of the design
+   itself). Styling it by id, rather than one of this file's own
+   .docs-editor-canvas-* classes, is the one narrow exception to this
+   file's own header rule against unscoped selectors -- earned because
+   #tabler-ui-editor-canvas is not, and can never become, part of the
+   rendered design: it is the layout's own hand-written wrapper
+   (editor_frame.html.erb), and no design tree this editor can build ever
+   produces an element carrying this id.
+
+   The padding gives a drag somewhere to land ABOVE the first component,
+   BELOW the last, and around a design that would otherwise span edge to
+   edge with nothing surrounding it to aim a drop at -- a single
+   top-level card used to render flush with all four frame edges
+   (gapAboveCard: 0), leaving no surface reachable except the components
+   themselves. 2rem (32px), not a smaller value: this file's own
+   .docs-editor-canvas-empty-container and .docs-editor-canvas-drag-grow-
+   height/-width rules already settled 2rem as this codebase's answer to
+   "how big does a target need to be to reliably aim a mouse at" (see the
+   latter's own comment on DRAG_GROW_MIN_SIZE), and this gutter needs
+   exactly that same property, so it reuses the number rather than
+   inventing a new one. Applied unconditionally, not only while layout
+   guides are on: the need this solves (somewhere to drop) is independent
+   of whether guides are drawn -- guides only help a designer SEE a
+   container that already has room, they are not what creates the room.
+   editor_controller.js's own drop-target fallback (see its
+   #_hitTestRootFallback) is the piece that makes this padding a REAL
+   drop target rather than just visual breathing room: a pointer
+   resolving to no stamped element now resolves against the nearest
+   root-level child instead of always appending to the end.
+
+   The border makes that same boundary visible at a glance, not just
+   reachable: solid and literally black -- not one of Tabler's own
+   --tblr-* tokens -- so it reads identically in light and dark mode
+   rather than following the design's own theme the way this file's
+   other chrome deliberately does (see this file's header on
+   --tblr-primary etc.), and reads as unambiguously different chrome
+   from both the dotted secondary-hue guides (.docs-editor-canvas-guide)
+   and the dashed primary/success-hue drag ghost boxes
+   (.docs-editor-canvas-box-ghost/-wrap) -- solid black matches neither
+   of those in style or hue. box-sizing: border-box is defensive rather
+   than load-bearing today (this element's width is auto, and an
+   auto-width block's rendered outer width already equals its
+   container's regardless of box-sizing), but it is what keeps a FUTURE
+   explicit width on this element from silently reintroducing a
+   horizontal scrollbar by having the border/padding add to that width
+   instead of being eaten out of it -- cheap insurance for a property
+   this rule otherwise gets "for free" only by accident of `width` never
+   being set. */
+#tabler-ui-editor-canvas {
+  box-sizing: border-box;
+  padding: 2rem;
+  border: 2px solid #000;
+}
 
 /* The one element overlay.js appends to the frame's <body>, a sibling of
    #tabler-ui-editor-canvas -- never a descendant of it, so nothing here
@@ -181,6 +239,42 @@
   background: rgba(var(--tblr-danger-rgb), 0.08);
 }
 
+/* A "wrap" drop (overlay.js#setGhost's `wrap` flag, editor_controller.js#
+   _paintDragGhost's "wrap" case) builds a whole new row, not just a plain
+   insert -- a bigger structural change that needs to read as visibly
+   different from the dashed primary-hue ghost above at a glance, not just
+   "the same box somewhere else". Solid border (vs. dashed) and Tabler's
+   success hue (vs. primary/danger, both already spoken for by validity)
+   are the two cues: neither collides with -invalid above, since a wrap
+   ghost can independently BE invalid too (advisory, same as any other
+   descriptor -- see drop_target.js's own header) and both modifier classes
+   can be present together in that case, danger winning visually because it
+   is listed after -wrap below and CSS's own cascade applies the later
+   rule's overlapping properties (border-color, background) last. */
+.docs-editor-canvas-box-ghost-wrap {
+  border-style: solid;
+  border-color: rgba(var(--tblr-success-rgb), 0.7);
+  background: rgba(var(--tblr-success-rgb), 0.1);
+}
+
+/* The wrap outline (overlay.js#setWrapOutline) drawn over the FULL hovered
+   element for the duration of a "wrap" drop -- everything currently inside
+   this box is about to become one half of a new row, so it gets the same
+   success hue as the wrap ghost above (a shared "this is a wrap" family,
+   distinct from the primary-hue selection/hover/ordinary-ghost boxes and
+   the secondary-hue guides), just a lighter, dashed treatment so the two
+   stay visually distinct FROM EACH OTHER too: the outline reads as "this
+   whole area", the ghost inside half of it as "your node lands here
+   specifically". */
+.docs-editor-canvas-box-wrap {
+  border: 2px dashed rgba(var(--tblr-success-rgb), 0.5);
+  background: rgba(var(--tblr-success-rgb), 0.05);
+}
+
+.docs-editor-canvas-label-wrap {
+  background: rgba(var(--tblr-success-rgb), 0.85);
+}
+
 /* The ghost's own label reuses .docs-editor-canvas-label's shape (padding,
    font, radius) but not the selection/hover kind's solid primary fill --
    a lighter surface keeps the dashed-box's "not real yet" read consistent
@@ -208,6 +302,24 @@
   pointer-events: none;
 }
 
+/* The left/right-edge counterpart of the bar above (overlay.js#
+   setInsertionLine's `orientation: "vertical"` case -- a horizontal band
+   drop_target.js now resolves near an element's left/right edge, either a
+   sibling-column insert or a wrap). Combined selector (both classes on the
+   same element, editor/overlay.js) rather than a standalone rule so this
+   overrides height/margin-top precisely, not just adds width/margin-left
+   alongside them -- left/top still come from the SAME inline styles the
+   base rule's element already carries, only which pair of dimensions is
+   fixed-by-CSS-vs-set-by-JS flips. Centred on its own `left` the same way
+   the horizontal line centres on `top`, so a caller never needs to know
+   this line's own thickness to position it correctly either. */
+.docs-editor-canvas-insertion-line.docs-editor-canvas-insertion-line-vertical {
+  width: 2px;
+  height: auto;
+  margin-top: 0;
+  margin-left: -1px;
+}
+
 /* The floating "drop into..." chip menu (overlay.js#setChips/#showChips) --
    a sibling of the toolbar, same shape rationale: position: absolute
    against the fixed root (see the toolbar's own comment above for why
@@ -230,6 +342,124 @@
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   pointer-events: auto;
+}
+
+/* Layout guides (overlay.js#setGuides/clearGuides, driven by
+   editor_controller.js#_repositionGuides) -- ghost outlines drawn over
+   every slot/row/column container currently in the design, so a
+   half-built design's structure stays legible even where nothing has been
+   dropped into it yet (an empty card is ~2px tall otherwise, an empty
+   column 0px -- nothing to see, nothing to aim a drop at). Deliberately a
+   DOTTED border in a muted, non-primary hue (--tblr-secondary-rgb) rather
+   than reusing the selection/hover/ghost boxes' dashed-primary treatment
+   above -- up to a few dozen of these can be on screen at once (a large
+   design has that many containers), and if a guide read as "just another
+   selection box" the canvas would be unreadable the moment more than one
+   is showing next to a real selection or the drag ghost. */
+.docs-editor-canvas-guide {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px dotted rgba(var(--tblr-secondary-rgb), 0.55);
+  background: rgba(var(--tblr-secondary-rgb), 0.045);
+  border-radius: 2px;
+}
+
+/* Muted variant of the guides layer, applied to the whole
+   .docs-editor-canvas-guides container (overlay.js#setGuidesMuted) for the
+   duration of a native drag. Guides used to be torn down outright for a
+   drag's whole duration; that was wrong (see editor_controller.js#
+   paletteDragStart's own comment) -- an empty container is invisible
+   without its guide, and dragging INTO one is the main reason to want it
+   drawn. What was real in the old reasoning is that a full-strength guide
+   competes with the drag's own dashed ghost box, insertion line and chip
+   menu, all of which need to read as clearly "in front". This resolves
+   that with recession, not removal: a single opacity drop on the shared
+   container, inherited by every guide box and label beneath it (rather
+   than a second rule on .docs-editor-canvas-guide/-guide-label each, which
+   could drift out of sync with this one over time). Scoped to the
+   container, not .docs-editor-canvas-guide directly, for the same reason
+   every other rule in this file stays scoped tight (this file's header). */
+.docs-editor-canvas-guides-muted {
+  opacity: 0.4;
+}
+
+/* The guide's own label, pinned to its box's own top-left corner by plain
+   CSS -- position: absolute against .docs-editor-canvas-guide (itself
+   position: absolute against the fixed root), NOT position: fixed +
+   overlay.js#flipAndClamp the way the selection/hover label and the
+   toolbar/chip menu are positioned. That is deliberate: flipAndClamp does
+   a synchronous label.offsetWidth/offsetHeight read per call, which is a
+   fine cost to pay once per selection change but not once per guide per
+   scroll tick when fifty of these might be on screen (see overlay.js#
+   setGuides' own comment). A label can clip past a very small container's
+   own edge as a result -- an acceptable trade against reintroducing that
+   read. This box's own label can also be hidden outright (the `hidden`
+   attribute, same mechanism #buildBox's boxes use) when overlay.js#
+   setGuides finds it landing within a few px of another guide's own
+   corner (still no measurement -- plain arithmetic against rects it
+   already has) -- nested containers whose boxes coincide exactly (a row
+   filled edge to edge by its own lone column) or merely nearly (that
+   column's own child starting a few px further in) would otherwise smear
+   two captions into one unreadable label; the guide's own dotted BOX is
+   never hidden this way, only its caption. */
+.docs-editor-canvas-guide-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.05em 0.35em;
+  font-family: var(--tblr-body-font-family);
+  font-size: 0.65rem;
+  line-height: 1.4;
+  color: var(--tblr-body-color);
+  background: rgba(var(--tblr-secondary-rgb), 0.35);
+  border-radius: 0 0 2px 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Decoration-only minimum height for an empty row/column, OR an empty
+   ROOT-SHARED component (card_group, badge_list, alert, ribbon --
+   drop_target.js#ROOT_SHARED_EMPTY_COMPONENTS) -- a real, already-stamped
+   <div> with no content collapses to 0px (a column, or one of these four
+   components' own root element -- their slot content renders straight
+   into it, no dedicated wrapper of its own to give even a decorated guide
+   marker somewhere to land) or the height of its own padding alone (a
+   row), leaving nothing for the guide box above to outline and nothing to
+   aim a drop at either. Applied unconditionally, guides on or off, for the
+   same reason this file's own #tabler-ui-editor-canvas gutter is (see that
+   rule's own comment): having somewhere to aim a drop is independent of
+   whether guides are drawn to LABEL that space, not created by them.
+   Stamped fresh on every canvas repaint by editor_controller.js#
+   _stampEmptyContainers, called alongside that same method's own
+   draggable="true"/"false" stamping -- the same presentation-only,
+   wiped-and-redone-on-every-repaint category: never read back into the
+   tree, never present in the exported .html.erb. */
+.docs-editor-canvas-empty-container {
+  min-height: 2rem;
+}
+
+/* Drag-only counterpart of the rule above, for the general "too small to
+   aim a drop at" case the empty-container rule doesn't cover on its own --
+   a `component`-kind element (a card with nothing in it, say) never gets
+   .docs-editor-canvas-empty-container at all (that stamp is row/column-
+   only, #_stampEmptyContainers's own doc), and even a stamped row/column
+   only reaches 2rem, which is the FLOOR this feature needs, not
+   necessarily what a hovered element other than an empty one already has.
+   Stamped by editor_controller.js#_growSmallDropTargets once at drag
+   start (never per dragover tick -- see that method's own doc) and wiped
+   by #_shrinkGrownDropTargets at #_endDrag -- same "wiped and redone on
+   every repaint" category as .docs-editor-canvas-empty-container, just
+   scoped to a single drag's lifetime instead of every repaint. Same 2rem
+   as that rule, not a new number -- see drop_target.js's own
+   DRAG_GROW_MIN_SIZE for why. Two independent classes, not one, so an
+   element that's already tall enough (or wide enough) in one dimension is
+   left alone in that dimension. */
+.docs-editor-canvas-drag-grow-height {
+  min-height: 2rem;
+}
+
+.docs-editor-canvas-drag-grow-width {
+  min-width: 2rem;
 }
 
 /* One labelled chip per available container -- see drop_target.js's

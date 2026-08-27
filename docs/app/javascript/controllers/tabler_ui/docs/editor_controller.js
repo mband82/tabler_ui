@@ -91,6 +91,66 @@
 // img/a[href]/[draggable] sitting inside one, so the browser doesn't
 // commit to dragging THAT instead -- see that method's own comment). Pure
 // presentation, redone on every repaint, never read back into the tree.
+//
+// ## Layout guides
+//
+// A half-built design is hard to aim a drop at: an empty card renders
+// ~2px tall, an empty row/column collapses to 0px, an empty root-shared
+// component (card_group, badge_list, alert, ribbon -- see drop_target.js's
+// own ROOT_SHARED_EMPTY_COMPONENTS) collapses to 0px too, for a related but
+// distinct reason (its slot content renders straight into the component's
+// own root, with no dedicated wrapper for even a decorated marker to land
+// on) -- nothing on screen to show where a slot or a container even is.
+// `#_guidesEnabled` (loaded from localStorage, default on --
+// #_loadGuidesEnabled) controls whether the next preview request asks the
+// server to decorate its HTML with `data-editor-slot`/`data-editor-slot-
+// shared` markers (Editor::Renderer's own `decorate:` flag) and whether
+// #_repositionGuides draws anything from them. See that method's own doc
+// for the full trigger list and #overlay.js#setGuides for how an
+// unbounded, recomputed-on-scroll rect set stays cheap. Rows/columns (and,
+// as of this fix, an empty root-shared component) need no server help at
+// all for THIS part -- #_stampEmptyContainers gives each one a
+// decoration-only min-height class (editor_canvas.css) purely from the
+// TREE, so it has real screen space to be hit-tested against and, when
+// guides are on, something for its own guide box to outline -- applied
+// unconditionally, guides on or off, for the same reason
+// editor_canvas.css's own canvas gutter is (see that rule's own comment):
+// having somewhere to aim a drop is a usability floor, not a decoration
+// preference, and an invisible-and-unreachable-at-rest component is a
+// worse problem than an un-outlined one. What guides being ON adds on top
+// is purely the dotted outline + label -- #_collectGuideRects' own
+// `[data-editor-slot-shared]` query, which only exists in the DOM once
+// this same min-height has given the marked element real geometry to
+// report.
+//
+// ## Drag-only growth: something to aim at
+//
+// #_stampEmptyContainers (just above) already solves "nothing to outline"
+// for an empty row/column, permanently, at every repaint. It does not
+// solve "nothing to AIM AT": that same empty container's own top/bottom
+// edge bands (drop_target.js's BEFORE_FRACTION/AFTER_FRACTION) are a
+// couple of pixels deep at 0-2px, and a `component`-kind element (a card
+// with nothing in it, say) gets no min-height stamp at all, empty or not.
+// #_growSmallDropTargets fixes this for the DURATION OF A DRAG ONLY, one
+// pass at drag start (#paletteDragStart, #_onFrameDragStart) over every
+// currently-stamped element: anything rendering under drop_target.js's own
+// DRAG_GROW_MIN_SIZE in height gets a drag-only min-height class, same for
+// width -- kept as two independent classes rather than one so a wide-but-
+// short banner only grows taller and a narrow-but-tall sidebar only wider.
+// Measured once, like guides' own trigger list explains is safe for the
+// same reason: the canvas is frozen for a drag's whole duration
+// (#_paintCanvas is a no-op while `_dragState` is set), so nothing this
+// method measures becomes stale before the drag ends. #_shrinkGrownDropTargets
+// undoes it explicitly in #_endDrag -- not left to the next repaint's
+// innerHTML replacement to clean up incidentally, since that repaint isn't
+// guaranteed to run (a drop's own preview is debounced; #_paintCanvas
+// itself no-ops if no preview has ever landed yet).
+//
+// Growing an element changes layout out from under every guide rect
+// already on screen -- #_growSmallDropTargets ends with exactly ONE
+// #_repositionGuides call to catch them up, same "measure once, not per
+// dragover tick" discipline #_repositionGuides' own doc already holds
+// scroll/resize to.
 import { Controller } from "@hotwired/stimulus"
 import * as Workspace from "controllers/tabler_ui/docs/editor/workspace"
 import * as Tree from "controllers/tabler_ui/docs/editor/tree"
@@ -103,7 +163,7 @@ import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
 import { exportWorkspaceZip } from "controllers/tabler_ui/docs/editor/export"
 import { createOverlay } from "controllers/tabler_ui/docs/editor/overlay"
 import * as DnD from "controllers/tabler_ui/docs/editor/dnd"
-import { resolveDropTarget, ROOT_GHOST_HEIGHT } from "controllers/tabler_ui/docs/editor/drop_target"
+import { resolveDropTarget, ROOT_GHOST_HEIGHT, DRAG_GROW_MIN_SIZE, isEmptyRootSharedComponent } from "controllers/tabler_ui/docs/editor/drop_target"
 
 const FIELD_PRIORITY = ["title", "text", "label", "value"]
 
@@ -126,8 +186,25 @@ function rectOf(left, top, width, height) {
 // by fixing it forward than by hunting through a long undo history for it.
 const UNDO_STACK_LIMIT = 20
 
+// table's declarative `sort_url:` (see docs/lib/tabler_ui/docs/editor/tree.rb
+// #normalize_declarative_sort_url) only survives a preview round-trip when
+// its shape already satisfies Tree's own rules -- simple mode needs all
+// three of path/sortParam/dirParam non-empty, pattern mode needs a pattern
+// carrying both {key} and {dir}. Anything short of that isn't merely
+// "incomplete", it gets DELETED the next time the tree is normalized, which
+// is exactly the trap this whole fix closes. These are the two places this
+// file ever writes a sort_url value nobody typed -- #toggleColumnSort
+// (ticking "Sortable" with no sort_url configured at all) and
+// #setSortUrlMode (picking a mode with a field still unset) -- so both draw
+// from the same already-valid defaults rather than each guessing its own.
+// "sort"/"dir" are the conventional query-param names; "/" and
+// "/{key}/{dir}" are harmless placeholders a user is expected to replace
+// with their own route once they see the field.
+const DEFAULT_SIMPLE_SORT_URL = { mode: "simple", path: "/", sortParam: "sort", dirParam: "dir" }
+const DEFAULT_PATTERN_SORT_URL = { mode: "pattern", pattern: "/{key}/{dir}" }
+
 export default class extends Controller {
-  static targets = ["explorer", "palette", "structure", "code", "inspector", "frame", "errors", "filename"]
+  static targets = ["explorer", "palette", "structure", "code", "inspector", "frame", "errors", "filename", "guides"]
   static values = {
     schemaUrl: { type: String, default: "" },
     previewUrl: { type: String, default: "" },
@@ -168,6 +245,19 @@ export default class extends Controller {
     this._previewRequestId = 0
     this._lastHtml = null
     this._lastErb = ""
+    // Layout guides: whether the next preview request asks the server to
+    // decorate its HTML with ghost-outline markers (Renderer's own
+    // `decorate:` flag -- see EditorController#preview's doc for the
+    // request-key name this reads back). Loaded from localStorage,
+    // default ON (see #_loadGuidesEnabled), and mirrored onto the
+    // toolbar's own toggle just below so a reload shows the same state it
+    // was left in rather than always starting from the server-rendered
+    // `checked` default. #_guidesRafId is the scroll-coalescing lock
+    // #_scheduleGuidesReposition/#_cancelGuidesFrame manage, the guides
+    // equivalent of #_hoverRafId above.
+    this._guidesEnabled = this._loadGuidesEnabled()
+    this._guidesRafId = null
+    if (this.hasGuidesTarget) this.guidesTarget.checked = this._guidesEnabled
 
     if (loaded.error) this._renderErrors([loaded.error])
 
@@ -320,13 +410,46 @@ export default class extends Controller {
     event.dataTransfer.setData("text/plain", label)
     DnD.paintDragImage(event, label)
 
+    // Give any too-small-to-aim-at element real edge bands for the rest of
+    // this drag -- see this file's header, "Drag-only growth". Runs from
+    // the parent document (this handler fired on a palette item, not
+    // inside the frame), but the elements it measures/grows are the
+    // frame's own -- #_growSmallDropTargets reaches into `this._frameDoc`
+    // itself rather than needing anything from `event`.
+    this._growSmallDropTargets()
+
     // Hide the selection box/toolbar for the duration of the drag --
     // #_endDrag's tail (via #_paintCanvas) restores them once the lock
     // lifts. this._selectedNodeId itself is untouched, so the selection
     // that was live before the drag started is still live after it ends.
+    // Guides are deliberately NOT cleared here (see #_repositionGuides'
+    // own doc for the fuller reasoning): an empty container is exactly as
+    // invisible mid-drag as it is at rest, and dragging a component into
+    // one is the main reason to want its guide drawn in the first place.
+    // #_paintCanvas stays a no-op for as long as this._dragState is set
+    // (this file's header, "Native drag-and-drop"), so the canvas subtree
+    // is never REPLACED underneath a drag -- no element is destroyed or
+    // recreated, so the guide rects already on screen stay pointed at the
+    // same real elements throughout. #_growSmallDropTargets just above is
+    // the one deliberate exception to "nothing changes": it can resize an
+    // element in place (this file's header, "Drag-only growth"), which is
+    // exactly why that method ends with its own single #_repositionGuides
+    // call rather than leaving this method to also trigger one -- by the
+    // time control reaches here, growth (if any) has already happened and
+    // guides are already caught up, so there is nothing left for dragstart
+    // itself to redraw. What DOES need to keep working for the rest of the
+    // drag is #_overlay.setGuidesMuted
+    // below, purely visual (recedes the existing boxes so the drag's own
+    // ghost/insertion-line/chip chrome reads clearly on top -- see
+    // editor_canvas.css's .docs-editor-canvas-guides-muted), and the
+    // scroll-triggered reposition #_scheduleGuidesReposition already wires
+    // up (this._dragState no longer suppresses it -- scrolling, including
+    // drag-edge auto-scroll, is the one thing that genuinely moves an
+    // already-correct rect out from under its container).
     if (this._overlay) {
       this._overlay.clearSelection()
       this._overlay.clearToolbar()
+      this._overlay.setGuidesMuted(true)
     }
   }
 
@@ -399,7 +522,12 @@ export default class extends Controller {
     // eslint-disable-next-line no-alert
     if (!window.confirm("Delete this node?")) return
 
-    this._updateTree((tree) => Tree.removeNode(tree, nodeId))
+    // this._schema lets Tree.removeNode rebalance a row's remaining
+    // columns back to equal widths when `nodeId` names a column being
+    // deleted straight out of an otherwise-uniform row (see that
+    // function's own header) -- passing null/undefined here would just
+    // fall back to the old plain-splice behaviour, not throw.
+    this._updateTree((tree) => Tree.removeNode(tree, nodeId, this._schema))
     if (this._selectedNodeId === nodeId) this._selectNode(null)
     this._schedulePreview()
   }
@@ -560,6 +688,34 @@ export default class extends Controller {
     this._schedulePreview()
   }
 
+  // Editing "key" gets one extra step the other plain COLUMN_FIELDS
+  // (label/class/sort itself) don't: keeping an auto-seeded `sort` in
+  // step with it. #toggleColumnSort seeds `sort` as a literal copy of
+  // `key` (`columns[index].key || ""`) the moment the checkbox is
+  // ticked -- if that happens before `key` has been typed, `sort` is
+  // seeded "". Ticking never revisited afterward, so without this,
+  // typing the key next leaves the tree at `{ key: "name", sort: "" }`:
+  // Table::Component#sortable? is `col[:sort].present?`, so `""` reads
+  // as NOT sortable while the checkbox -- keyed off `col.sort != null`
+  // in inspector.js#columnSortFieldHtml -- stays visibly checked. Same
+  // failure shape as the sort_url seeding fix above: the panel showing a
+  // state the tree doesn't actually have.
+  //
+  // The fix is to treat "sort still equals the key's PREVIOUS value" as
+  // the signal that `sort` is still the auto-seeded copy (never
+  // diverged), and carry that same edit over to `sort` too. That
+  // deliberately does NOT fire when `sort` has been hand-typed to
+  // something other than `key` (see #columnSortFieldHtml's own comment --
+  // Table::Component#sorted? never requires the two to match, a column
+  // can render one field and sort by another) -- a `sort` that no longer
+  // equals the old `key` is evidence of exactly that, so it's left alone.
+  //
+  // Clearing `key` back to empty is the one case worth calling out: if
+  // `sort` was still the auto-seeded copy, syncing it to match would
+  // write `sort: ""` right back -- the very state this fix exists to
+  // avoid. A column with no key to render can't sensibly claim a sort
+  // key it never chose for itself, so `sort` (and with it the checkbox)
+  // is dropped instead of carrying an empty string forward.
   updateColumnField(event) {
     const el = event.currentTarget
     const nodeId = el.dataset.editorNodeId
@@ -567,10 +723,29 @@ export default class extends Controller {
     const index = Number(el.dataset.editorIndex)
     const field = el.dataset.editorField
 
+    // Only set when editing "key" actually moves `sort` too -- that's
+    // also the only case where the checkbox/sort-key-input markup needs
+    // rebuilding; a plain label/class/sort edit changes no other control.
+    let sortWasSynced = false
+
     this._updateTree((tree) => {
       const current = Tree.getNodeValue(tree, nodeId, ["options", optionName])
       const columns = Array.isArray(current) ? current.map((c) => ({ ...c })) : []
       if (!columns[index]) columns[index] = {}
+
+      if (field === "key") {
+        const oldKey = columns[index].key != null ? columns[index].key : ""
+        const sortIsAutoSeededCopy = columns[index].sort != null && columns[index].sort === oldKey
+        if (sortIsAutoSeededCopy) {
+          if (el.value === "") {
+            delete columns[index].sort
+          } else {
+            columns[index].sort = el.value
+          }
+          sortWasSynced = true
+        }
+      }
+
       if (el.value === "") {
         delete columns[index][field]
       } else {
@@ -578,6 +753,162 @@ export default class extends Controller {
       }
       return Tree.setNodeValue(tree, nodeId, ["options", optionName], columns)
     })
+    if (sortWasSynced) this._renderInspector()
+    this._schedulePreview()
+  }
+
+  // The "Sortable" checkbox in editor/inspector.js#columnSortFieldHtml --
+  // a dedicated action rather than #updateColumnField because it has to
+  // DECIDE a value (seed `sort:` from the column's own `key:` the moment
+  // it's ticked) rather than just copy `el.checked` across. Unlike
+  // #updateColumnField, this rebuilds the inspector: checking/unchecking
+  // changes whether the sort-key text field is shown on this same column
+  // AND whether this column appears at all in the table-level sort
+  // dropdown (#sortControlHtml reads sortable columns straight off this
+  // same node's `columns` option on every render) -- both are only
+  // correct after a fresh build, exactly like #addColumn/#removeColumn
+  // already rebuild for the same reason.
+  //
+  // Tree#guard_sort_requires_sort_url drops a column's `sort:` outright
+  // (with a loud error) the moment it sees one without the table's own
+  // `sort_url:` present -- so ticking this box while sort_url is still
+  // unconfigured used to write a `sort:` the very next preview round-trip
+  // stripped straight back out: the normalized workspace came back with
+  // `sort` gone, this controller wrote that normalized workspace back, and
+  // the checkbox silently reverted to unchecked. The fix is NOT to relax
+  // that guard (a design posted from anywhere still has to earn a working
+  // sort_url before a column gets to claim one) but to never hand it a
+  // tree that fails it in the first place: when the box is ticked and
+  // there's no sort_url yet, #_seedSortUrlIfMissing writes a valid default
+  // one into the SAME mutator this method already passes to #_updateTree,
+  // so the `sort:` and the `sort_url:` land as one tree mutation -- one
+  // undo entry, one preview request, nothing for Tree to reject. Unticking
+  // never touches sort_url at all, seeded or user-edited, so clearing every
+  // sortable column can't lose it either.
+  toggleColumnSort(event) {
+    const el = event.currentTarget
+    const nodeId = el.dataset.editorNodeId
+    const optionName = el.dataset.editorOption
+    const index = Number(el.dataset.editorIndex)
+
+    this._updateTree((tree) => {
+      const current = Tree.getNodeValue(tree, nodeId, ["options", optionName])
+      const columns = Array.isArray(current) ? current.map((c) => ({ ...c })) : []
+      if (!columns[index]) columns[index] = {}
+
+      if (el.checked) {
+        columns[index].sort = columns[index].key || ""
+        const withSort = Tree.setNodeValue(tree, nodeId, ["options", optionName], columns)
+        return this._seedSortUrlIfMissing(withSort, nodeId)
+      }
+
+      delete columns[index].sort
+      return Tree.setNodeValue(tree, nodeId, ["options", optionName], columns)
+    })
+    this._renderInspector()
+    this._schedulePreview()
+  }
+
+  // @return [Object] `tree` unchanged if `nodeId` already carries SOMETHING
+  //   under options.sort_url -- valid or not, fully typed or only half
+  //   filled in -- since that's the user's own in-progress configuration
+  //   and overwriting it would be exactly the kind of silent data loss this
+  //   fix exists to prevent. Only a genuinely empty slot (never configured,
+  //   or emptied out via #clearSortUrl) gets DEFAULT_SIMPLE_SORT_URL
+  //   written in.
+  _seedSortUrlIfMissing(tree, nodeId) {
+    const current = Tree.getNodeValue(tree, nodeId, ["options", "sort_url"])
+    if (current && typeof current === "object") return tree
+
+    return Tree.setNodeValue(tree, nodeId, ["options", "sort_url"], { ...DEFAULT_SIMPLE_SORT_URL })
+  }
+
+  // "Clear sort" in editor/inspector.js#sortControlHtml -- drops the whole
+  // table-level `sort:` option (as opposed to picking "(unsorted)" in the
+  // key dropdown, which only clears the `key` sub-field and leaves a
+  // `{ dir: ... }` remnant -- functionally equivalent, since
+  // Table::Component#normalize_sort treats a keyless sort: Hash as
+  // unsorted too, but this is the tidy version for someone who wants the
+  // option gone from the exported ERB entirely). Rebuilds the inspector so
+  // the dropdown/direction controls disappear along with the value.
+  clearTableSort(event) {
+    const el = event.currentTarget
+    const nodeId = el.dataset.editorNodeId
+    const optionName = el.dataset.editorOption
+
+    this._updateTree((tree) => Tree.setNodeValue(tree, nodeId, ["options", optionName], undefined))
+    this._renderInspector()
+    this._schedulePreview()
+  }
+
+  // The Simple/Custom pattern buttons in editor/inspector.js#sortUrlControlHtml.
+  // A dedicated action, not #applyField, for two reasons: clicking the
+  // ALREADY-active-looking button still has to do something (the first
+  // click ever, before `options.sort_url` exists at all, looks like it's
+  // clicking "Simple" when nothing is set yet), and switching modes seeds
+  // sensible defaults (the conventional "sort"/"dir" parameter names, and
+  // -- see DEFAULT_SIMPLE_SORT_URL/DEFAULT_PATTERN_SORT_URL's own comment --
+  // an already-valid path/pattern) the moment a mode is (re)selected.
+  //
+  // Those defaults are written into the FIELDS, not left as inert input
+  // placeholders nobody actually typed: an empty `path`/`pattern` is
+  // exactly what Tree#valid_simple_sort_url?/#valid_pattern_sort_url?
+  // reject, so a blank default would fail validation the moment this
+  // method's own write reaches the next preview round-trip -- picking
+  // "Simple" would silently bounce straight back to "Not configured" with
+  // no error a user could connect to what they just clicked, the same
+  // class of self-undoing control #toggleColumnSort's own fix (above) had
+  // to close for the "Sortable" checkbox.
+  //
+  // Existing fields from BOTH modes are preserved across the switch
+  // (spread first, only `mode` and any missing default overwritten) so
+  // bouncing from simple -> pattern -> simple never loses what was typed
+  // on either side -- Tree only ever reads the fields belonging to
+  // whichever `mode` is currently set, so the other side's leftover keys
+  // just ride along inertly until the user switches back to them. A field
+  // left over from a PRIOR pick (even an empty string a user cleared by
+  // hand) is treated the same as "never set" here (`!next.path`, not
+  // `next.path == null`) -- on this control there is no meaningful
+  // difference between the two: either way nothing usable is typed there,
+  // and defaulting past it is what keeps the freshly-selected mode valid.
+  setSortUrlMode(event) {
+    const el = event.currentTarget
+    const nodeId = el.dataset.editorNodeId
+    const optionName = el.dataset.editorOption
+    const mode = el.dataset.editorMode
+
+    this._updateTree((tree) => {
+      const current = Tree.getNodeValue(tree, nodeId, ["options", optionName])
+      const next = (current && typeof current === "object") ? { ...current } : {}
+      next.mode = mode
+      if (mode === "simple") {
+        if (next.sortParam == null) next.sortParam = DEFAULT_SIMPLE_SORT_URL.sortParam
+        if (next.dirParam == null) next.dirParam = DEFAULT_SIMPLE_SORT_URL.dirParam
+        if (!next.path) next.path = DEFAULT_SIMPLE_SORT_URL.path
+      } else if (!next.pattern) {
+        next.pattern = DEFAULT_PATTERN_SORT_URL.pattern
+      }
+      return Tree.setNodeValue(tree, nodeId, ["options", optionName], next)
+    })
+    this._renderInspector()
+    this._schedulePreview()
+  }
+
+  // "Clear" in editor/inspector.js#sortUrlControlHtml -- drops the whole
+  // declarative `sort_url:` option, returning the control to its
+  // unconfigured "pick a mode" state. Any column still marked `sort:`
+  // becomes dangling the moment this lands (Tree#guard_sort_requires_sort_url
+  // drops it on the next preview and reports why, surfaced through the
+  // usual errors banner) -- this action doesn't cascade that clear itself,
+  // matching Tree's own "drop the offending piece, report why" contract
+  // rather than silently rewriting columns this control doesn't own.
+  clearSortUrl(event) {
+    const el = event.currentTarget
+    const nodeId = el.dataset.editorNodeId
+    const optionName = el.dataset.editorOption
+
+    this._updateTree((tree) => Tree.setNodeValue(tree, nodeId, ["options", optionName], undefined))
+    this._renderInspector()
     this._schedulePreview()
   }
 
@@ -698,6 +1029,13 @@ export default class extends Controller {
   //   { html, erb, workspace, errors } on success or { errors } on a 422,
   //   Editor Controller#preview is always-JSON on every path (see that
   //   controller's own doc), so the body alone tells the two apart.
+  //
+  // `decorate` rides along on every call this makes, including #exportAll's
+  // own direct use of this method -- harmless there: ErbGenerator (the
+  // only field export.js reads, `erb`) has no decoration concept at all
+  // and never will (EditorController#preview's own doc), so a decorated
+  // `html` field export.js never looks at costs nothing and changes
+  // nothing about what gets zipped.
   _fetchPreview(path, signal) {
     return fetch(this.previewUrlValue, {
       method: "POST",
@@ -706,7 +1044,7 @@ export default class extends Controller {
         Accept: "application/json",
         "X-CSRF-Token": this.csrfTokenValue
       },
-      body: JSON.stringify({ path, workspace: this._workspace }),
+      body: JSON.stringify({ path, workspace: this._workspace, decorate: this._guidesEnabled }),
       signal
     }).then((response) => response.json())
   }
@@ -776,8 +1114,24 @@ export default class extends Controller {
     // does not bubble, so a listener on `doc` only ever sees it via
     // capture, whether the thing that scrolled is the document itself or
     // some scrollable element inside the design.
-    this._frameScrollHandler = () => this._repositionOverlay()
-    this._frameResizeHandler = () => this._repositionOverlay()
+    // Guides piggyback on the same two triggers, but not the same call:
+    // #_repositionOverlay is O(1) (one selected/hovered node) and stays
+    // un-throttled here exactly as it always has; guide recompute is
+    // O(number of containers), so scroll -- which can fire many times a
+    // second -- goes through #_scheduleGuidesReposition's rAF coalescing
+    // instead of calling #_repositionGuides directly the way resize does
+    // (a resize is a discrete, low-frequency event with nothing to
+    // coalesce). See #_repositionGuides' own doc for the full trigger
+    // list, including the two that are NOT wired here (canvas repaint,
+    // shown.bs.tab).
+    this._frameScrollHandler = () => {
+      this._repositionOverlay()
+      this._scheduleGuidesReposition()
+    }
+    this._frameResizeHandler = () => {
+      this._repositionOverlay()
+      this._repositionGuides()
+    }
     // Source-side listeners for a canvas-node-originated drag -- see
     // #_onFrameDragStart/#_onFrameDragEnd's own headers, and dnd.js's, for
     // why these two (unlike dragover/dragenter/dragleave/drop just below)
@@ -855,6 +1209,7 @@ export default class extends Controller {
     this._frameDoc.removeEventListener("dragstart", this._frameDragStartHandler)
     this._frameDoc.removeEventListener("dragend", this._frameDragEndHandler)
     this._cancelHoverFrame()
+    this._cancelGuidesFrame()
     if (this._overlay) {
       this._overlay.destroy()
       this._overlay = null
@@ -886,6 +1241,7 @@ export default class extends Controller {
     if (canvasEl) {
       canvasEl.innerHTML = this._lastHtml
       this._makeCanvasDraggable(canvasEl)
+      this._stampEmptyContainers(canvasEl)
     }
     // The repaint just above replaced the whole canvas subtree, so any
     // element a hover box was pointing at is gone -- clear it rather than
@@ -900,6 +1256,13 @@ export default class extends Controller {
     // point at no longer exists -- the selection has to be re-resolved
     // against the new DOM, not merely re-measured.
     this._repositionOverlay()
+    // Trigger 1 of #_repositionGuides, same reasoning -- every marker/
+    // row/column element a guide pointed at is gone with the old subtree.
+    // A dedicated call, not folded into #_repositionOverlay above: that
+    // method is O(1) (one selected/hovered node), this one is O(number of
+    // containers), and the two triggers below (scroll/resize) treat that
+    // cost difference very differently (see #_repositionGuides' own doc).
+    this._repositionGuides()
   }
 
   // Makes every design node draggable in place -- a plain element fires no
@@ -931,6 +1294,103 @@ export default class extends Controller {
     canvasEl.querySelectorAll("img, a[href], [draggable]").forEach((el) => {
       if (el.hasAttribute("data-editor-node-id")) return // a stamped element itself -- leave draggable="true"
       if (el.closest("[data-editor-node-id]")) el.setAttribute("draggable", "false")
+    })
+  }
+
+  // Layout-guide sibling of #_makeCanvasDraggable, run right alongside it
+  // on every repaint and for the same reason: a presentation-only stamp
+  // over the JUST-painted subtree, wiped along with the rest of it on the
+  // next repaint, never read back into the tree, never present in the
+  // exported .html.erb. Rows and columns render as real elements with no
+  // server-side decoration help at all (see this feature's own task
+  // note), but an EMPTY one collapses to 0px -- nothing for its own guide
+  // box (#_collectGuideRects) to outline and nothing to aim a drop at --
+  // so this gives it editor_canvas.css's decoration-only min-height class
+  // first. Walks the tree rather than the DOM (`(node.children || [])`)
+  // because "empty" is a tree fact, not a DOM one: a row with only
+  // whitespace text nodes, say, would look non-empty to a DOM child-count
+  // check but is exactly as empty from the design's own point of view.
+  //
+  // Second pass, same class, same reasoning, different emptiness test: an
+  // empty ROOT-SHARED component (card_group, badge_list, alert, ribbon --
+  // drop_target.js#isEmptyRootSharedComponent) collapses exactly as flat as
+  // an empty row/column, but "empty" means something different for one of
+  // these -- no children array to check, its content lives in `node.slots`
+  // instead. Kept as its OWN walk (#_collectEmptyRootSharedNodes) rather
+  // than folded into #_collectContainerNodes above: that method's result
+  // also feeds #_collectGuideRects, which already finds a root-shared
+  // component's own guide rect a completely different way (the
+  // `[data-editor-slot-shared]` DOM query, this file's header, "Layout
+  // guides") -- merging the two walks would hand #_collectGuideRects a
+  // second, redundant rect for the same element, drawing two overlapping
+  // guide boxes over one component.
+  _stampEmptyContainers(canvasEl) {
+    const tree = this._currentTree()
+
+    this._collectContainerNodes(tree, []).forEach((node) => {
+      if ((node.children || []).length > 0) return
+      const el = canvasEl.querySelector(`[data-editor-node-id="${this._cssEscape(node.id)}"]`)
+      if (el) el.classList.add("docs-editor-canvas-empty-container")
+    })
+
+    this._collectEmptyRootSharedNodes(tree, []).forEach((node) => {
+      const el = canvasEl.querySelector(`[data-editor-node-id="${this._cssEscape(node.id)}"]`)
+      if (el) el.classList.add("docs-editor-canvas-empty-container")
+    })
+  }
+
+  // See this file's header, "Drag-only growth: something to aim at" --
+  // called once from #paletteDragStart/#_onFrameDragStart, never from a
+  // per-dragover-tick handler. Independent height/width classes (rather
+  // than one class covering both) so an element only grows in the
+  // dimension it was actually too small in.
+  _growSmallDropTargets() {
+    if (!this._frameDoc) return
+    const canvasEl = this._frameDoc.getElementById("tabler-ui-editor-canvas")
+    if (!canvasEl) return
+
+    // `:not([aria-hidden="true"])` excludes the empty-slot PLACEHOLDER
+    // Renderer synthesizes (#editor_slot_placeholder) -- the exact same
+    // element #_collectGuideRects' own `seenSlots` dedup already has to
+    // work around, for the exact same reason (that method's own comment):
+    // it deliberately carries the SAME data-editor-node-id/data-editor-slot
+    // pair as the real wrapper around it, so a naive "every stamped
+    // element" query matches an empty slot TWICE. There, the fix is to
+    // keep only the first (real) match; here, the placeholder has to be
+    // excluded outright rather than merely deduped, because growing it is
+    // actively harmful, not just redundant: it is never reachable by a
+    // pointer in the first place (0x0 and aria-hidden, so elementFromPoint
+    // can never land on it), but forcing it to DRAG_GROW_MIN_SIZE tall
+    // still inserts that much real, visible empty space into its parent
+    // -- confirmed live against the running editor: an empty card's own
+    // `.card-body` measured 32px before this exclusion was added, and
+    // grew to 64px during a drag, entirely from its own invisible
+    // placeholder child being forced tall, not from anything a user could
+    // ever have meant to aim at.
+    canvasEl.querySelectorAll('[data-editor-node-id]:not([aria-hidden="true"])').forEach((el) => {
+      const rect = el.getBoundingClientRect()
+      if (rect.height < DRAG_GROW_MIN_SIZE) el.classList.add("docs-editor-canvas-drag-grow-height")
+      if (rect.width < DRAG_GROW_MIN_SIZE) el.classList.add("docs-editor-canvas-drag-grow-width")
+    })
+
+    // The growth just applied is a real layout change -- every guide rect
+    // already on screen was measured before it ran, so it's now off by
+    // however much its own container (or an ancestor's) just grew. One
+    // reposition catches every guide up in a single pass; nothing else for
+    // the rest of the drag recomputes them again (this file's header).
+    this._repositionGuides()
+  }
+
+  // Counterpart of #_growSmallDropTargets, called from #_endDrag. Explicit
+  // rather than left to the next #_paintCanvas's innerHTML replacement to
+  // clean up incidentally -- see this file's header for why that repaint
+  // is not a reliable enough backstop on its own.
+  _shrinkGrownDropTargets() {
+    if (!this._frameDoc) return
+    const canvasEl = this._frameDoc.getElementById("tabler-ui-editor-canvas")
+    if (!canvasEl) return
+    canvasEl.querySelectorAll(".docs-editor-canvas-drag-grow-height, .docs-editor-canvas-drag-grow-width").forEach((el) => {
+      el.classList.remove("docs-editor-canvas-drag-grow-height", "docs-editor-canvas-drag-grow-width")
     })
   }
 
@@ -1128,9 +1588,17 @@ export default class extends Controller {
     event.dataTransfer.setData("text/plain", label) // Firefox requires this -- see dnd.js's header
     DnD.paintDragImage(event, label)
 
+    // See #paletteDragStart's own comment on this same call -- identical
+    // reasoning, just the other of the two places a drag can start.
+    this._growSmallDropTargets()
+
+    // See #paletteDragStart's own comment on this same block -- identical
+    // reasoning (guides stay drawn and merely mute), just the other of the
+    // two documents a drag can start in.
     if (this._overlay) {
       this._overlay.clearSelection()
       this._overlay.clearToolbar()
+      this._overlay.setGuidesMuted(true)
     }
   }
 
@@ -1158,12 +1626,20 @@ export default class extends Controller {
   _onFrameDragOver(event) {
     if (!this._dragState || !this._frameDoc) return
 
-    const hit = DnD.hitTestStamped(this._frameDoc, event.clientX, event.clientY)
+    // #_hitTestDragTarget alone only ever matches a real stamped element --
+    // over the new gutter padding (or any other dead space around a
+    // root-level child) it finds nothing, so #_hitTestRootFallback is tried
+    // second, never instead: a real element under the pointer always wins.
+    // See that method's own header for why this is a root-relative
+    // before/after/beside resolution now, not always a trailing append.
+    const hit = this._hitTestDragTarget(event.clientX, event.clientY) || this._hitTestRootFallback(event.clientX, event.clientY)
     const descriptor = resolveDropTarget({
       tree: this._currentTree(),
       schema: this._schema,
       hoveredNodeId: hit ? hit.id : null,
       hoveredRect: hit ? hit.rect : null,
+      hoveredSlotName: hit ? hit.slotName : null,
+      pointerX: event.clientX,
       pointerY: event.clientY,
       draggedKind: this._dragState.kind,
       draggedNodeId: this._dragState.sourceNodeId
@@ -1182,6 +1658,98 @@ export default class extends Controller {
     this._paintDragGhost(descriptor, event)
   }
 
+  // The same "elementFromPoint + closest [data-editor-node-id]" lookup
+  // DnD.hitTestStamped already does (see that function's own header for
+  // why it stays its own small copy rather than a shared helper --
+  // #_updateHoverFromPoint above is a second, independent copy of the
+  // same two lines for exactly that reason) -- kept as a THIRD small copy
+  // here, rather than widening hitTestStamped's own {id, rect} return
+  // shape, because this call site needs one more thing off the SAME
+  // matched element: `data-editor-slot`, present only on a decorated
+  // PRECISE slot's own dedicated wrapper (Renderer#stamp_slot_marker),
+  // naming which slot of the hovered component this exact element is --
+  // see drop_target.js's own header on `hoveredSlotName` for what that
+  // unlocks (the middle band resolving straight into that slot instead of
+  // the cursor-anchored chip menu). Deliberately reads `data-editor-slot`
+  // only, never `data-editor-slot-shared` (Renderer#stamp_shared_slot's
+  // different attribute for a ROOT_SHARED slot with no wrapper of its
+  // own) -- leaving that one unread is what keeps a root-shared component
+  // (alert, avatar, badge_list, card_group, ribbon) resolving through the
+  // chip path exactly as before.
+  //
+  // @return {id, rect, slotName} for the stamped element under the point,
+  //   or null. `slotName` is null whenever the matched element carries no
+  //   `data-editor-slot` -- guides off (the attribute doesn't exist in the
+  //   DOM at all then, Renderer's own `if @decorate` gate), the matched
+  //   element is a component's plain root, or it's some other kind
+  //   entirely (row/column/fragment/leaf).
+  _hitTestDragTarget(x, y) {
+    if (!this._frameDoc || !this._frameDoc.elementFromPoint) return null
+    const el = this._frameDoc.elementFromPoint(x, y)
+    const target = el && el.closest ? el.closest("[data-editor-node-id]") : null
+    if (!target) return null
+    return {
+      id: target.getAttribute("data-editor-node-id"),
+      rect: target.getBoundingClientRect(),
+      slotName: target.getAttribute("data-editor-slot")
+    }
+  }
+
+  // #_hitTestDragTarget's own fallback, tried only when it found nothing --
+  // the pointer is over the new gutter padding around the design
+  // (editor_canvas.css's own #tabler-ui-editor-canvas rule), a gap between
+  // two root-level siblings, or dead space below a design shorter than the
+  // frame itself. Before this existed, "no stamped element under the
+  // pointer" always fell through to #resolveAgainstRoot's plain append --
+  // right for the space below the last component, but wrong everywhere
+  // else: hovering the new top gutter, plainly aiming ABOVE the first
+  // component, still landed the drop at the very end. This resolves the
+  // pointer against whichever ROOT-LEVEL child it is vertically nearest to
+  // instead, and hands that back in exactly the {id, rect, slotName} shape
+  // #_hitTestDragTarget already returns for a real hit -- #_onFrameDragOver
+  // cannot tell the difference, so every existing rule for a real hit
+  // (edgeBandFor's four-edge test, the vertical three-band split, the
+  // left/right "join this row" / "wrap into a new one" cases) already
+  // applies unchanged: above the nearest child resolves to "before" it,
+  // below to "after", and beside it to whatever those same horizontal
+  // rules already do for a root-level node -- see drop_target.js's own
+  // header, "Four edges, one rule". Only root-level children are ever
+  // candidates here (this reads `tree.children`, not the DOM subtree), so
+  // a gap INSIDE some other container (say, between two rows nested three
+  // levels down) is not this method's concern -- that space sits inside an
+  // element #_hitTestDragTarget already matches directly.
+  //
+  // @return the same {id, rect, slotName} shape as #_hitTestDragTarget, or
+  //   null when the tree is empty or unavailable, or open, or none of its
+  //   root children still have a stamped element on screen -- the caller
+  //   falls through to #resolveAgainstRoot's plain append in that case,
+  //   same as before this method existed.
+  _hitTestRootFallback(x, y) {
+    const tree = this._currentTree()
+    if (!tree || !this._frameDoc) return null
+    const children = Array.isArray(tree.children) ? tree.children : []
+
+    let nearest = null
+    let nearestDistance = Infinity
+    children.forEach((child) => {
+      const el = this._frameDoc.querySelector(`[data-editor-node-id="${this._cssEscape(child.id)}"]`)
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      // 0 when the pointer's own Y already falls within this child's own
+      // vertical span (it is "beside" this child, not above or below it) --
+      // the same three-way split #resolveAgainstElement's band logic is
+      // about to re-derive from `rect` and `y` anyway, computed here only
+      // well enough to pick WHICH child to hand it, not to duplicate that
+      // logic.
+      const distance = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
+      if (distance < nearestDistance) {
+        nearestDistance = distance
+        nearest = { id: child.id, rect, slotName: null }
+      }
+    })
+    return nearest
+  }
+
   // The pointer left the frame document entirely (dnd.js's `onLeave`,
   // fired only for that one case -- see its own header). The drag is
   // still live (dragend/drop haven't happened), but there is nothing
@@ -1195,6 +1763,7 @@ export default class extends Controller {
       this._overlay.clearGhost()
       this._overlay.clearInsertionLine()
       this._overlay.clearChips()
+      this._overlay.clearWrapOutline()
     }
   }
 
@@ -1219,22 +1788,39 @@ export default class extends Controller {
   }
 
   // Performs the mutation a resolved single-target descriptor (or a chosen
-  // chip -- same {parentId, container, index} shape) describes. Two
-  // branches on `this._dragState.sourceNodeId`: null means this is a
-  // palette drag building a brand-new node (#_buildNewNode +
-  // Tree.insertAt, exactly what #_onFrameDrop always did before canvas-
-  // node dragging existed); set means this is an existing node being
-  // moved (Tree.moveNodeTo). Deliberately does not gate on
-  // `target.valid`: validity is advisory only (drop_target.js's own
-  // header) -- an "invalid" target is still handed to Tree.moveNodeTo/
-  // Tree.insertAt exactly like any other edit. For moveNodeTo specifically
-  // this is more than "advisory" in practice: dropping into a node's own
-  // descendant is already a safe no-op at the data layer (tree.js's own
-  // header on #moveNodeTo) regardless of what this file thinks `valid`
-  // should say, so there is nothing here that NEEDS gating for
-  // correctness -- only the ghost/chip's appearance depends on it.
+  // chip -- same {parentId, container, index} shape) describes. "wrap" and
+  // "column" are each peeled off first into their own compound-mutation
+  // helper (#_applyWrapDrop / #_applyColumnInsertDrop) -- both build a
+  // brand-new column around the dragged node, just around a brand-new row
+  // vs. an existing one, so neither fits the plain insertAt/moveNodeTo
+  // shape every other position uses. What's left is two branches on
+  // `this._dragState.sourceNodeId`: null means this is a palette drag
+  // building a brand-new node (#_buildNewNode + Tree.insertAt, exactly what
+  // #_onFrameDrop always did before canvas-node dragging existed); set
+  // means this is an existing node being moved (Tree.moveNodeTo).
+  // Deliberately does not gate on `target.valid`: validity is advisory only
+  // (drop_target.js's own header) -- an "invalid" target is still handed to
+  // Tree.moveNodeTo/Tree.insertAt exactly like any other edit. For
+  // moveNodeTo specifically this is more than "advisory" in practice:
+  // dropping into a node's own descendant is already a safe no-op at the
+  // data layer (tree.js's own header on #moveNodeTo) regardless of what
+  // this file thinks `valid` should say, so there is nothing here that
+  // NEEDS gating for correctness -- only the ghost/chip's appearance
+  // depends on it.
   _applyDrop(target) {
     if (!target || !target.parentId) return
+
+    if (target.position === "wrap") {
+      this._applyWrapDrop(target)
+      this._schedulePreview()
+      return
+    }
+
+    if (target.position === "column") {
+      this._applyColumnInsertDrop(target)
+      this._schedulePreview()
+      return
+    }
 
     if (this._dragState.sourceNodeId) {
       const sourceId = this._dragState.sourceNodeId
@@ -1247,43 +1833,123 @@ export default class extends Controller {
     this._schedulePreview()
   }
 
-  // Renders the ghost box + insertion line, OR the chip menu, for the drop
-  // `descriptor` resolved this tick -- exactly one of the two is ever
-  // showing at once, so each branch below clears the other's chrome before
-  // (or instead of) drawing its own. Four cases, in the order checked:
+  // The "wrap" branch of #_applyDrop -- builds the {newNode}/{moveId}
+  // payload tree.js#wrapInRow's own contract expects (see that function's
+  // header) from the SAME sourceNodeId/kind/component split #_applyDrop's
+  // other branch already makes, then hands it, `target`'s own
+  // wrapTargetId/wrapSide/columnSpan (all resolved already by
+  // drop_target.js#resolveHorizontalEdge), straight through.
+  _applyWrapDrop(target) {
+    const payload = this._dragState.sourceNodeId
+      ? { moveId: this._dragState.sourceNodeId }
+      : { newNode: this._buildNewNode(this._dragState.kind, this._dragState.component) }
+    if (!payload.moveId && !payload.newNode) return
+
+    this._updateTree((tree) => Tree.wrapInRow(tree, target.wrapTargetId, target.wrapSide, payload, target.columnSpan))
+  }
+
+  // The "column" branch of #_applyDrop -- #_applyWrapDrop's sibling for
+  // joining an EXISTING row instead of building a brand-new one (see
+  // drop_target.js's header, "Four edges, one rule", case 1, for when this
+  // resolves over #_applyWrapDrop's case 2). Builds the exact same
+  // {newNode}/{moveId} payload shape tree.js#insertColumnBeside expects --
+  // and that #_applyWrapDrop already builds the same way one line up, so
+  // this is genuinely the same split, not a near-miss copy of it -- then
+  // hands it `target`'s own columnTargetId/columnSide/columnSpan (all
+  // resolved already by drop_target.js#resolveHorizontalEdge) straight
+  // through, plus this._schema so tree.js#insertColumnBeside can rebalance
+  // the joined row's columns back to equal widths when they were still
+  // uniform (see that function's own header).
+  _applyColumnInsertDrop(target) {
+    const payload = this._dragState.sourceNodeId
+      ? { moveId: this._dragState.sourceNodeId }
+      : { newNode: this._buildNewNode(this._dragState.kind, this._dragState.component) }
+    if (!payload.moveId && !payload.newNode) return
+
+    this._updateTree((tree) => Tree.insertColumnBeside(tree, target.columnTargetId, target.columnSide, payload, target.columnSpan, this._schema))
+  }
+
+  // Renders the ghost box + insertion line, the wrap chrome, OR the chip
+  // menu, for the drop `descriptor` resolved this tick -- exactly one of
+  // the three is ever showing at once, so each branch below clears the
+  // others' chrome before (or instead of) drawing its own. Six cases, in
+  // the order checked:
   //
   //   1. no descriptor at all (drag left the frame, #_onFrameDragLeave) --
   //      clear everything.
   //   2. `position: "chips"` -- delegate to #_paintChips; no ghost/
   //      insertion line for this tick.
-  //   3. `position: "into"` -- landing INSIDE the hovered element itself
+  //   3. `position: "wrap"` -- a bigger change than a plain insert (it
+  //      builds a whole new row), so it gets its own, visually distinct
+  //      chrome rather than reusing the plain ghost's look: a wrap
+  //      outline over the FULL hovered element (drop_target.js's own
+  //      `.docs-editor-canvas-box-wrap` -- everything currently there is
+  //      about to become one half of a new row) plus a ghost sized to
+  //      exactly HALF that element's width, on the side the dragged node
+  //      will actually land, in the wrap's own colour (setGhost's `wrap`
+  //      flag) so it doesn't read as an ordinary "into" ghost.
+  //   4. `position: "into"` -- landing INSIDE the hovered element itself
   //      (a row/column/fragment taking children directly), so the ghost is
   //      drawn as that element's own full rect rather than a sliver beside
   //      it, and there is no edge to draw an insertion line against.
-  //   4. `position: "before"/"after"` (descriptor.anchorRect set) --
-  //      original phase-1 behaviour: insertion line flush with the
-  //      resolved edge, ghost sized off the hovered element's own width,
-  //      sitting just outside it on the correct side.
-  //   5. `position: "append"` (no hovered element at all -- empty canvas,
-  //      or the pointer over dead space) -- no insertion line, ghost sized
-  //      off the canvas element itself, at ROOT_GHOST_HEIGHT (drop_target.
-  //      js's own constant, so the two never drift apart).
+  //   5. `position: "before"/"after"/"column"` (descriptor.anchorRect set)
+  //      -- insertion line flush with the resolved edge, ghost sized off
+  //      the hovered element's own cross-dimension, sitting just outside it
+  //      on the correct side. `descriptor.lineOrientation` picks which way:
+  //      "horizontal" (a top/bottom edge) draws the ORIGINAL full-width bar
+  //      above/below the element, same as before this feature; "vertical"
+  //      (a left/right edge, drop_target.js's horizontal bands) draws a
+  //      full-height bar beside it instead, with the ghost a narrow sliver
+  //      of the SAME thickness (ROOT_GHOST_HEIGHT) sitting left or right
+  //      rather than above or below -- so a left/right insertion reads as a
+  //      vertical line on that edge, never the horizontal one. "column" is
+  //      deliberately NOT given its own branch here, unlike "wrap": it is a
+  //      structural change (a new column joins an existing row) but a small
+  //      one, and the plain vertical insertion line this branch already
+  //      draws for an ordinary left/right "before"/"after" is exactly the
+  //      right chrome for it too -- a thin line at the column boundary, not
+  //      a whole-element outline. That is also the distinction this file's
+  //      task cares about: a sibling-column insert must read as visibly
+  //      DIFFERENT from a wrap's box-around-the-whole-element chrome
+  //      (case 3 above), which it does simply by falling through to this
+  //      case instead of case 3.
+  //   6. `position: "append"` with no anchorRect -- reached only for a
+  //      genuinely EMPTY tree now (#_hitTestRootFallback resolves every
+  //      other "no stamped element under the pointer" case -- gutter,
+  //      inter-sibling gap, dead space below a short design -- against the
+  //      nearest root-level child instead, landing in one of the branches
+  //      above with a real anchorRect). No insertion line, ghost sized off
+  //      the canvas element itself, at ROOT_GHOST_HEIGHT (drop_target.js's
+  //      own constant, so the two never drift apart).
   _paintDragGhost(descriptor, event) {
     if (!this._overlay) return
     if (!descriptor) {
       this._overlay.clearGhost()
       this._overlay.clearInsertionLine()
       this._overlay.clearChips()
+      this._overlay.clearWrapOutline()
       return
     }
 
     if (descriptor.position === "chips") {
       this._overlay.clearGhost()
       this._overlay.clearInsertionLine()
+      this._overlay.clearWrapOutline()
       this._paintChips(descriptor, event)
       return
     }
     this._overlay.clearChips()
+
+    if (descriptor.position === "wrap") {
+      const anchor = descriptor.anchorRect
+      this._overlay.setInsertionLine(descriptor.insertionRect, descriptor.lineOrientation)
+      this._overlay.setWrapOutline(anchor, "New row")
+      const halfWidth = anchor.width / 2
+      const left = descriptor.wrapSide === "before" ? anchor.left : anchor.left + halfWidth
+      this._overlay.setGhost(rectOf(left, anchor.top, halfWidth, anchor.height), this._dragState.label, descriptor.valid, true)
+      return
+    }
+    this._overlay.clearWrapOutline()
 
     if (descriptor.position === "into") {
       this._overlay.clearInsertionLine()
@@ -1298,11 +1964,17 @@ export default class extends Controller {
 
     if (descriptor.anchorRect) {
       const anchor = descriptor.anchorRect
-      const height = Math.max(20, Math.min(ROOT_GHOST_HEIGHT, anchor.height))
-      const top = descriptor.position === "before" ? anchor.top - height : anchor.bottom
+      this._overlay.setInsertionLine(descriptor.insertionRect, descriptor.lineOrientation)
 
-      this._overlay.setInsertionLine(descriptor.insertionRect)
-      this._overlay.setGhost(rectOf(anchor.left, top, anchor.width, height), this._dragState.label, descriptor.valid)
+      if (descriptor.lineOrientation === "vertical") {
+        const width = Math.max(20, Math.min(ROOT_GHOST_HEIGHT, anchor.width))
+        const left = descriptor.edge === "left" ? anchor.left - width : anchor.right
+        this._overlay.setGhost(rectOf(left, anchor.top, width, anchor.height), this._dragState.label, descriptor.valid)
+      } else {
+        const height = Math.max(20, Math.min(ROOT_GHOST_HEIGHT, anchor.height))
+        const top = descriptor.position === "before" ? anchor.top - height : anchor.bottom
+        this._overlay.setGhost(rectOf(anchor.left, top, anchor.width, height), this._dragState.label, descriptor.valid)
+      }
       return
     }
 
@@ -1369,10 +2041,24 @@ export default class extends Controller {
   _endDrag() {
     if (!this._dragState) return
     this._dragState = null
+    // See this file's header, "Drag-only growth" -- undoes
+    // #_growSmallDropTargets explicitly, on both a successful drop and a
+    // cancelled drag, rather than counting on the next repaint to happen
+    // to wipe it.
+    this._shrinkGrownDropTargets()
     if (this._overlay) {
       this._overlay.clearGhost()
       this._overlay.clearInsertionLine()
       this._overlay.clearChips()
+      this._overlay.clearWrapOutline()
+      // Un-mute back to the guides' normal appearance -- #paletteDragStart/
+      // #_onFrameDragStart's own comment. #_paintCanvas below (now that
+      // this._dragState is cleared) repaints the canvas and, at its tail,
+      // recomputes the guide set proper against whatever the drop (or its
+      // absence, for a cancelled drag) actually left in the tree -- this
+      // call only restores the LOOK of whatever is still on screen from a
+      // moment ago, it does not itself redraw geometry.
+      this._overlay.setGuidesMuted(false)
     }
     this._paintCanvas()
   }
@@ -1747,6 +2433,7 @@ export default class extends Controller {
   // one directly from inside this controller.
   repositionOverlay() {
     this._repositionOverlay()
+    this._repositionGuides()
   }
 
   // A DOMRect returned by getBoundingClientRect() is a one-time snapshot,
@@ -1778,6 +2465,256 @@ export default class extends Controller {
       return
     }
     this._highlightCanvasSelection(this._selectedNodeId)
+  }
+
+  // === Layout guides ==========================================================
+  //
+  // Recomputes and redraws the full guide set -- ghost outlines over every
+  // server-decorated slot marker plus every row/column tree node -- from
+  // scratch. "From scratch" is safe to say here even though it sounds like
+  // the rebuild-every-time pattern this feature's own task note warns
+  // against: the EXPENSIVE part of that pattern is DOM churn (destroying
+  // and recreating elements), and overlay.js#setGuides is what avoids
+  // that, by diffing this method's rect list against the boxes already on
+  // screen instead of rebuilding them. Recomputing the *list itself* on
+  // every trigger is unavoidable and cheap relative to that -- there is no
+  // stale-but-still-correct subset of "every container in the design" to
+  // reuse the way a diffed DOM node can be reused.
+  //
+  // Four triggers share this method, matching #_repositionOverlay's own
+  // four exactly (that method's own doc has the full reasoning for each):
+  // the tail of #_paintCanvas (direct call), "scroll" on the frame
+  // document (via #_scheduleGuidesReposition's rAF coalescing -- see that
+  // method's own doc for why scroll alone is throttled here while resize
+  // and repaint are not), "resize" on the frame's own window (direct
+  // call), and Bootstrap's shown.bs.tab on the Preview tab's anchor
+  // (#repositionOverlay, the public Stimulus-action wrapper both this and
+  // #_repositionOverlay share).
+  //
+  // Guarded on #_guidesEnabled alone (an explicit off means "show
+  // nothing", not "show whatever was last computed") -- NOT on
+  // this._dragState. Guides deliberately stay live through a drag (see
+  // #paletteDragStart's own doc for why the old "suppress for the whole
+  // drag" behaviour was wrong), and this is the method that keeps them
+  // correct while one is in progress: #_paintCanvas -- the trigger below
+  // that would otherwise recompute the rect list from a changed DOM -- is
+  // itself a no-op for as long as this._dragState is set, so the only
+  // triggers that can actually reach this method mid-drag are scroll (via
+  // #_scheduleGuidesReposition) and resize/shown.bs.tab (direct calls,
+  // just below). All three re-measure the SAME already-correct elements
+  // with getBoundingClientRect() -- nothing about the tree or the canvas
+  // subtree changed, only the viewport-relative position of things already
+  // on screen -- so letting them run mid-drag is a reposition, never the
+  // per-dragover-tick full recompute this feature's own task note warns
+  // against (dragover itself, #_onFrameDragOver, never calls this method
+  // at all).
+  _repositionGuides() {
+    if (!this._overlay) return
+    if (!this._guidesEnabled) {
+      this._overlay.clearGuides()
+      return
+    }
+    this._overlay.setGuides(this._collectGuideRects())
+  }
+
+  // Coalesces scroll-triggered guide recomputes into at most one per
+  // animation frame -- unlike #_repositionOverlay (O(1), left un-throttled
+  // even on scroll), a full guide recompute is O(number of containers) in
+  // the design, and a mouse wheel or trackpad can fire "scroll" many times
+  // between two frames. Mirrors #_onFramePointerMove's own rAF-coalescing
+  // shape (and #_hoverRafId/#_cancelHoverFrame) for the same reason: only
+  // the LATEST state matters once a frame's worth of scroll events have
+  // all landed, so nothing is lost by dropping the intermediate ones.
+  _scheduleGuidesReposition() {
+    if (this._guidesRafId != null) return // already scheduled for this frame
+    const view = this._frameDoc && this._frameDoc.defaultView
+    if (!view) {
+      this._repositionGuides()
+      return
+    }
+    this._guidesRafId = view.requestAnimationFrame(() => {
+      this._guidesRafId = null
+      this._repositionGuides()
+    })
+  }
+
+  _cancelGuidesFrame() {
+    if (this._guidesRafId != null && this._frameDoc && this._frameDoc.defaultView) {
+      this._frameDoc.defaultView.cancelAnimationFrame(this._guidesRafId)
+    }
+    this._guidesRafId = null
+  }
+
+  // Builds this tick's full rect list -- see #_repositionGuides' own doc
+  // for when this runs. Two sources, per this feature's own task note:
+  //
+  //   1. Server markers -- every [data-editor-slot] (the PRECISE case: a
+  //      slot with its own dedicated wrapper part, labelled with the slot
+  //      name) and every [data-editor-slot-shared] (the COARSE case: a
+  //      component whose slot content renders straight into its own root
+  //      with no wrapper of its own -- alert, avatar, badge_list,
+  //      card_group, ribbon -- labelled from every shared slot name
+  //      together, see the loop below for why). Both only ever exist in
+  //      the DOM at all when this preview was rendered with `decorate:
+  //      true` (Renderer's own gate) -- if a stale, undecorated response
+  //      is still painted when this runs (the toggle flipped on but the
+  //      new preview hasn't landed yet), these two queries simply find
+  //      nothing, and the guide set catches up the moment #_paintCanvas
+  //      repaints with the decorated response.
+  //   2. The tree -- every row/column node, resolved to its own stamped
+  //      element and labelled with its own kind. These need no server
+  //      help to exist as real elements (see this feature's own task
+  //      note), so this walks `this._currentTree()` directly rather than
+  //      querying for another server-side marker.
+  //
+  // Each rect's `id` is stable across recomputes of the SAME tree/DOM
+  // state (built from the owning node's id, never from array position or
+  // insertion order), which is exactly what overlay.js#setGuides needs to
+  // diff correctly rather than tearing down and rebuilding every box on
+  // every scroll tick.
+  _collectGuideRects() {
+    if (!this._frameDoc) return []
+    const rects = []
+
+    // The empty-slot placeholder Renderer synthesizes
+    // (#editor_slot_placeholder) deliberately carries the SAME
+    // data-editor-slot/data-editor-node-id pair as the real wrapper
+    // around it (see that method's own comment: "so the client can
+    // identify a placeholder on its own terms") -- which means a single
+    // empty slot matches this query TWICE, wrapper then placeholder, in
+    // that document order. Only the first (the wrapper -- the element
+    // that actually has real size, via its own component-CSS padding)
+    // is wanted here; the placeholder is an empty, aria-hidden child sat
+    // inside it with no size of its own to usefully outline. `seenSlots`
+    // keeps only that first match per id.
+    const seenSlots = new Set()
+    this._frameDoc.querySelectorAll("[data-editor-slot]").forEach((el) => {
+      const nodeId = el.getAttribute("data-editor-node-id")
+      const slot = el.getAttribute("data-editor-slot")
+      const id = `slot:${nodeId}:${slot}`
+      if (seenSlots.has(id)) return
+      seenSlots.add(id)
+      rects.push(this._guideRectFor(el, id, slot))
+    })
+
+    // The coarse case never has a placeholder to collide with (Renderer
+    // never synthesizes one for a ROOT_SHARED slot -- its region already
+    // IS the component root, which always renders regardless), so no
+    // dedup is needed here. Labelled by joining every shared slot name
+    // with " + " rather than picking just one: SlotParts maps at most one
+    // slot to ROOT_SHARED per component today, but the attribute itself
+    // is already comma-joined for the case where a future component maps
+    // more than one (Renderer#stamp_shared_slot's own doc), and "+" reads
+    // unambiguously as "this one guide stands in for all of these" --
+    // distinct from the plain single-word label a precise slot gets,
+    // which is the whole point: this element is the coarser of the two
+    // cases, and its label should look like it.
+    this._frameDoc.querySelectorAll("[data-editor-slot-shared]").forEach((el) => {
+      const nodeId = el.getAttribute("data-editor-node-id")
+      const names = el.getAttribute("data-editor-slot-shared").split(",")
+      rects.push(this._guideRectFor(el, `slot-shared:${nodeId}`, names.join(" + ")))
+    })
+
+    this._collectContainerNodes(this._currentTree(), []).forEach((node) => {
+      const el = this._frameDoc.querySelector(`[data-editor-node-id="${this._cssEscape(node.id)}"]`)
+      if (el) rects.push(this._guideRectFor(el, `container:${node.id}`, node.kind))
+    })
+
+    return rects
+  }
+
+  _guideRectFor(el, id, label) {
+    const rect = el.getBoundingClientRect()
+    return { id, label, left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+  }
+
+  // Every row/column node anywhere in `node`, walking the same set of
+  // child arrays Tree.js's own internal traversal does -- `children`
+  // (fragment/row/column), each value of `slots` (a slot-style
+  // component's own content), and `items` (a builder-style component or a
+  // builder_item with block: :items) -- so a row or column nested inside
+  // a slot or a builder item's own children is found too, not just ones
+  // that hang directly off the root. Not itself exported from tree.js
+  // (that module's own `childArrays` is private to it), so this is a
+  // second, small copy of the same shape rather than a new export earned
+  // by exactly one caller.
+  _collectContainerNodes(node, acc) {
+    if (!node) return acc
+    if (node.kind === "row" || node.kind === "column") acc.push(node)
+    if (Array.isArray(node.children)) node.children.forEach((child) => this._collectContainerNodes(child, acc))
+    if (node.slots && typeof node.slots === "object") {
+      Object.values(node.slots).forEach((arr) => (arr || []).forEach((child) => this._collectContainerNodes(child, acc)))
+    }
+    if (Array.isArray(node.items)) node.items.forEach((item) => this._collectContainerNodes(item, acc))
+    return acc
+  }
+
+  // #_collectContainerNodes' sibling for #_stampEmptyContainers' second
+  // pass (that method's own doc explains why this is a separate walk
+  // rather than folded into the one above) -- same traversal shape
+  // (children/slots/items), same "keep walking past a match" behaviour (an
+  // empty card_group nested inside a row still needs the row found too, if
+  // it's ALSO empty, and vice versa), just a different per-node test:
+  // drop_target.js#isEmptyRootSharedComponent instead of `node.kind ===
+  // "row" || "column"`.
+  _collectEmptyRootSharedNodes(node, acc) {
+    if (!node) return acc
+    if (isEmptyRootSharedComponent(node)) acc.push(node)
+    if (Array.isArray(node.children)) node.children.forEach((child) => this._collectEmptyRootSharedNodes(child, acc))
+    if (node.slots && typeof node.slots === "object") {
+      Object.values(node.slots).forEach((arr) => (arr || []).forEach((child) => this._collectEmptyRootSharedNodes(child, acc)))
+    }
+    if (Array.isArray(node.items)) node.items.forEach((item) => this._collectEmptyRootSharedNodes(item, acc))
+    return acc
+  }
+
+  // The toolbar's "Layout guides" switch (editor/show.html.erb) --
+  // decoration is server-side (Renderer's `decorate:`), so flipping this
+  // can't just redraw the existing overlay the way every other guides
+  // method here does: it has to re-request the preview with the new flag.
+  // Turning guides OFF also clears whatever is on screen immediately
+  // rather than waiting for that round trip -- leaving stale guides up
+  // for the length of a network request would read as the toggle having
+  // done nothing. Turning guides ON has no equivalent eager step: there is
+  // no decorated markup to measure until the new response lands and
+  // #_paintCanvas repaints, at which point its own #_repositionGuides call
+  // picks it up same as any other repaint.
+  toggleGuides(event) {
+    this._guidesEnabled = event.currentTarget.checked
+    this._saveGuidesEnabled(this._guidesEnabled)
+    if (!this._guidesEnabled && this._overlay) this._overlay.clearGuides()
+    this._schedulePreview(true)
+  }
+
+  // @return {Boolean} true (guides on) for both "the key was never
+  // written" and a genuinely corrupt value -- see editor/workspace.js's
+  // own header for why this reads/writes tabler-ui-docs-editor:guides
+  // directly rather than through a loadWorkspace-shaped helper there: a
+  // single boolean has no shape worth one. Never throws -- a
+  // localStorage read can fail (private browsing, a disabled/full store)
+  // exactly like editor/workspace.js#loadWorkspace's own can, and a
+  // failure here should fall back to the same default an absent key gets,
+  // not take the whole controller down before #connect finishes.
+  _loadGuidesEnabled() {
+    try {
+      const raw = localStorage.getItem(Workspace.GUIDES_KEY)
+      return raw === null ? true : raw === "true"
+    } catch (e) {
+      return true
+    }
+  }
+
+  // Counterpart of #_loadGuidesEnabled. DOES report a failure (rather than
+  // swallowing it the way the loader's catch above does) -- same
+  // reasoning as editor/workspace.js#saveWorkspace's own header: a write
+  // failure the user never hears about means the toggle they just clicked
+  // silently won't survive a reload.
+  _saveGuidesEnabled(enabled) {
+    try {
+      localStorage.setItem(Workspace.GUIDES_KEY, enabled ? "true" : "false")
+    } catch (e) {
+      this._renderErrors([`could not save the layout-guides setting: ${e.message}`])
+    }
   }
 
   // labelFor (editor/structure.js) is the same function the Structure

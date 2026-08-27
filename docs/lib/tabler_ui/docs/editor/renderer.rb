@@ -2,6 +2,9 @@
 
 require "tabler_ui/docs/editor/contract"
 require "tabler_ui/docs/editor/builder_map"
+require "tabler_ui/docs/editor/sort_url"
+require "tabler_ui/docs/editor/slot_map"
+require "tabler_ui/docs/editor/slot_parts"
 
 module TablerUi
   module Docs
@@ -80,6 +83,42 @@ module TablerUi
       # `table`'s own :columns option. See that method's doc for the full
       # story, and ErbGenerator#format_columns_array for the export-side
       # counterpart that must stay in agreement with it.
+      #
+      # ## `table`'s :sort_url is declarative too
+      #
+      # Same problem, same shape of fix: `table`'s real :sort_url option is
+      # a callable (`sort_url.call(key, dir)`), so a design tree carries a
+      # declarative Hash instead and #synthesize_sort_url builds the real
+      # lambda right before dispatch, scoped to exactly `table`'s own
+      # :sort_url option. See that method's doc, SortUrl's own doc, and
+      # ErbGenerator#format_sort_url_value for the export-side counterpart.
+      #
+      # ## Decoration (layout guides) -- off by default, on only when asked
+      #
+      # `decorate:` (default `false`) turns on a second, independent kind of
+      # stamping: "layout guides", ghost outlines the design-editor canvas
+      # draws over a slot-style component's own slots so a half-built
+      # design's structure stays legible even when a slot is still empty (an
+      # empty card is ~2px tall today -- nothing to see, nothing to aim a
+      # drag at). See #decorate_slot_opts and #emit_decorated_slots for the
+      # two halves of the mechanism, and SlotParts' own module doc for the
+      # registry that makes either one possible at all.
+      #
+      # This is a deliberate, narrow exception to "Renderer only ever
+      # reflects the design tree" -- decoration adds attributes/elements the
+      # tree itself never asked for. It stays bounded the same way every
+      # other exception in this file does: a single `if @decorate` gate,
+      # checked at exactly the call sites below and nowhere else, never
+      # inverted, never defaulted true anywhere in the codebase.
+      # EditorController#preview is the only caller that can ever pass
+      # `decorate: true`, and only from a real JSON `true` in the request
+      # body (see that controller's own doc) -- every other call site in
+      # this codebase (ErbGenerator's consistency corpus, any future caller
+      # that just wants real HTML) keeps getting back exactly what it got
+      # before this feature existed, unchanged. decoration_spec.rb is the
+      # anti-rot check that undecorated output is untouched and decorated
+      # output differs from it by exactly SlotParts' declared deltas, no
+      # more.
       class Renderer
         MAX_DEPTH = Contract::LIMITS.fetch(:depth)
 
@@ -88,9 +127,13 @@ module TablerUi
         # @param resolve [#call, nil] takes a partial path String, returns
         #   that file's design tree (a Hash) or nil. Never wired to Rails'
         #   own `render` -- see the class docs' RCE section.
-        def initialize(view_context, resolve: nil)
+        # @param decorate [Boolean] see the class docs' "Decoration" section
+        #   above. Defaults to false, matching every call site that
+        #   predates this flag and every one that has no reason to set it.
+        def initialize(view_context, resolve: nil, decorate: false)
           @view = view_context
           @resolve = resolve
+          @decorate = decorate
         end
 
         # @param node [Hash] a Contract-shaped design tree node
@@ -162,6 +205,18 @@ module TablerUi
         # guessing from which of `items`/`slots` the node happens to carry.
         # A component that is neither gets no block at all, matching how a
         # caller with nothing to add would write the ERB by hand.
+        #
+        # The slot branch's condition is the one place decoration widens
+        # what would otherwise happen: undecorated, an all-empty
+        # `node["slots"]` skips the block entirely (`node["slots"].present?`
+        # false) exactly as before. Decorated, `#decorate_slots_for?` forces
+        # the block open even then, because #emit_decorated_slots may still
+        # need to hand every known slot a placeholder -- with no block at
+        # all there would be no SlotContext to hand one to. See that
+        # method's own doc for why this never changes undecorated output
+        # (every one of the 13 templates only ever checks
+        # `defined?(slots) && slots.present?(:x)`, never `defined?(slots)`
+        # alone, so an empty block yields the exact same false either way).
         def render_component_node(node, depth)
           name = node.fetch("name")
           klass = component_class_for(name)
@@ -171,9 +226,14 @@ module TablerUi
             @view.tabler_ui.public_send(name, **opts) do |builder|
               emit_items(builder, node["items"], name, :root, depth + 1)
             end
-          elsif node["slots"].present?
+          elsif node["slots"].present? || decorate_slots_for?(name)
+            opts = decorate_slot_opts(name, opts, node["id"]) if @decorate
             @view.tabler_ui.public_send(name, **opts) do |slots|
-              emit_slots(slots, node["slots"], depth + 1)
+              if @decorate
+                emit_decorated_slots(slots, name, node, opts, depth + 1)
+              else
+                emit_slots(slots, node["slots"], depth + 1)
+              end
             end
           else
             @view.tabler_ui.public_send(name, **opts)
@@ -262,6 +322,241 @@ module TablerUi
           end
         end
 
+        # --- Decoration (layout guides, see the class docs) -------------------
+
+        # @return [Boolean] whether #render_component_node should force the
+        #   slot-block-yielding branch open even when this node's own
+        #   `node["slots"]` is empty -- true only under decoration, and only
+        #   for one of SlotMap's 13 known slot-style components. Everything
+        #   downstream (#decorate_slot_opts, #emit_decorated_slots) already
+        #   no-ops correctly for a component SlotMap doesn't know about
+        #   (`SlotMap.slots_for` returns `[]`), so this early, cheap check
+        #   exists purely so a fully-empty decorated card/modal/... still
+        #   gets a block to hand placeholders to, not to protect anything
+        #   downstream from a name it can't handle.
+        def decorate_slots_for?(name)
+          @decorate && SlotMap.slots_for(name).any?
+        end
+
+        # Part (a) of decoration: merges a `data-editor-slot*` marker into
+        # the `<part>_html:` (or, for a ROOT_SHARED slot, plain `html:`)
+        # option for every slot SlotMap knows about on this component --
+        # SlotParts decides where each one lands (see that module's own doc
+        # for the three possible answers). Runs once per slot regardless of
+        # whether that slot actually has content: on an empty PRECISE slot
+        # the placeholder #emit_decorated_slots adds is what makes the
+        # marked wrapper exist at all; on a slot the component's own
+        # gating never renders in the first place (e.g. table's
+        # `filter_form_html:` when `filter:` was never given), the merged
+        # Hash entry is simply inert -- the component never calls
+        # `html_for(:filter_form, ...)`, so nothing reads it.
+        #
+        # @return [Hash] opts with zero or more `:html` / `:<part>_html`
+        #   entries augmented; every other key untouched.
+        def decorate_slot_opts(name, opts, id)
+          SlotMap.slots_for(name).each do |slot|
+            part = SlotParts.part_for(name, slot)
+            next if part == SlotParts::UNMAPPED
+
+            opts =
+              if SlotParts.root_shared?(name, slot)
+                opts.merge(html: stamp_shared_slot(opts[:html], slot))
+              else
+                key = :"#{part}_html"
+                opts.merge(key => stamp_slot_marker(opts[key], slot, id))
+              end
+          end
+          opts
+        end
+
+        # Precise case: the marker lands on the slot's own dedicated
+        # wrapper part, together with the owning node's id -- unlike the
+        # component's own `html:` (:root) part, a dedicated part carries no
+        # id of its own otherwise (#stamp_editor_id only ever stamps
+        # :root), so without repeating it here the client would have no way
+        # to associate a precise slot guide back to its component. Deep-
+        # merges into `data:` the same deliberate way #stamp_editor_id does
+        # (see that method's own doc) so a design's own `<part>_html: {
+        # data: {...} }` survives and the marker still wins on collision.
+        def stamp_slot_marker(html_hash, slot, id)
+          html_hash = symbolize(html_hash)
+          html_hash.merge(data: symbolize(html_hash[:data]).merge(editor_slot: slot, editor_node_id: id))
+        end
+
+        # ROOT_SHARED case: the marker lands on the component's own `html:`
+        # (:root) part instead -- the only element in reach for a slot with
+        # no dedicated wrapper of its own (see SlotParts::ROOT_SHARED's own
+        # doc). Deliberately a DIFFERENT attribute
+        # (`data-editor-slot-shared`, never `data-editor-slot`) than the
+        # precise case above, so the client can tell a coarse
+        # whole-component guide apart from one scoped to a real wrapper
+        # without having to know which element either one landed on. No id
+        # merged here -- :root already carries `data-editor-node-id`
+        # unconditionally via #stamp_editor_id, decorated or not.
+        #
+        # Joins onto any name(s) already merged rather than overwriting, in
+        # case a future component ever maps more than one slot to
+        # ROOT_SHARED (none does today -- see SlotParts::PARTS): every
+        # shared slot sharing that one coarse guide should stay
+        # discoverable from the single attribute.
+        def stamp_shared_slot(html_hash, slot)
+          html_hash = symbolize(html_hash)
+          data = symbolize(html_hash[:data])
+          names = data[:editor_slot_shared].to_s.split(",") | [slot.to_s]
+          html_hash.merge(data: data.merge(editor_slot_shared: names.join(",")))
+        end
+
+        # Part (b) of decoration: renders every SlotMap-known slot for a
+        # decorated component -- real content exactly as #emit_slots
+        # already would (unaffected by decoration), or, for an EMPTY slot,
+        # an inert placeholder just precise enough to flip that slot's
+        # `slots.present?(:name)` true so the component's own template
+        # stops gating its wrapper element out of existence (every one of
+        # these 13 templates does, e.g. card's `<% if ... slots.present?(:body)
+        # %>` around `.card-body`). No placeholder for an empty ROOT_SHARED
+        # slot -- its region already IS the component root, which always
+        # renders regardless, so a placeholder there would only add
+        # divergence for no gain (see the class docs) -- and none for a
+        # slot #decorated_placeholder_allowed? vetoes.
+        #
+        # `slots.public_send(slot) { ... }` only ever stores into
+        # SlotContext (TablerUi::SlotContext#method_missing); it does not
+        # itself decide whether the component ends up rendering that
+        # slot's wrapper, real content or placeholder alike -- that stays
+        # entirely up to the component's own template. So any exception a
+        # template raises reacting to a slot merely being present (avatar's
+        # overlay-on-identicon guard is the one case that actually does,
+        # and only for slot content a design already supplied -- see
+        # #decorated_placeholder_allowed?'s doc for why decoration never
+        # synthesizes a placeholder there in the first place) propagates
+        # out of this whole method uncaught, straight to #render_node's own
+        # per-node `rescue` -- one bad node still becomes one
+        # `.alert-danger` marker, not a broken preview.
+        def emit_decorated_slots(slots, name, node, opts, depth)
+          slot_hash = node["slots"] || {}
+
+          SlotMap.slots_for(name).each do |slot|
+            children = slot_hash[slot]
+            if children.present?
+              slots.public_send(slot) { render_children(children, depth) }
+            elsif decorated_placeholder_allowed?(name, slot, opts)
+              slots.public_send(slot) { editor_slot_placeholder(slot, node["id"]) }
+            end
+          end
+        end
+
+        # @return [Boolean] whether an empty slot should get a synthesized
+        #   placeholder. False for a ROOT_SHARED slot (see
+        #   #emit_decorated_slots' own doc), false for an UNMAPPED one
+        #   (nothing to place it against at all -- defensive; SlotMap and
+        #   SlotParts cover the same slots by construction, kept in sync by
+        #   slot_parts_spec.rb), false for table's `filter` slot in either
+        #   of the two cases #table_filter_placeholder_allowed? vetoes, and
+        #   false for one of the 7 slots #FALLBACK_GUARDED_SLOTS lists when
+        #   its own guard says so (see that constant's doc). True for
+        #   everything else SlotParts maps to a real, dedicated part.
+        def decorated_placeholder_allowed?(name, slot, opts)
+          return false if SlotParts.root_shared?(name, slot)
+          return false if SlotParts.part_for(name, slot) == SlotParts::UNMAPPED
+          return table_filter_placeholder_allowed?(opts) if name == "table" && slot == "filter"
+
+          guard = FALLBACK_GUARDED_SLOTS[[name, slot]]
+          return !guard.call(opts) if guard
+
+          true
+        end
+
+        # Mirrors, ahead of time and from the very same (already-
+        # synthesized) `opts` the real dispatcher call is about to receive,
+        # the two conditions under which Table::Component would treat a
+        # filter slot as illegitimate:
+        #
+        # * `table.filter?` (`opts[:filter]` a Hash at all) is false --
+        #   the ENTIRE `filter_markup` capture in the template is skipped
+        #   (`<% if table.filter? %>`), so a filter slot placeholder would
+        #   force a wrapper element into existence the component's own
+        #   gating would never otherwise show at all.
+        # * `filter:` was given `fields:` (a declarative field list) --
+        #   Table::Component#guard_filter_slot! raises the moment BOTH a
+        #   filter slot AND `fields:` are present, on the (correct, for a
+        #   real design) theory that the two are mutually exclusive ways of
+        #   supplying the same toolbar. A design that only ever set
+        #   `fields:` and never touched the filter slot renders that
+        #   toolbar today with no error at all; decoration synthesizing an
+        #   empty placeholder there would flip that same design into a
+        #   full-node `.alert-danger` marker purely as a side effect of
+        #   turning the flag on -- exactly the kind of large, non-marker
+        #   divergence decoration must never introduce.
+        #
+        # @return [Boolean]
+        def table_filter_placeholder_allowed?(opts)
+          filter_opt = opts[:filter]
+          filter_opt.is_a?(Hash) && filter_opt[:fields].blank?
+        end
+
+        # A second family of "must never synthesize a placeholder here",
+        # found the same way the class docs say table's filter slot was:
+        # by actually reading each template rather than trusting that
+        # "empty slot -> add a placeholder" is universally safe. 7 of
+        # SlotParts' PRECISE slots don't gate their wrapper on slot
+        # presence alone the way card's `body`/`footer` or table's
+        # `footer` do (`<% if slots.present?(:x) %>`, nothing else inside
+        # to lose) -- they branch `if header_slot ... <REAL fallback
+        # content> ... else ... <slot> ... end` (card/modal/toast/
+        # offcanvas's `header` falling back to a title; empty's `img`/
+        # `icon`/`header` falling back to an illustration/icon/plain
+        # text). Flip that branch's condition true via a synthesized
+        # placeholder while the fallback content is what a real,
+        # undecorated render would show, and the placeholder does not
+        # just add a guide marker -- it REPLACES the real, already-visible
+        # fallback with an invisible, empty div. Hiding real content is a
+        # far larger divergence than decoration is allowed to make (worse
+        # than table's case: there, the vetoed placeholder would only have
+        # been redundant/unreachable; here, it would actively delete
+        # something the reader could already see).
+        #
+        # `offcanvas`'s `header` is the one entry with two independent
+        # fallbacks to protect, not one: unlike card/modal/toast (whose
+        # close button, where they have one at all, renders in a separate
+        # `if component.close_button` block OUTSIDE the header branch, so
+        # is never at risk), offcanvas's own `close_button` -- default
+        # `true` when the key is omitted entirely, mirroring
+        # Offcanvas::Component#initialize's own
+        # `options.key?(:close_button) ? options[:close_button] : true` --
+        # sits INSIDE the same `else` branch as its title. Losing the
+        # close button to a synthesized placeholder is exactly the
+        # regression offcanvas_empty_slots_spec (decoration_spec.rb)
+        # caught before this guard existed.
+        #
+        # Each lambda reads straight from `opts` -- the very same,
+        # already-synthesized Hash the real dispatcher call is about to
+        # receive -- so it can never drift from what the component itself
+        # is about to decide.
+        FALLBACK_GUARDED_SLOTS = {
+          %w[card header] => ->(opts) { opts[:title].present? },
+          %w[modal header] => ->(opts) { opts[:title].present? },
+          %w[toast header] => ->(opts) { opts[:title].present? },
+          %w[offcanvas header] => lambda { |opts|
+            opts[:title].present? || (opts.key?(:close_button) ? !!opts[:close_button] : true)
+          },
+          %w[empty img] => ->(opts) { opts[:image].present? },
+          %w[empty icon] => ->(opts) { opts[:icon].present? },
+          %w[empty header] => ->(opts) { opts[:header].present? }
+        }.freeze
+
+        # The synthesized placeholder itself: no class, no text, nothing
+        # that could be mistaken for real content -- every bit of visible
+        # guide styling is drawn client-side, never by this element's own
+        # appearance. `aria-hidden="true"` keeps it invisible to assistive
+        # tech the same way it already is to sighted users. Carries the
+        # same `data-editor-slot`/id pair #stamp_slot_marker puts on the
+        # wrapper around it, so the client can identify a placeholder on
+        # its own terms without depending on which element the wrapper
+        # attributes actually landed on.
+        def editor_slot_placeholder(slot, id)
+          @view.tag.div(data: { editor_slot: slot, editor_node_id: id }, aria: { hidden: "true" })
+        end
+
         # --- Option / HTML-hook building --------------------------------------
 
         def component_class_for(name)
@@ -280,6 +575,7 @@ module TablerUi
           opts = symbolize(node["options"])
           opts.merge!(symbolize(node["args"]))
           opts = synthesize_table_columns(node["name"], opts)
+          opts = synthesize_sort_url(node["name"], opts)
           opts.merge(build_html_opts(node["html"], node["id"]))
         end
 
@@ -346,6 +642,28 @@ module TablerUi
         def ruby_label_key(key)
           key_s = key.to_s
           key_s.match?(RUBY_LABEL) ? key_s.to_sym : key_s
+        end
+
+        # --- table :sort_url synthesis ------------------------------------
+
+        # Mirrors #synthesize_table_columns for `table`'s other callable
+        # option -- see this class's own "table's :sort_url is declarative
+        # too" doc, and SortUrl's doc for why the simple-mode-to-pattern
+        # conversion happens inside SortUrl.pattern_for rather than here.
+        # Tree has already validated the Hash's shape (tree.rb's
+        # #normalize_declarative_sort_url); this only builds the lambda the
+        # component actually needs, invoked exactly the way the component's
+        # own doc comment specifies (`sort_url.call(key, dir)`).
+        #
+        # Scoped to exactly (component == "table", option == :sort_url) --
+        # left untouched (and thus nil/absent, same as a caller who never
+        # set it) on any other component or when the tree carries no
+        # sort_url: at all, matching #synthesize_table_columns' own guard.
+        def synthesize_sort_url(name, opts)
+          return opts unless name == "table" && opts[:sort_url].is_a?(Hash)
+
+          pattern = SortUrl.pattern_for(opts[:sort_url])
+          opts.merge(sort_url: ->(key, dir) { pattern.sub("{key}", key.to_s).sub("{dir}", dir.to_s) })
         end
 
         # A builder item's own `html:` hook -- e.g. accordion's `item` takes

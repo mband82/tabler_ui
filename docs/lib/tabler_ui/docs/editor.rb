@@ -22,9 +22,9 @@ module TablerUi
     # docs/lib is on $LOAD_PATH (gemspec require_paths) but is NOT
     # Zeitwerk-autoloaded and NOT reloaded in development -- same as every
     # other file under docs/lib/tabler_ui/docs. Requiring this one file
-    # pulls in all three registries; editing any of them requires a server
-    # restart in the docs app. No per-request mutable state anywhere in
-    # this namespace.
+    # pulls in the editor's data contract, registries, and pipeline modules;
+    # editing the registries requires a server restart in the docs app.
+    # No per-request mutable state anywhere in this namespace.
     module Editor
     end
   end
@@ -34,6 +34,8 @@ require_relative "editor/contract"
 require_relative "editor/slot_map"
 require_relative "editor/builder_map"
 require_relative "editor/enum_map"
+require_relative "editor/slot_parts"
+require_relative "editor/sort_url"
 require_relative "editor/tree"
 require_relative "editor/workspace"
 require_relative "editor/schema"

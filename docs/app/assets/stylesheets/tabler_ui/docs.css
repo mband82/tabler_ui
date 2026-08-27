@@ -90,8 +90,125 @@
   transform: rotate(180deg);
 }
 
-/* Design editor (docs/app/views/tabler_ui/docs/editor/show.html.erb):
-   Explorer/Components rail, Preview/Structure/Code pane and Inspector
+/* Design editor (docs/app/views/tabler_ui/docs/editor/show.html.erb): the
+   three-pane row itself. Deliberately NOT Bootstrap's .row/.col-* grid --
+   the Inspector's width has to be a real user-resizable px value
+   (editor_inspector_resize_controller.js writes it as an inline
+   --docs-editor-inspector-width custom property on .docs-editor-pane-
+   inspector, see that rule below), which a percentage-based .col-lg-3
+   can't host without fighting the grid math on every drag tick. Stacks
+   full-width below lg -- the same breakpoint, and the same "every rail
+   gets its own fixed viewport-derived height" behaviour, .docs-editor-rail
+   below already gives each pane regardless of how its wrapper is laid
+   out -- and becomes a fixed-plus-flexible row at lg+, matching Bootstrap's
+   own breakpoint so this still reads as "the same responsive behaviour,
+   just not grid-implemented". A resizer only means something once the
+   panes sit side by side, so .docs-editor-pane-handle (further down) is
+   hidden entirely below lg -- not merely inert -- taking it out of both
+   the tab order and the flow. */
+.docs-editor-panes {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Lets a flex item shrink below its own content's intrinsic width
+   (flex-basis: auto items default to min-width: auto, which is exactly
+   the "refuse to shrink" behaviour a narrow palette rail or a dragged-down
+   Inspector must NOT have). */
+.docs-editor-pane {
+  min-width: 0;
+}
+
+@media (min-width: 992px) {
+  .docs-editor-panes {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  /* A narrower fixed default than the old col-lg-3 (25% of the viewport --
+     far more than the Explorer/Components rail's own content ever needs).
+     Freeing that width up is the whole point: it goes to the centre pane
+     below, which is what actually benefits from it. */
+  .docs-editor-pane-palette {
+    flex: 0 0 16rem;
+  }
+
+  /* Takes whatever width the fixed-width palette and the Inspector (its
+     own width set by the resize controller, see .docs-editor-pane-inspector
+     below) don't need. min-width is the other half of MAX_WIDTH
+     (editor_inspector_resize_controller.js) keeping the Inspector from
+     ever swallowing the canvas -- even a MAX_WIDTH drag can only take the
+     centre pane down to this floor, never past it. */
+  .docs-editor-pane-centre {
+    flex: 1 1 auto;
+    min-width: 22rem;
+  }
+}
+
+/* The Inspector rail's own width. Sourced from a --docs-editor-inspector-
+   width custom property, defaulted here to editor_inspector_resize_
+   controller.js's own DEFAULT_WIDTH (kept in sync with it by hand) and
+   overridden by an inline style that same controller sets on this exact
+   element -- on connect() (restoring the last-dragged width) and on every
+   drag tick/keypress after that; an inline declaration always wins over
+   this stylesheet rule for the same property on the same element. The
+   default here only actually shows through for the instant before that
+   controller connects, and on a host running with JS disabled entirely.
+   Below lg this property is simply never read (see the media query below
+   -- nothing outside it gives .docs-editor-pane-inspector a width rule),
+   so the pane falls back to the ordinary stacked full-width flex-column
+   behaviour every other pane gets there. */
+.docs-editor-pane-inspector {
+  --docs-editor-inspector-width: 320px;
+}
+
+@media (min-width: 992px) {
+  .docs-editor-pane-inspector {
+    flex: 0 0 var(--docs-editor-inspector-width);
+  }
+}
+
+/* The drag handle between the centre and Inspector panes
+   (editor_inspector_resize_controller.js). Hidden entirely below lg --
+   not just visually inert -- so it drops out of both the flex row (which
+   doesn't exist below that breakpoint either, see .docs-editor-panes
+   above) and the tab order: a stacked, full-width Inspector has no
+   horizontal width left for a drag to change. */
+.docs-editor-pane-handle {
+  display: none;
+}
+
+@media (min-width: 992px) {
+  .docs-editor-pane-handle {
+    display: flex;
+    flex: 0 0 0.5rem;
+    width: 0.5rem;
+    align-self: stretch;
+    cursor: col-resize;
+    border-radius: 4px;
+    background-color: transparent;
+    /* The handle owns every pointer gesture on itself (drag-to-resize) --
+       this stops a touch browser's own pan/zoom from competing with
+       that, the same reason a native <input type="range"> thumb needs
+       it. */
+    touch-action: none;
+  }
+
+  /* Hover AND focus-visible (not just hover) -- the handle is a real
+     keyboard-operable control (tabindex="0", ArrowLeft/ArrowRight/Home/
+     End -- see editor_inspector_resize_controller.js#adjustWithKeyboard),
+     so a keyboard user tabbing to it needs the same "you're on the
+     handle" affordance a mouse user gets by hovering it. */
+  .docs-editor-pane-handle:hover,
+  .docs-editor-pane-handle:focus-visible {
+    background-color: var(--tblr-active-bg, rgba(32, 107, 196, 0.1));
+    outline: none;
+  }
+}
+
+/* Explorer/Components rail, Preview/Structure/Code pane and Inspector
    rail all need to fill the viewport below the fixed header rather than
    growing with their content -- reads the same --docs-header-height
    custom property .docs-sidebar already does, so the fit is correct on
@@ -154,6 +271,34 @@
   background-color: var(--tblr-body-bg, #f9fafb);
 }
 
+/* Wraps one category's (or the Structure & text section's) palette items
+   (Explorer rail's "Components" tab, both the static server-rendered
+   fallback and the schema-driven replacement -- see editor/palette.js and
+   show.html.erb's own no-JS fallback, which both apply this class on the
+   same wrapping div as list-group/list-group-flush). Bootstrap's
+   list-group lays each .list-group-item out as its own full-width block
+   row; overridden here to a wrapping flex row instead, so a narrower
+   palette rail (.docs-editor-pane-palette, above) still shows several
+   short component names per line rather than one per line down a long
+   column. The category <h4> heading sits OUTSIDE this wrapper (both
+   copies of the markup place it as a preceding sibling, not a child), so
+   it keeps breaking the flow onto its own line the way a section heading
+   should. */
+.docs-editor-palette-list {
+  display: flex;
+  /* Bootstrap's own .list-group (same element, still carries that class
+     alongside this one) sets flex-direction: column -- that's what makes
+     ordinary list-groups stack full-width rows in the first place, and it
+     has the same specificity as this rule, so it has to be named and
+     overridden explicitly rather than assumed away. Without this, wrap
+     still wraps, just along the vertical main axis instead of the
+     horizontal one, which is what actually caused every item to render
+     at one even, unwanted width instead of shrinking to its own label. */
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
 /* Palette items (Explorer rail's "Components" tab, both the static
    server-rendered fallback and the schema-driven replacement -- see
    docs/app/javascript/controllers/tabler_ui/docs/editor/palette.js) are
@@ -161,6 +306,25 @@
    buttons, so they need their own pointer cursor. */
 .docs-editor-palette-item {
   cursor: pointer;
+}
+
+/* Inside a .docs-editor-palette-list (above), an item sizes to its own
+   label instead of stretching to the wrapper's full width -- list-group-
+   flush's own border-radius: 0/hairline-borders-only-between-siblings look
+   reads as "one continuous column", which is exactly what wrapping into a
+   flex row is meant to stop looking like, so it gets a full border and
+   its own corners back to read as a discrete chip instead. Padding is cut
+   down from list-group-item's own 0.5rem 1rem -- that horizontal 1rem was
+   sized for a full-width row with room to breathe, not a chip that's
+   trying to fit several siblings across a rail this much narrower than
+   the old one; the tighter padding is what actually lets more than one
+   chip share a line at the palette's new default width. */
+.docs-editor-palette-list .docs-editor-palette-item {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--tblr-border-color, #e6e7e9);
+  border-radius: 4px;
 }
 
 /* Palette items are also native HTML5 drag sources now (editor/dnd.js,

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "rails_helper"
+require "json"
 require "tabler_ui/docs/editor/erb_generator"
 
 # ErbGenerator is pure formatting over an already-validated tree (see its
@@ -145,6 +146,78 @@ RSpec.describe TablerUi::Docs::Editor::ErbGenerator do
       expect(html).to include("Ada Lovelace")
     ensure
       TablerUi.auth_method = original_auth_method
+    end
+  end
+
+  # --- table :sort_url -> literal Ruby lambda ------------------------------
+
+  # The export-side counterpart to renderer_spec.rb's "table :sort_url
+  # synthesis" coverage -- see ErbGenerator#format_sort_url_value's own doc
+  # for the shared story with Renderer#synthesize_sort_url, and SortUrl's
+  # doc for why simple mode's conversion to a pattern happens in exactly
+  # one place, used by both.
+  describe "table :sort_url" do
+    it "emits simple mode as a real ->(key, dir) lambda, path/sortParam/dirParam folded into one pattern" do
+      node = component_node("table",
+                             options: { "sort_url" => { "mode" => "simple", "path" => "/users",
+                                                         "sortParam" => "sort", "dirParam" => "dir" } })
+
+      expect(generate(node)).to eq(
+        '<%= tabler_ui.table sort_url: ->(key, dir) { "/users?sort={key}&dir={dir}".sub("{key}", key.to_s)' \
+        '.sub("{dir}", dir.to_s) } %>'
+      )
+    end
+
+    it "emits pattern mode's own pattern untouched, extra literal query parameters included" do
+      node = component_node("table",
+                             options: { "sort_url" => { "mode" => "pattern",
+                                                         "pattern" => "/reports/sorted/{key}/{dir}?scope=active" } })
+
+      expect(generate(node)).to eq(
+        '<%= tabler_ui.table sort_url: ->(key, dir) { "/reports/sorted/{key}/{dir}?scope=active".sub("{key}", ' \
+        'key.to_s).sub("{dir}", dir.to_s) } %>'
+      )
+    end
+
+    it "String#inspect-escapes the pattern rather than interpolating it raw -- a pattern containing a \" " \
+       "or #{} must not be able to break out of the string literal it's emitted into" do
+      node = component_node("table",
+                             options: { "sort_url" => { "mode" => "pattern",
+                                                         "pattern" => %(/x?q={key}"+puts(1)+"{dir}) } })
+
+      generated = generate(node)
+
+      # The embedded quote survives only as a backslash-escaped `\"` inside
+      # the String literal -- proof it never became a real Ruby expression
+      # boundary a "+puts(1)+" segment could hide behind.
+      expect(generated).to eq(
+        '<%= tabler_ui.table sort_url: ->(key, dir) { "/x?q={key}\"+puts(1)+\"{dir}".sub("{key}", key.to_s)' \
+        '.sub("{dir}", dir.to_s) } %>'
+      )
+    end
+
+    it "renders to the exact same HTML the Renderer produces, real sort link href included" do
+      original_auth_method = TablerUi.auth_method
+      TablerUi.auth_method = ->(*) { true }
+
+      node = component_node("table",
+                             options: { "columns" => [{ "label" => "Name", "key" => "name", "sort" => "name" }],
+                                        "data" => [{ "name" => "Ada Lovelace" }],
+                                        "sort" => { "key" => "name", "dir" => "asc" },
+                                        "sort_url" => { "mode" => "simple", "path" => "/users",
+                                                         "sortParam" => "sort", "dirParam" => "dir" } })
+
+      html = plain_view_context.render(inline: generate(node))
+
+      expect(html).to include('href="/users?sort=name&amp;dir=desc"')
+    ensure
+      TablerUi.auth_method = original_auth_method
+    end
+
+    it "leaves a non-table component's own Hash option formatted generically, with no synthesized lambda" do
+      node = component_node("card", options: { "title" => { "mode" => "simple" } })
+
+      expect(generate(node)).to eq('<%= tabler_ui.card title: { mode: "simple" } %>')
     end
   end
 
@@ -390,6 +463,55 @@ RSpec.describe TablerUi::Docs::Editor::ErbGenerator do
       ]
 
       fixtures.each { |node| expect(generate(node)).not_to include("contenteditable") }
+    end
+  end
+
+  # --- Decoration is entirely Renderer's concept, never this class's ------
+  #
+  # Renderer's `decorate:` flag (see its own "Decoration" class docs) draws
+  # design-editor-only "layout guide" markup -- `data-editor-slot`/
+  # `data-editor-slot-shared` attributes and inert placeholder elements --
+  # over a slot-style component's empty slots. ErbGenerator has no
+  # equivalent concept, on purpose: the whole point of the export is real,
+  # host-app-ready `.html.erb`, and guide markup baked into that output
+  # would be a real bug a developer would have to notice and strip by hand.
+  # This class is the one most at risk of ever growing one anyway, if the
+  # two tree-walkers are ever refactored to share code (consistency_spec.rb
+  # exists precisely because they already drift in other ways) -- these
+  # examples exist to keep that risk visible.
+  describe "decoration-free output" do
+    it "does not accept a decorate: argument at all -- unlike Renderer, this class has no such concept" do
+      params = described_class.instance_method(:initialize).parameters
+      expect(params.map(&:last)).not_to include(:decorate)
+    end
+
+    it "never emits data-editor-slot/data-editor-slot-shared for a slot-style component, filled or empty" do
+      filled = {
+        "kind" => "component", "id" => "c1", "name" => "card", "options" => { "title" => "Card title" },
+        "slots" => { "body" => [text_node("Body content")], "footer" => [text_node("Footer content")] }
+      }
+      empty = component_node("card", options: { "title" => "Card title" })
+
+      [filled, empty].each do |node|
+        output = generate(node)
+        expect(output).not_to include("data-editor-slot")
+        expect(output).not_to include("data-editor-slot-shared")
+        expect(output).not_to include("aria-hidden")
+      end
+    end
+
+    it "never emits decoration markup across the whole shared fixture corpus" do
+      fixtures_dir = File.expand_path(File.join(__dir__, "..", "..", "..", "..", "fixtures", "editor"))
+      fixture_paths = Dir.glob(File.join(fixtures_dir, "*.json"))
+      expect(fixture_paths).not_to be_empty, "expected to find fixtures under #{fixtures_dir}"
+
+      fixture_paths.each do |path|
+        node = JSON.parse(File.read(path))
+        output = described_class.new(node).call
+
+        expect(output).not_to include("data-editor-slot"), "#{File.basename(path)} leaked decoration markup"
+        expect(output).not_to include("data-editor-node-id"), "#{File.basename(path)} leaked a decoration node id"
+      end
     end
   end
 

@@ -13,6 +13,7 @@
 import DocsSearchController from "controllers/tabler_ui/docs/search_controller"
 import DocsEditorController from "controllers/tabler_ui/docs/editor_controller"
 import DocsEditorSortableController from "controllers/tabler_ui/docs/editor_sortable_controller"
+import DocsEditorInspectorResizeController from "controllers/tabler_ui/docs/editor_inspector_resize_controller"
 
 if (window.Stimulus) {
   window.Stimulus.register("tabler-ui--docs-search", DocsSearchController)
@@ -24,4 +25,7 @@ if (window.Stimulus) {
   // render (editor/structure.js, editor/explorer.js) -- a purely additive
   // drag-and-drop enhancement on top of those panes' own buttons.
   window.Stimulus.register("tabler-ui--docs-editor-sortable", DocsEditorSortableController)
+  // Drives the Inspector rail's drag handle (editor/show.html.erb) --
+  // resize-only, knows nothing about the design tree itself.
+  window.Stimulus.register("tabler-ui--docs-editor-inspector-resize", DocsEditorInspectorResizeController)
 }
