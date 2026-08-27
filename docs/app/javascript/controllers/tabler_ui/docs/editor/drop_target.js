@@ -107,6 +107,66 @@
 //      proximity had never been considered, rather than offering an
 //      illegal drop.
 //
+// ## A centre hover on a direct-child container's own child never nests
+//
+// Case 0 above (the LEFT/RIGHT edge test) already turns an edge drop on a
+// direct-child container's own child into a plain sibling insert rather
+// than a wrap/column join. The exact same "nesting was never the meaning
+// of this drop" reasoning applies just as hard to a CENTRE ("into" band)
+// hover on that same child, and closes the failure mode this paragraph
+// exists to name: a card_group with one card already in it fills the
+// group's own area with that card, so the group's own middle band shrinks
+// to a thin, barely-hittable strip around its child -- a pointer aiming at
+// "the group, roughly in the middle" is, geometrically, hovering the CARD,
+// not the group. Before this fix, that "into" hit resolved through the
+// ordinary #resolveInto path exactly like any other component -- landing
+// in one of the card's own slots, or a chip menu choosing one -- which
+// reads as "drop this INSIDE the card" every time, nesting one card inside
+// another's body slot instead of landing beside it in the group. Dropping
+// a second (or third) card onto a card_group is never trying to say "put
+// this inside the first card" -- a card_group (or badge_list) is a flat
+// list, and "add another sibling" is always the meaningful reading of a
+// drop on it, exactly the reading case 0's own edge drop already gives it.
+//
+// #resolveAgainstElement's own "into" branch checks this ONLY when the
+// matched element carries no `hoveredSlotName` -- a hit on the child's own
+// SLOT WRAPPER (`data-editor-slot`, #resolveDirectSlot just below) is
+// strictly more specific than "which container does this child's PARENT
+// belong to", and a card_group's card still needs to be fillable with a
+// title/body/footer the ordinary way, so that check runs FIRST and wins
+// outright: #resolveDirectSlot's own result (including "singleton slot
+// already occupied, refuse" -- see that function's own comment) is never
+// second-guessed by this rule. Only once there is no slot-wrapper hit at
+// all -- the pointer is over the child's own bare root, nothing more
+// specific to land in -- does this apply, and it applies unconditionally
+// once it does: unlike #resolveInto, there is no kind-based branching here
+// (row/column/fragment vs. a slot-style/builder-style component vs. a
+// plain leaf like `heading`) -- ANY child of a direct-child container
+// resolves to a sibling insert on a bare-root centre hit, a leaf kind with
+// nothing to land "into" in the first place included (a `heading` dropped
+// into a `badge_list`, say) -- the rule this closes ("nesting is never
+// meaningful here") doesn't care what kind of child is in the way, so
+// nothing here needs to either.
+//
+// #directChildContainerSiblingTarget builds the exact same descriptor
+// shape case 0 already does (parentId/container/index in the SAME
+// container the hovered child already lives in, `position: "before"|
+// "after"`, a VERTICAL insertion line at the child's own left/right edge)
+// -- reused, not reinvented, so this reads as chrome-identical to an edge
+// drop on the same element rather than a third, competing visual
+// vocabulary (editor_controller.js#_paintDragGhost already draws this
+// shape correctly with no changes of its own needed -- see that method's
+// own case list). What differs is only how `side` gets picked: case 0
+// already knows which edge the pointer was closest to (it got here via
+// #edgeBandFor); a centre hit has no edge to ask, so
+// #resolveDirectChildContainerCentreSibling instead compares the
+// pointer's X position against the hovered child's own horizontal
+// MIDPOINT -- left half -> "before", right half -> "after" -- the exact
+// same "compare against the rect's own midpoint" rule #nearestEdge
+// already uses on the Y axis for the vertical three-band fallback, just
+// turned sideways because card_group/badge_list lay their children out
+// LEFT TO RIGHT, not top to bottom.
+//
 // ## Validity is advisory, never enforcement
 //
 // #resolveDropTarget's `valid`/`reason` (and, on a "chips" descriptor,
@@ -286,6 +346,42 @@ export const ROOT_SHARED_COMPONENTS = ["alert", "avatar", "badge_list", "card_gr
 //     feature has to avoid.
 export const ROOT_SHARED_EMPTY_COMPONENTS = ["alert", "badge_list", "card_group", "ribbon"]
 
+// The one slot that still refuses a second occupant, now that
+// #resolveDirectSlot/#resolveContainerChips below no longer enforce "a slot
+// holds at most one node" as a general rule -- the SERVER never enforced
+// that generally either (Editor::Tree#normalize_slots caps a slot array
+// only by Contract::LIMITS[:children_per_node], exactly like any other
+// array), so a card's `body` (say) can hold a heading AND some text AND a
+// button, same as the server has always allowed. avatar's `overlay` is
+// different in kind, not degree: it holds one absolutely-positioned status
+// dot (tabler.css's `.avatar-status`/`.avatar-badge` positioning), so a
+// second node dropped there would render exactly on top of the first --
+// stacked, not beside it -- rather than genuinely adding content the way a
+// second element in a card body does. Kept as a single exported map (keyed
+// by component name -> the slot names on it that stay singleton) so both
+// this file's #resolveDirectSlot/#resolveContainerChips and
+// editor_controller.js's #_handleStructureMove check the SAME list rather
+// than each hand-maintaining its own copy that could silently drift apart.
+export const SINGLE_OCCUPANT_SLOTS = { avatar: ["overlay"] }
+
+// @param componentName a tree node's `name` (e.g. "avatar"), or null/undefined.
+// @param slotName the slot being checked, or null/undefined.
+// @return {Boolean} true iff that component/slot pair is still capped at
+//   one occupant -- see SINGLE_OCCUPANT_SLOTS above.
+export function isSingleOccupantSlot(componentName, slotName) {
+  const slots = SINGLE_OCCUPANT_SLOTS[componentName]
+  return Array.isArray(slots) && slots.includes(slotName)
+}
+
+// The message editor_controller.js's errors banner (#_renderErrors) shows
+// when a drop is refused for exactly this reason -- one place so the
+// canvas-drag refusal (#resolveDirectSlot below) and the Structure-pane
+// refusal (editor_controller.js#_handleStructureMove) read identically
+// rather than drifting into two different phrasings of the same rule.
+export function singleOccupantRefusalReason(componentName, slotName) {
+  return `${componentName}'s ${slotName} slot can only hold one node`
+}
+
 // The tree-only half of "does this node need the empty-root-shared
 // min-height stamp" -- mirrors how editor_controller.js#_stampEmptyContainers
 // already answers the equivalent question for a row/column from
@@ -423,6 +519,13 @@ export function resolveDropTarget({ tree, schema, hoveredNodeId, hoveredRect, ho
   }
   if (!target) target = resolveAgainstRoot(tree)
 
+  // `position: "refused"` (#buildRefusedTarget) already carries its own
+  // final valid/reason -- returned as-is rather than through
+  // #validateTarget, which would recompute (and stomp) both from a
+  // parentId/container that are deliberately null here. See
+  // #buildRefusedTarget's own comment for why.
+  if (target.position === "refused") return target
+
   return { ...target, ...validateTarget(tree, schema, target, draggedKind, draggedNodeId) }
 }
 
@@ -505,6 +608,29 @@ function resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hovered
   const key = containerKeyFor(parent, container.array)
   if (!key) return null
 
+  // The hovered element -- whatever it is -- lives INSIDE a
+  // SINGLE_OCCUPANT_SLOTS container that already has an occupant other
+  // than the node being dragged. This is deliberately checked here, on
+  // the CONTAINER the hovered element sits in, rather than only where
+  // #resolveDirectSlot/#resolveInto check it (whether the hovered element
+  // IS the slot owner itself): once avatar's overlay already holds one
+  // node, hovering that occupant's own edge would otherwise reach the
+  // ordinary before/after/wrap logic below (this file's header, "Four
+  // edges, one rule") -- which knows nothing about SINGLE_OCCUPANT_SLOTS
+  // and would happily insert a sibling, or wrap, right back into the SAME
+  // slot__overlay container the child sits in, defeating the exception
+  // through a second entry point. Refusing unconditionally here, before
+  // any edge-band math runs, closes that off no matter which element
+  // (the slot owner's own wrapper, or its existing occupant) the pointer
+  // actually lands on.
+  if (key.startsWith("slot__") && isSingleOccupantSlot(parent.name, key.slice("slot__".length))) {
+    const slotName = key.slice("slot__".length)
+    const occupant = (parent.slots && parent.slots[slotName]) || []
+    if (occupant.some((n) => n.id !== draggedNodeId)) {
+      return buildRefusedTarget(singleOccupantRefusalReason(parent.name, slotName), hoveredRect)
+    }
+  }
+
   const nearEdge = edgeBandFor(hoveredRect, pointerX, pointerY)
   if (nearEdge === "left" || nearEdge === "right") {
     const horizontal = resolveHorizontalEdge(tree, schema, hoveredNodeId, hoveredRect, parent, key, container, nearEdge, draggedKind)
@@ -542,17 +668,35 @@ function resolveAgainstElement(tree, schema, hoveredNodeId, hoveredRect, hovered
     const hoveredNode = findNode(tree, hoveredNodeId)
     // The matched element itself names a slot (see #resolveDirectSlot and
     // this file's header on `hoveredSlotName`) -- that's a stronger, more
-    // specific answer than "offer a chip for every empty slot", so it
-    // takes priority over #resolveInto's chip-menu path below and, unlike
-    // that path, deliberately does NOT fall back to chips when the named
-    // slot itself can't take this drop (occupied): the element under the
-    // pointer already committed to one specific slot, so if that slot is
-    // out, the only thing left to offer is a sibling via the edge bands,
-    // not a menu of the component's OTHER slots the pointer isn't even
-    // over.
-    const into = hoveredSlotName
-      ? resolveDirectSlot(hoveredNode, hoveredSlotName, hoveredRect)
-      : resolveInto(tree, schema, hoveredNode, hoveredRect, draggedKind, draggedNodeId)
+    // specific answer than anything below, so it takes priority over
+    // both #resolveDirectChildContainerCentreSibling and #resolveInto's
+    // chip-menu path. A slot can now hold several nodes (SINGLE_OCCUPANT_
+    // SLOTS' own comment -- the server never capped it at one to begin
+    // with, except for that one exception), so #resolveDirectSlot appends
+    // rather than refusing for an ordinary slot; when it DOES refuse
+    // (avatar's `overlay`, already occupied), that refusal is deliberately
+    // NOT treated as "nothing to offer here, fall back to the edge bands"
+    // the way a null `into` is a few lines down -- the element under the
+    // pointer already committed to one specific slot that will not take
+    // this drop, so the honest answer is to refuse the drop outright and
+    // say why (editor_controller.js's errors banner), not to quietly
+    // redirect it into a sibling insert the user never asked for.
+    //
+    // No slot named -- the pointer is over the hovered element's own bare
+    // root -- and that element's own PARENT is a direct-child container
+    // (badge_list/card_group): nesting is never the meaning of a drop
+    // here (this file's header, "A centre hover on a direct-child
+    // container's own child never nests"), so a sibling insert wins next,
+    // before #resolveInto ever gets a chance to offer a slot/chip descend
+    // into the hovered child itself.
+    let into
+    if (hoveredSlotName) {
+      into = resolveDirectSlot(hoveredNode, hoveredSlotName, hoveredRect, draggedNodeId)
+      if (into && into.refused) return buildRefusedTarget(into.reason, hoveredRect)
+    } else {
+      into = resolveDirectChildContainerCentreSibling(schema, parent, key, container, hoveredRect, pointerX)
+      if (!into) into = resolveInto(tree, schema, hoveredNode, hoveredRect, draggedKind, draggedNodeId)
+    }
     if (into) return into
     band = nearestEdge(hoveredRect, pointerY) // no container to land in -- fall back to the nearer edge
   }
@@ -603,26 +747,7 @@ function resolveHorizontalEdge(tree, schema, hoveredNodeId, hoveredRect, parent,
   const directChildContainers = (schema && schema.kinds && schema.kinds.directChildContainers) || []
   if (parent.kind === "component" && directChildContainers.includes(parent.name)) {
     const side = edge === "left" ? "before" : "after"
-    return {
-      parentId: parent.id,
-      container: key,
-      index: side === "before" ? container.index : container.index + 1,
-      position: side,
-      edge,
-      lineOrientation: "vertical",
-      anchorRect: hoveredRect,
-      insertionRect: {
-        left: edge === "left" ? hoveredRect.left : hoveredRect.right,
-        top: hoveredRect.top,
-        height: hoveredRect.height
-      },
-      wrapTargetId: null,
-      wrapSide: null,
-      columnTargetId: null,
-      columnSide: null,
-      columnSpan: null,
-      chips: null
-    }
+    return directChildContainerSiblingTarget(parent, key, container, hoveredRect, side, edge)
   }
 
   // Case 1: the hovered element lives inside a column that is itself a
@@ -710,6 +835,82 @@ function resolveHorizontalEdge(tree, schema, hoveredNodeId, hoveredRect, parent,
   }
 }
 
+// The descriptor shape a plain sibling insert into a direct-child
+// container's own `children`/`slot__<name>` array always takes -- shared
+// by case 0 above (an EDGE hover on the container's own child, `side`
+// already known from which edge #edgeBandFor picked) and
+// #resolveDirectChildContainerCentreSibling below (a CENTRE hover on that
+// same child, `side` picked a different way -- see that function's own
+// comment) -- one shape, two ways of arriving at `side`, per this file's
+// header, "A centre hover on a direct-child container's own child never
+// nests". `edge` doubles as both the descriptor's own `edge` field (drives
+// which physical side the insertion line reads as coming from) and which
+// side of `hoveredRect` the line/ghost actually get drawn against below --
+// always in lockstep with `side` (case 0 derives one from the other;
+// #resolveDirectChildContainerCentreSibling picks `side` first and derives
+// `edge` from it the same way), so there is only ever one to pass in here,
+// not two independently-choosable values that could disagree.
+function directChildContainerSiblingTarget(parent, key, container, hoveredRect, side, edge) {
+  return {
+    parentId: parent.id,
+    container: key,
+    index: side === "before" ? container.index : container.index + 1,
+    position: side,
+    edge,
+    lineOrientation: "vertical",
+    anchorRect: hoveredRect,
+    insertionRect: {
+      left: edge === "left" ? hoveredRect.left : hoveredRect.right,
+      top: hoveredRect.top,
+      height: hoveredRect.height
+    },
+    wrapTargetId: null,
+    wrapSide: null,
+    columnTargetId: null,
+    columnSide: null,
+    columnSpan: null,
+    chips: null
+  }
+}
+
+// #resolveAgainstElement's "into" (middle) band, for a hovered element
+// that carries no `hoveredSlotName` of its own (a slot-wrapper hit is
+// strictly more specific and already handled by #resolveDirectSlot before
+// this is ever called -- see this file's header). If `hoveredNodeId`'s own
+// immediate parent is a direct-child container (`schema.kinds.
+// directChildContainers` -- badge_list/card_group today, the exact same
+// vocabulary case 0 above already reads), a centre hit resolves to a
+// sibling insert in that SAME container, exactly like an edge hit on this
+// same element already does -- nesting is never the meaning of a drop on
+// one of these, whatever the hovered child's own kind is (see this file's
+// header for why this applies uniformly, no kind check needed here).
+//
+// `side` -- and therefore which side of `hoveredRect` the insertion line
+// lands on -- follows the pointer's OWN horizontal position: the left half
+// of the hovered child's own bounding box resolves to "insert before
+// this child", the right half to "insert after" it. Mirrors #nearestEdge
+// just below in this file (same "compare the pointer against the rect's
+// own midpoint" rule), turned onto the X axis because a direct-child
+// container lays its children out left-to-right, not top-to-bottom, so
+// horizontal position -- not vertical -- is the meaningful axis for "which
+// side does this new sibling land on".
+//
+// @return the same descriptor shape case 0 (#resolveHorizontalEdge) above
+//   returns, or null when `parent` isn't a direct-child container (no
+//   schema loaded yet degrades to an empty `directChildContainers` list,
+//   same permissive-by-omission stance case 0's own comment already takes
+//   -- this just falls through to the caller's ordinary #resolveInto
+//   instead of guessing).
+function resolveDirectChildContainerCentreSibling(schema, parent, key, container, hoveredRect, pointerX) {
+  const directChildContainers = (schema && schema.kinds && schema.kinds.directChildContainers) || []
+  if (!parent || parent.kind !== "component" || !directChildContainers.includes(parent.name)) return null
+
+  const midpointX = hoveredRect.left + hoveredRect.width / 2
+  const side = pointerX < midpointX ? "before" : "after"
+  const edge = side === "before" ? "left" : "right"
+  return directChildContainerSiblingTarget(parent, key, container, hoveredRect, side, edge)
+}
+
 // Walks UP from `hoveredNodeId` (starting with the hovered node itself,
 // then each successive owner via tree.js#findParent) looking for the
 // NEAREST ancestor that is both a `column` and has a `row` as its own
@@ -787,29 +988,71 @@ function defaultColumnSpan(schema) {
 // once the pointer is over a real, on-screen, labelled slot element.
 //
 // @return the same {parentId, container, index, position: "into", ...}
-//   shape #resolveInto's row/column/fragment branch returns, or null if
-//   `slotName` is already occupied -- a slot holds at most one node
-//   (editor_controller.js#_handleStructureMove's own comment), checked
-//   here against the TREE's own `slots` data, never the DOM (the DOM
-//   placeholder only ever exists for an EMPTY slot in the first place --
-//   Renderer#emit_decorated_slots -- so there is nothing in the DOM an
-//   occupied slot's real content could be confused with anyway). null
-//   sends the caller to the edge-band fallback, not to the chip menu --
-//   see the caller's own comment for why.
-function resolveDirectSlot(hoveredNode, slotName, hoveredRect) {
+//   shape #resolveInto's row/column/fragment branch returns, appending
+//   after whatever the slot already holds (checked against the TREE's own
+//   `slots` data, never the DOM -- the DOM placeholder only ever exists
+//   for an EMPTY slot in the first place, Renderer#emit_decorated_slots --
+//   so there is nothing in the DOM an occupant's real content could be
+//   confused with anyway); a {refused: true, reason} marker if `slotName`
+//   is one of SINGLE_OCCUPANT_SLOTS and already has an occupant other than
+//   the node being dragged (the one slot that still enforces "at most one
+//   node" -- see that map's own comment for why); or null if the hovered
+//   element isn't a component at all. `refused` is a DIFFERENT signal from
+//   null: null sends the caller to the edge-band fallback (this file's own
+//   header, `hoveredSlotName`'s doc), silently landing the drop somewhere
+//   else instead; `refused` means the pointer is over a slot wrapper that
+//   deliberately will not take this drop at all, and the caller has to
+//   surface that rather than pretend nothing was hovered.
+function resolveDirectSlot(hoveredNode, slotName, hoveredRect, draggedNodeId) {
   if (!hoveredNode || hoveredNode.kind !== "component") return null
 
   const occupant = (hoveredNode.slots && hoveredNode.slots[slotName]) || []
-  if (occupant.length > 0) return null
+  if (isSingleOccupantSlot(hoveredNode.name, slotName) && occupant.some((n) => n.id !== draggedNodeId)) {
+    return { refused: true, reason: singleOccupantRefusalReason(hoveredNode.name, slotName) }
+  }
 
   return {
     parentId: hoveredNode.id,
     container: `slot__${slotName}`,
-    index: 0,
+    index: occupant.length,
     position: "into",
     anchorRect: hoveredRect,
     insertionRect: null,
     chips: null
+  }
+}
+
+// Builds the full descriptor #resolveDropTarget returns for a refused
+// SINGLE_OCCUPANT_SLOTS drop -- `position: "refused"` is a signal
+// #resolveDropTarget checks for and returns directly, BYPASSING
+// #validateTarget entirely (see that call site's own comment): letting
+// this flow through the ordinary validate-and-merge path would have
+// #validateSingleTarget recompute `valid`/`reason` from `parentId: null`/
+// `container: null` and stomp this function's own, specific reason with
+// its generic "cannot be placed there" placement-check message. `valid:
+// false` here is the one exception to this file's "validity is advisory"
+// rule (this file's own header): everywhere else a `false` is a look-and-
+// feel cue only, ignored by editor_controller.js's own drop application,
+// but a "refused" position is checked there and genuinely skipped rather
+// than applied -- see editor_controller.js#_onFrameDrop.
+function buildRefusedTarget(reason, hoveredRect) {
+  return {
+    parentId: null,
+    container: null,
+    index: null,
+    position: "refused",
+    edge: null,
+    lineOrientation: null,
+    anchorRect: hoveredRect,
+    insertionRect: null,
+    wrapTargetId: null,
+    wrapSide: null,
+    columnTargetId: null,
+    columnSide: null,
+    columnSpan: null,
+    chips: null,
+    valid: false,
+    reason
   }
 }
 
@@ -841,6 +1084,25 @@ function resolveDirectSlot(hoveredNode, slotName, hoveredRect) {
 //      like heading/text/partial/builder_item that never accepts
 //      children at all) -- no "into" landing exists; return null so the
 //      caller falls back to the nearer edge.
+// The SINGLE_OCCUPANT_SLOTS on `hoveredNode` (avatar's `overlay`, today)
+// that are why #resolveContainerChips just excluded them from `chips` --
+// as opposed to a slot never existing there in the first place, or an
+// ordinary (non-singleton) slot that's simply not legal for other
+// reasons. #resolveInto uses this to tell "genuinely nothing to offer
+// here, fall back to the edge bands" (an empty list) apart from "the one
+// thing this component could have offered was refused" (non-empty), which
+// needs to surface as an explicit refusal instead -- see that call site's
+// own comment.
+function singleOccupantBlockedSlots(hoveredNode, schema) {
+  if (!hoveredNode || hoveredNode.kind !== "component") return []
+  const meta = schema && schema.components && schema.components[hoveredNode.name]
+  const slots = (meta && Array.isArray(meta.slots)) ? meta.slots : []
+  return slots.filter((slotName) => {
+    const occupant = (hoveredNode.slots && hoveredNode.slots[slotName]) || []
+    return isSingleOccupantSlot(hoveredNode.name, slotName) && occupant.length > 0
+  })
+}
+
 function resolveInto(tree, schema, hoveredNode, hoveredRect, draggedKind, draggedNodeId) {
   if (!hoveredNode) return null
 
@@ -858,7 +1120,22 @@ function resolveInto(tree, schema, hoveredNode, hoveredRect, draggedKind, dragge
   }
 
   const chips = legalChips(tree, schema, hoveredNode, draggedKind, draggedNodeId)
-  if (chips.length === 0) return null
+  if (chips.length === 0) {
+    // Nothing legal to land "into" -- ordinarily that just means "fall
+    // back to the edge bands" (this file's header). But if the ONLY
+    // reason chips came back empty is that every candidate was a
+    // SINGLE_OCCUPANT_SLOTS slot already holding a node (avatar hovered
+    // dead centre, its one-and-only `overlay` slot occupied), silently
+    // redirecting to a sibling insert would bury the refusal -- the user
+    // aimed at the middle of the avatar, not its edge, and nothing about
+    // that gesture should turn into "insert before/after the avatar
+    // instead" with no explanation. Refuse explicitly instead (see
+    // buildRefusedTarget's own comment for why this bypasses the ordinary
+    // validate-and-merge path).
+    const blocked = singleOccupantBlockedSlots(hoveredNode, schema)
+    if (blocked.length > 0) return buildRefusedTarget(singleOccupantRefusalReason(hoveredNode.name, blocked[0]), hoveredRect)
+    return null
+  }
 
   if (chips.length === 1) {
     const [chip] = chips
@@ -924,11 +1201,16 @@ function containerKeyFor(parent, arrayRef) {
 // task-brief header, "Which containers to offer"):
 //
 //   * slot-style (schema `components[name].slots` is non-empty): one chip
-//     per EMPTY slot -- a slot holds at most one node
-//     (editor_controller.js#_handleStructureMove already enforces this),
-//     so an occupied one isn't offered. A component with every slot
-//     filled returns [] here, which #resolveInto above treats as "no
-//     into target" and falls back to the edge bands.
+//     per slot that will still take this drop -- every slot except a
+//     SINGLE_OCCUPANT_SLOTS one that already has an occupant (avatar's
+//     `overlay` -- see that map's own comment). An ordinary slot offers a
+//     chip whether or not it already has content: the server never capped
+//     a slot at one node to begin with (SINGLE_OCCUPANT_SLOTS' own
+//     comment), so a card with a `body` already holding a heading still
+//     offers a "Body" chip to append a second element to it. A component
+//     with nothing left to offer (every slot is the singleton kind and
+//     already filled) returns [] here, which #resolveInto above treats as
+//     "no into target" and falls back to the edge bands.
 //   * builder-style (schema `components[name].builder` present) AND the
 //     thing being dragged is itself an existing `builder_item`
 //     (`draggedKind === "builder_item"`): this is the one builder case
@@ -958,14 +1240,17 @@ function resolveContainerChips(hoveredNode, schema, draggedKind) {
     return slots
       .filter((slotName) => {
         const occupant = (hoveredNode.slots && hoveredNode.slots[slotName]) || []
-        return occupant.length === 0
+        return occupant.length === 0 || !isSingleOccupantSlot(hoveredNode.name, slotName)
       })
-      .map((slotName) => ({
-        label: titleCase(slotName),
-        parentId: hoveredNode.id,
-        container: `slot__${slotName}`,
-        index: 0
-      }))
+      .map((slotName) => {
+        const occupant = (hoveredNode.slots && hoveredNode.slots[slotName]) || []
+        return {
+          label: titleCase(slotName),
+          parentId: hoveredNode.id,
+          container: `slot__${slotName}`,
+          index: occupant.length
+        }
+      })
   }
 
   if (meta.builder && draggedKind === "builder_item") {

@@ -25,7 +25,14 @@
     Accordion::Component#button_classes) so the chevron renders in the
     right rotation before Bootstrap's JS has run at all -- Bootstrap's
     Collapse then keeps that class in sync on every toggle afterwards, same
-    as it does for the trigger array of any other collapse it manages. %>
+    as it does for the trigger array of any other collapse it manages.
+
+    No "Design editor" entry up top any more -- this sidebar never renders
+    on the editor page at all now (see application.html.erb's own comment
+    on `wide_layout`), and the top navbar carries a link to it on every
+    docs page instead (see the layout's "Documentation"/"Editor" nav items),
+    so a second link to the same page from inside this sidebar would be
+    pure duplication rather than a second, distinct route to it. %>
 <nav class="docs-sidebar" aria-label="Components">
   <div class="list-group list-group-transparent mb-3">
     <%= link_to "Overview", root_path,
@@ -33,9 +40,6 @@
     <%= link_to "HTML attributes", html_attributes_path,
                  class: ["list-group-item", "list-group-item-action",
                          ("active" if current == TablerUi::Docs::Navigation::HTML_ATTRIBUTES)].compact.join(" ") %>
-    <%= link_to "Design editor", editor_path,
-                 class: ["list-group-item", "list-group-item-action",
-                         ("active" if current == TablerUi::Docs::Navigation::EDITOR)].compact.join(" ") %>
   </div>
 
   <% TablerUi::Docs::Navigation.category_names.each do |category| %>

@@ -222,7 +222,20 @@
    every kind, not a special case). Deliberately NOT the selection box's
    solid --tblr-primary border -- this is a preview of something that
    doesn't exist in the tree yet, not a real selection, and needs to read
-   as tentative at a glance. */
+   as tentative at a glance.
+
+   Sized to the hovered element's own FULL rect only for a `position:
+   "into"` descriptor (editor_controller.js#_paintDragGhost's case 4) --
+   "drop lands inside me" chrome. A hover over a direct-child container's
+   own child (badge_list/card_group -- drop_target.js#
+   resolveDirectChildContainerCentreSibling) deliberately never produces
+   that descriptor for a bare-root hit any more, precisely so this full-
+   fill look never appears for "drop another card next to this one": it
+   gets the narrow sliver ghost case 5 draws instead (same class, sized to
+   ROOT_GHOST_HEIGHT and parked outside the hovered element's own edge,
+   next to the vertical insertion line below) -- no new class needed here,
+   the existing sibling-insert look already reads as "beside", never
+   "inside". */
 .docs-editor-canvas-box-ghost {
   border: 2px dashed rgba(var(--tblr-primary-rgb), 0.5);
   background: rgba(var(--tblr-primary-rgb), 0.06);
@@ -305,7 +318,10 @@
 /* The left/right-edge counterpart of the bar above (overlay.js#
    setInsertionLine's `orientation: "vertical"` case -- a horizontal band
    drop_target.js now resolves near an element's left/right edge, either a
-   sibling-column insert or a wrap). Combined selector (both classes on the
+   sibling-column insert or a wrap -- OR a plain direct-child-container
+   sibling insert, real edge hover or a centre one drop_target.js#
+   resolveDirectChildContainerCentreSibling reinterpreted as one; see that
+   function's own doc). Combined selector (both classes on the
    same element, editor/overlay.js) rather than a standalone rule so this
    overrides height/margin-top precisely, not just adds width/margin-left
    alongside them -- left/top still come from the SAME inline styles the
@@ -460,6 +476,90 @@
 
 .docs-editor-canvas-drag-grow-width {
   min-width: 2rem;
+}
+
+/* Drag-only, stamped by editor_controller.js#_growDirectChildContainerSpace
+   on a direct-child container's own root (card_group/badge_list --
+   schema.kinds.directChildContainers) at drag start, wiped by
+   #_shrinkDirectChildContainerSpace at #_endDrag -- same lifetime as
+   .docs-editor-canvas-drag-grow-height/-width just above, solving a
+   different unreachability (that rule's own comment; that method's file
+   header, "A direct-child container's own drop space"). At rest, a
+   card_group's cards touch edge to edge and a badge_list's badges sit
+   flush against its own padding -- there is no pixel left that belongs to
+   the CONTAINER rather than one of its children, so this reclaims some:
+   real padding around the whole container, and a real gap between/around
+   each child.
+
+   2rem (32px) padding, not a smaller value: the same "how big does a
+   target need to be to reliably aim a mouse at" number
+   .docs-editor-canvas-empty-container and the drag-grow rules above already
+   settled (see the latter's own comment on DRAG_GROW_MIN_SIZE) -- this
+   gutter needs exactly that same property on every edge, not a fresh one.
+
+   The gap is bigger, and deliberately proportional (a percentage, not a
+   fixed px) rather than reusing 2rem outright: it has a harder job than the
+   outer padding. The outer padding only ever has to be reachable near the
+   container's own edge; the gap has to stay reachable somewhere in the
+   MIDDLE of the container too, however many children currently share it --
+   with even one child capped by the max-width rule just below, the gap is
+   what carries a real, hittable strip through roughly the container's own
+   centre (a card capped under a third of the row's width, packed against
+   the container's own left edge -- default `justify-content: flex-start`,
+   untouched here -- leaves everything to its right, geometric centre
+   included, as this gap). A fixed px gap can't promise that across every
+   container width this renders at; a percentage of the row's own width
+   can.
+
+   `outline`/`background` here are a SECOND, independent cue on top of the
+   reclaimed pixels themselves -- reachability alone is silent, and a user
+   has no way to tell, just by looking, that this container now has room of
+   its own to aim at rather than only its child/children. Primary hue,
+   same family as the ordinary sibling-insert ghost/insertion-line
+   (.docs-editor-canvas-box-ghost, .docs-editor-canvas-insertion-line) --
+   deliberately NOT the wrap family's success hue (.docs-editor-canvas-box-
+   wrap): this container growing is not a structural wrap, it is the SAME
+   plain sibling-insert semantics as everywhere else the primary hue
+   already means "your node lands here", just made visible for the
+   container's own space specifically rather than only appearing under the
+   cursor on hover. `outline`, not `border`: an outline never participates
+   in box-sizing/layout, so it draws exactly on top of the padding this
+   rule just added without perturbing the width/max-width math above by so
+   much as a pixel. Persistent for the drag's whole duration (unlike the
+   per-hover insertion line/ghost, which only ever show wherever the
+   pointer currently is) -- this is "the group itself can take a drop",
+   not "a drop would land exactly here". */
+.docs-editor-canvas-drag-container-space {
+  padding: 2rem;
+  gap: 40%;
+  outline: 2px dashed rgba(var(--tblr-primary-rgb), 0.35);
+  outline-offset: -2px;
+  background: rgba(var(--tblr-primary-rgb), 0.04);
+}
+
+/* The other half of the same fix -- without this, `flex: 1 0 0` (card_group
+   -- tabler.css) still stretches a lone card to consume the ENTIRE row,
+   gap or no gap: a gap only ever appears BETWEEN items, and one item alone
+   has no "between" to sit in. Capping how wide any one child is allowed to
+   grow is what leaves the rest of the row -- the container's own space --
+   actually empty. `max-width` clamps a flex item's resolved size
+   regardless of its `flex-grow` factor (part of the flex sizing algorithm
+   itself, not a property this rule has to fight card_group's own CSS
+   over), so this needs no `flex:`/`flex-grow` override of its own. 25%
+   comfortably UNDER a third of the row, chosen alongside the 40% gap above
+   so that even packed hard against the container's own left edge, a single
+   capped child's own right edge (25%) still falls well short of the row's
+   own geometric centre (50%) -- see that rule's own comment for why that
+   specific pixel matters. Badges are unaffected in practice: a badge's own
+   natural width is already far under this cap, so the rule never actually
+   constrains one -- it exists for card_group's stretching cards, not
+   badge_list's already-small ones. `:not([aria-hidden="true"])` excludes
+   the empty-slot PLACEHOLDER Renderer synthesizes for a decorated empty
+   slot (#_growSmallDropTargets' own comment on the identical exclusion) --
+   capping ITS width would be harmless on its own (0×0, never reachable by
+   a pointer) but there is no reason to match it here either. */
+.docs-editor-canvas-drag-container-space > [data-editor-node-id]:not([aria-hidden="true"]) {
+  max-width: 25%;
 }
 
 /* One labelled chip per available container -- see drop_target.js's

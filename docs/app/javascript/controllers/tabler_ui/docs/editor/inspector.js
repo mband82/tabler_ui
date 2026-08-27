@@ -301,14 +301,32 @@ function builderItemFields(schema, node, context, readOnly) {
   `
 }
 
+// `data-editor-arg-name`, when present, is this method's OWN required
+// positional (BuilderMap's `arg:`, surfaced here as `levelDef[method].arg.name`
+// -- see docs/lib/tabler_ui/docs/editor/schema.rb#arg_payload) -- e.g.
+// "title" for tabs.tab, "page" for pagination.item. Reading it straight off
+// the schema payload, rather than the controller guessing from the method
+// name, is what lets #addBuilderItem seed a non-blank placeholder for it:
+// Tree#normalize_required_args (docs/lib/tabler_ui/docs/editor/tree.rb)
+// checks a required arg by KEY PRESENCE alone, so a freshly-added item with
+// no key at all for its required arg -- exactly what this button used to
+// hand the controller -- fails that check on the very next preview
+// round-trip and the whole item is dropped from the tree, no error a user
+// could connect to what they just clicked. Omitted entirely (like the
+// action/id attributes above) for a method with no required arg at all
+// (`arg: null` -- e.g. dropdown's own "divider").
 function builderAddButtons(node, levelDef, level) {
-  const buttons = Object.keys(levelDef).map((method) => `
+  const buttons = Object.keys(levelDef).map((method) => {
+    const arg = levelDef[method] && levelDef[method].arg
+    const argAttr = arg ? ` data-editor-arg-name="${escapeHtml(arg.name)}"` : ""
+    return `
     <button type="button" class="btn btn-sm btn-outline-secondary me-1 mb-1"
             data-action="click->tabler-ui--docs-editor#addBuilderItem"
-            data-editor-node-id="${node.id}" data-editor-method="${escapeHtml(method)}" data-editor-level="${escapeHtml(level)}">
+            data-editor-node-id="${node.id}" data-editor-method="${escapeHtml(method)}" data-editor-level="${escapeHtml(level)}"${argAttr}>
       + ${escapeHtml(method)}
     </button>
-  `).join("")
+  `
+  }).join("")
 
   return `<h5 class="mt-3 mb-1">Add item</h5><div>${buttons}</div>`
 }

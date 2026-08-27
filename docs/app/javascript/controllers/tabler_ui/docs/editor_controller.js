@@ -151,6 +151,46 @@
 // #_repositionGuides call to catch them up, same "measure once, not per
 // dragover tick" discipline #_repositionGuides' own doc already holds
 // scroll/resize to.
+//
+// ## A direct-child container's own drop space
+//
+// #_growSmallDropTargets above solves "too small to aim at". A direct-child
+// container (schema.kinds.directChildContainers -- card_group/badge_list,
+// drop_target.js's own vocabulary) that already holds a child has the
+// opposite problem: its child (or children) already tile its ENTIRE
+// rendered area -- card_group's cards touch edge to edge (`flex: 1 0 0`, no
+// gap by default), and with layout guides on, even an EMPTY card renders
+// its own header/body/footer slot WRAPPERS covering its whole box. Either
+// way, #_hitTestDragTarget's `elementFromPoint().closest("[data-editor-
+// node-id]")` always lands on the CHILD (or one of its slot wrappers),
+// never the container's own bare root -- there is no pixel left that
+// belongs to the container itself, so a drop aimed at "the group, not any
+// one card in it" is unreachable no matter how carefully it's aimed.
+// #_growDirectChildContainerSpace reclaims real pixels for the container:
+// editor_canvas.css's `.docs-editor-canvas-drag-container-space` class,
+// stamped on the container's own root for the duration of a drag, gives it
+// real padding and a real gap between children, AND caps how wide any one
+// child is allowed to grow (a CSS `max-width`, which clamps a flex item's
+// resolved width regardless of `flex-grow` -- no need to fight card_group's
+// own `flex: 1 0 0` directly). The result is real, uncovered container
+// pixels around every child and in the gap between any two -- including,
+// deliberately, the container's own geometric middle, which is exactly
+// where the original "second card nests inside the first" bug was aimed.
+// #_hitTestDragTarget's own #_hitTestDirectChildContainerGutter re-resolves
+// a hit that lands on the container's bare root against whichever CHILD the
+// pointer is nearest, in the same {id, rect, slotName: null} shape a real
+// hit already carries -- so drop_target.js needs no changes at all: its
+// existing edge-band math (#resolveHorizontalEdge's case 0, this module's
+// own header on "Four edges, one rule") already turns a left/right (or,
+// for the gutter above/below a single-row container, top/bottom) edge on
+// that nearest child into a plain sibling insert in the SAME container,
+// never a nest. Applied once per drag start (#paletteDragStart,
+// #_onFrameDragStart, right after #_growSmallDropTargets) and undone once
+// in #_endDrag (#_shrinkDirectChildContainerSpace) -- same "stamp once,
+// reposition guides once, undo explicitly" discipline as the small-target
+// growth just above, kept as its own pair of methods rather than folded
+// into that one because the two solve different unreachability problems
+// and can be reasoned about (and, if ever needed, disabled) independently.
 import { Controller } from "@hotwired/stimulus"
 import * as Workspace from "controllers/tabler_ui/docs/editor/workspace"
 import * as Tree from "controllers/tabler_ui/docs/editor/tree"
@@ -163,7 +203,7 @@ import { escapeHtml } from "controllers/tabler_ui/docs/editor/html_escape"
 import { exportWorkspaceZip } from "controllers/tabler_ui/docs/editor/export"
 import { createOverlay } from "controllers/tabler_ui/docs/editor/overlay"
 import * as DnD from "controllers/tabler_ui/docs/editor/dnd"
-import { resolveDropTarget, ROOT_GHOST_HEIGHT, DRAG_GROW_MIN_SIZE, isEmptyRootSharedComponent } from "controllers/tabler_ui/docs/editor/drop_target"
+import { resolveDropTarget, ROOT_GHOST_HEIGHT, DRAG_GROW_MIN_SIZE, isEmptyRootSharedComponent, isSingleOccupantSlot, singleOccupantRefusalReason } from "controllers/tabler_ui/docs/editor/drop_target"
 
 const FIELD_PRIORITY = ["title", "text", "label", "value"]
 
@@ -202,6 +242,76 @@ const UNDO_STACK_LIMIT = 20
 // with their own route once they see the field.
 const DEFAULT_SIMPLE_SORT_URL = { mode: "simple", path: "/", sortParam: "sort", dirParam: "dir" }
 const DEFAULT_PATTERN_SORT_URL = { mode: "pattern", pattern: "/{key}/{dir}" }
+
+// Same self-undoing-control trap as the sort_url/"Sortable" fixes above
+// (see DEFAULT_SIMPLE_SORT_URL's own comment), one level up: a NODE, not
+// just one of its options. #_buildComponentNode (a component's own required
+// positional, e.g. accordion/tabs/... "id") and #addBuilderItem (a builder
+// method's single required arg, e.g. tabs.tab's "title") both used to seed
+// a required arg with "" -- present as a Hash key so it LOOKS filled in,
+// but Editor::Tree's own sanitizer treats an empty string as a real,
+// legal value for a generic arg (only KEY PRESENCE is checked, see
+// docs/lib/tabler_ui/docs/editor/tree.rb#normalize_required_args), so that
+// half of the bug survives Tree's validation. The other half doesn't:
+// #addBuilderItem used to omit the key entirely (`args: {}`), which DOES
+// fail that same presence check -- "builder item 'item' is missing
+// required arg(s): title" -- and the item is dropped outright, the
+// literal "+ item does nothing" bug this whole fix exists for. Either way
+// the fresh node is one silent round-trip away from disappearing or from
+// sitting there un-editable-looking with a blank required field, so both
+// callers seed a real, non-empty value up front instead.
+//
+// Keyed on the ARGUMENT's own name, not on which component/method it
+// belongs to -- every required arg across the whole schema today is one of
+// exactly these five names (id: accordion/carousel/modal/offcanvas/
+// settings_page/tabs; icon: Icon; name: Illustration; title: most builder
+// items; page: pagination.item), and a name is what both call sites
+// actually have in hand (schema.rb's own `args`/`arg` payloads carry a
+// `name`, never a component/method identity) -- see #_placeholderForArg.
+// Each value is chosen to read as a real, keepable example of that
+// argument, not a "fill me in" stub:
+//   id    -- "new-id": a component id becomes an HTML id / data-bs-target
+//            anchor (accordion/modal/offcanvas/tabs toggle each other by
+//            it), so it has to look like a legal id token, not a sentence.
+//   icon  -- "home": Icon#read_svg (app/components/tabler_ui/icon/component.rb)
+//            reads this straight off disk as a filename -- "home.svg"
+//            genuinely exists under both icons/outline and icons/filled,
+//            so the freshly-added icon renders for real instead of the
+//            component's own fallback bug-icon glyph.
+//   name  -- "calendar": same reasoning, one component over --
+//            app/assets/illustrations/{light,dark}/calendar.svg both exist,
+//            so Illustration renders real art immediately. The doc
+//            comment's own "empty" example is NOT backed by a real file
+//            (confirmed: no empty.svg on disk) -- illustrative only, not a
+//            safe placeholder to copy, exactly the trap CLAUDE.md's design-
+//            editor rule warns @example blocks are never guaranteed real.
+//   title -- "New item": every builder method whose arg is "title" (tabs,
+//            accordion, dropdown, datagrid, navbar, settings_page, steps,
+//            breadcrumb) renders it as the item's own visible label, so a
+//            generic-but-legible phrase beats a name-shaped token.
+//   page  -- "1": pagination.item's arg is a page NUMBER; "1" is the
+//            obvious first value and is exactly as valid a String as
+//            anything else this control's control:"text" input accepts.
+const ARG_PLACEHOLDERS = {
+  id: "new-id",
+  icon: "home",
+  name: "calendar",
+  title: "New item",
+  page: "1"
+}
+
+// @return [String] a non-empty, individually-sensible starting value for a
+//   required arg named `argName` -- see ARG_PLACEHOLDERS just above for the
+//   five names the schema actually produces today. Falls back to a plain
+//   "New <name>" for anything else (there is no sixth case today, but a
+//   future required positional on some new component/builder method would
+//   otherwise silently regress to the blank-string version of this same
+//   bug) -- still non-empty, which is the one property every caller here
+//   actually depends on.
+function placeholderForArg(argName) {
+  if (Object.prototype.hasOwnProperty.call(ARG_PLACEHOLDERS, argName)) return ARG_PLACEHOLDERS[argName]
+  return `New ${argName}`
+}
 
 export default class extends Controller {
   static targets = ["explorer", "palette", "structure", "code", "inspector", "frame", "errors", "filename", "guides"]
@@ -418,6 +528,12 @@ export default class extends Controller {
     // itself rather than needing anything from `event`.
     this._growSmallDropTargets()
 
+    // See this file's header, "A direct-child container's own drop space"
+    // -- a SEPARATE growth pass from the one just above, solving a
+    // different unreachability (a container whose child already covers it
+    // entirely, not one that's merely too small).
+    this._growDirectChildContainerSpace()
+
     // Hide the selection box/toolbar for the duration of the drag --
     // #_endDrag's tail (via #_paintCanvas) restores them once the lock
     // lifts. this._selectedNodeId itself is untouched, so the selection
@@ -464,11 +580,22 @@ export default class extends Controller {
     this._endDrag()
   }
 
+  // `data-editor-arg-name`, when present (editor/inspector.js#builderAddButtons),
+  // is this method's own required positional straight off the schema
+  // payload -- e.g. "title" for tabs.tab. Seeding `args` with a real,
+  // non-empty placeholder for it (ARG_PLACEHOLDERS/#placeholderForArg
+  // above) is what makes the item survive the very next preview
+  // round-trip: see those constants' own comment for the bug this closes
+  // -- an item added with no key (or an empty-string one) for its required
+  // arg used to come back missing/blank the moment the debounced preview
+  // posted, and this button looked like it did nothing.
   addBuilderItem(event) {
     const el = event.currentTarget
     const nodeId = el.dataset.editorNodeId
     const method = el.dataset.editorMethod
-    const item = { kind: "builder_item", id: Tree.generateId(), method, args: {}, options: {} }
+    const argName = el.dataset.editorArgName
+    const args = argName ? { [argName]: placeholderForArg(argName) } : {}
+    const item = { kind: "builder_item", id: Tree.generateId(), method, args, options: {} }
 
     this._updateTree((tree) => Tree.insertNode(tree, nodeId, item, { container: "items" }))
     this._renderInspector()
@@ -594,26 +721,32 @@ export default class extends Controller {
   // Reorder/reparent within the design tree, on top of tree.js's
   // moveNodeTo primitive (remove + insert-at-index against one working
   // tree -- see that function's own header for how a same-container move
-  // keeps its target index correct with no extra arithmetic here). This
-  // method itself only has to enforce the one rule that's a UI concern
-  // rather than a tree-structure one: a slot holds at most one node.
+  // keeps its target index correct with no extra arithmetic here). A slot
+  // can hold several nodes now (drop_target.js's SINGLE_OCCUPANT_SLOTS own
+  // comment -- the server never capped it at one to begin with), so
+  // moveNodeTo's plain insert is correct as-is for an ordinary slot; the
+  // one thing this method still has to enforce itself is the single
+  // exception in that same shared map (avatar's `overlay`), imported from
+  // drop_target.js rather than re-declared here so the canvas-drag path
+  // (drop_target.js#resolveDirectSlot) and this Structure-pane path can
+  // never disagree about which slots are singleton.
   _handleStructureMove(itemId, toContainer, newIndex) {
     const [, parentId, key] = toContainer.split(":")
     if (!parentId || !key) return
 
+    let refusedReason = null
     this._updateTree((tree) => {
       if (key.startsWith("slot__")) {
         const slotName = key.slice("slot__".length)
         const parent = Tree.findNode(tree, parentId)
         const occupant = (parent && parent.slots && parent.slots[slotName]) || []
-        // A slot holds at most one node. moveNodeTo/insertAt have no such
-        // guard (they only ever insert) -- this is the one place that
-        // enforces it: refuse the drop (no-op) rather than silently
-        // displacing the existing occupant or stacking two nodes in one
-        // slot. Excludes `itemId` itself so dragging a slot's own occupant
+        // Excludes `itemId` itself so dragging the slot's own occupant
         // back onto its own slot isn't mistaken for the slot already being
         // occupied by someone else.
-        if (occupant.some((n) => n.id !== itemId)) return tree
+        if (parent && isSingleOccupantSlot(parent.name, slotName) && occupant.some((n) => n.id !== itemId)) {
+          refusedReason = singleOccupantRefusalReason(parent.name, slotName)
+          return tree // refuse the drop -- see #_renderErrors call below, not a silent no-op
+        }
       }
 
       // moveNodeTo no-ops (returns the tree unchanged) if `itemId` isn't
@@ -622,6 +755,11 @@ export default class extends Controller {
       // into its own subtree: refuse.
       return Tree.moveNodeTo(tree, itemId, parentId, key, newIndex)
     })
+
+    if (refusedReason) {
+      this._renderErrors([refusedReason])
+      return
+    }
     this._schedulePreview()
   }
 
@@ -1394,6 +1532,53 @@ export default class extends Controller {
     })
   }
 
+  // See this file's header, "A direct-child container's own drop space" --
+  // called once from #paletteDragStart/#_onFrameDragStart, right alongside
+  // #_growSmallDropTargets, never from a per-dragover-tick handler (same
+  // "measure/mutate once, not every tick" discipline that method's own doc
+  // already holds to). Stamps editor_canvas.css's `.docs-editor-canvas-
+  // drag-container-space` on every currently-stamped element that is a
+  // direct-child container right now -- reads the TREE, not the DOM, to
+  // decide which ones qualify (`node.kind === "component"` and its `name`
+  // published under schema.kinds.directChildContainers), exactly the same
+  // vocabulary drop_target.js's own case 0 already checks.
+  _growDirectChildContainerSpace() {
+    if (!this._frameDoc) return
+    const canvasEl = this._frameDoc.getElementById("tabler-ui-editor-canvas")
+    if (!canvasEl) return
+
+    canvasEl.querySelectorAll("[data-editor-node-id]").forEach((el) => {
+      if (this._isDirectChildContainerNode(el.getAttribute("data-editor-node-id"))) {
+        el.classList.add("docs-editor-canvas-drag-container-space")
+      }
+    })
+
+    // Capping every child's width and padding/gapping the container is a
+    // real layout change -- every guide rect already on screen was
+    // measured before this ran, so it's now stale in exactly the way
+    // #_growSmallDropTargets' own tail comment describes. One reposition
+    // catches every guide up in a single pass; nothing else for the rest
+    // of the drag recomputes them again (scroll is the one exception,
+    // already wired up independently -- this file's header).
+    this._repositionGuides()
+  }
+
+  // Counterpart of #_growDirectChildContainerSpace above, called from
+  // #_endDrag alongside #_shrinkGrownDropTargets -- same "explicit rather
+  // than left to the next repaint to wipe it" reasoning as that method's
+  // own doc. A plain class removal, not a tree walk: every element this
+  // could ever be sitting on already carries the class (or doesn't), so
+  // there's nothing to re-derive from the tree on the way out the way
+  // growing it had to.
+  _shrinkDirectChildContainerSpace() {
+    if (!this._frameDoc) return
+    const canvasEl = this._frameDoc.getElementById("tabler-ui-editor-canvas")
+    if (!canvasEl) return
+    canvasEl.querySelectorAll(".docs-editor-canvas-drag-container-space").forEach((el) => {
+      el.classList.remove("docs-editor-canvas-drag-container-space")
+    })
+  }
+
   _onFrameClick(event) {
     // Never let a link (or an auto-submitting form) inside the previewed
     // design navigate the sandboxed frame away from the editor.
@@ -1592,6 +1777,10 @@ export default class extends Controller {
     // reasoning, just the other of the two places a drag can start.
     this._growSmallDropTargets()
 
+    // See #paletteDragStart's own comment on this same call -- identical
+    // reasoning, just the other of the two places a drag can start.
+    this._growDirectChildContainerSpace()
+
     // See #paletteDragStart's own comment on this same block -- identical
     // reasoning (guides stay drawn and merely mute), just the other of the
     // two documents a drag can start in.
@@ -1655,6 +1844,28 @@ export default class extends Controller {
       const allowedEffect = this._dragState.sourceNodeId ? "move" : "copy"
       event.dataTransfer.dropEffect = descriptor.valid ? allowedEffect : "none"
     }
+    // A "refused" descriptor (drop_target.js#buildRefusedTarget) sets
+    // `dropEffect = "none"` on the line just above, same as any other
+    // invalid target -- and that is exactly what stops the browser's
+    // native drag-and-drop from ever firing a `drop` event at all once the
+    // pointer releases over it, #_onFrameDrop's own refusal handling
+    // included: there is no reliable "the user just tried this and it was
+    // refused" moment to hook for a SINGLE_OCCUPANT_SLOTS refusal, only
+    // "the pointer is currently hovering a refused target". So the errors
+    // banner is kept live here instead, in sync with hover rather than
+    // drop -- shown the moment a refused target is entered, cleared the
+    // moment it is left -- guarded by `_dragRefusalActive` so it only ever
+    // touches a banner THIS mechanism put there (never a stale, unrelated
+    // server-preview error already showing when the drag started).
+    if (descriptor.position === "refused") {
+      if (!this._dragRefusalActive) {
+        this._renderErrors([descriptor.reason])
+        this._dragRefusalActive = true
+      }
+    } else if (this._dragRefusalActive) {
+      this._renderErrors([])
+      this._dragRefusalActive = false
+    }
     this._paintDragGhost(descriptor, event)
   }
 
@@ -1688,11 +1899,84 @@ export default class extends Controller {
     const el = this._frameDoc.elementFromPoint(x, y)
     const target = el && el.closest ? el.closest("[data-editor-node-id]") : null
     if (!target) return null
+
+    // The matched element is a direct-child container's own bare root, not
+    // any child of it -- see this file's header, "A direct-child
+    // container's own drop space". A child's own [data-editor-node-id]
+    // wrapper sits BETWEEN the container and any point actually over that
+    // child, so `.closest()` above would already have matched the child
+    // instead; landing on the container's own id here can only mean the
+    // pointer is over #_growDirectChildContainerSpace's drag-only gutter or
+    // gap. Re-resolve against whichever child the pointer is nearest to.
+    const gutterHit = this._hitTestDirectChildContainerGutter(target, x, y)
+    if (gutterHit) return gutterHit
+
     return {
       id: target.getAttribute("data-editor-node-id"),
       rect: target.getBoundingClientRect(),
       slotName: target.getAttribute("data-editor-slot")
     }
+  }
+
+  // #_hitTestDragTarget's own direct-child-container case, split out for
+  // its own doc. Hands back a SYNTHETIC hit on the nearest child -- the
+  // exact same {id, rect, slotName: null} shape a real hit already carries
+  // -- rather than building any new descriptor of its own: drop_target.js's
+  // existing edge-band math (#resolveHorizontalEdge's case 0, its own
+  // header on "Four edges, one rule") already knows exactly what a
+  // left/right (or top/bottom, for the gutter above/below a single-row
+  // container) edge on a direct-child container's own child means -- a
+  // plain sibling insert in the SAME container, never a wrap or a nest --
+  // so this only has to pick WHICH child, never re-derive what the hit
+  // means. Distance is 2D (clamped-to-zero horizontal/vertical components,
+  // combined), not #_hitTestRootFallback's Y-only measure just below: that
+  // method's own root-level children are always stacked vertically, but a
+  // direct-child container's children sit side by side, so both axes
+  // matter here -- the gutter above a short row and the gutter beside a
+  // tall one both need to resolve toward whichever child is actually
+  // closest, not just whichever comes first top-to-bottom.
+  //
+  // @param target the direct-child container's own stamped element (its
+  //   `[data-editor-node-id]` matched `.closest()`'s own hit).
+  // @return the same {id, rect, slotName} shape #_hitTestDragTarget already
+  //   returns for a real hit, or null when this container isn't a
+  //   `directChildContainers` member (not a container at all, this file's
+  //   own #_isDirectChildContainerNode) or has no child yet to aim beside
+  //   (an empty container -- falls through to the container's own "into"
+  //   resolution instead, appending the very first child into its slot,
+  //   unaffected by any of this).
+  _hitTestDirectChildContainerGutter(target, x, y) {
+    if (!this._isDirectChildContainerNode(target.getAttribute("data-editor-node-id"))) return null
+
+    const children = Array.from(target.children).filter((el) => el.hasAttribute("data-editor-node-id"))
+    if (children.length === 0) return null
+
+    let nearest = null
+    let nearestDistance = Infinity
+    children.forEach((el) => {
+      const rect = el.getBoundingClientRect()
+      const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0
+      const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0
+      const distance = Math.hypot(dx, dy)
+      if (distance < nearestDistance) {
+        nearestDistance = distance
+        nearest = { id: el.getAttribute("data-editor-node-id"), rect, slotName: null }
+      }
+    })
+    return nearest
+  }
+
+  // @param nodeId a tree node id, or null/undefined.
+  // @return true iff that node is a `component` whose name is published
+  //   under schema.kinds.directChildContainers (card_group/badge_list
+  //   today) -- the exact vocabulary drop_target.js's own case 0 already
+  //   checks (this file's header, "A direct-child container's own drop
+  //   space").
+  _isDirectChildContainerNode(nodeId) {
+    const directChildContainers = (this._schema && this._schema.kinds && this._schema.kinds.directChildContainers) || []
+    if (directChildContainers.length === 0) return false
+    const node = Tree.findNode(this._currentTree(), nodeId)
+    return !!(node && node.kind === "component" && directChildContainers.includes(node.name))
   }
 
   // #_hitTestDragTarget's own fallback, tried only when it found nothing --
@@ -1782,7 +2066,16 @@ export default class extends Controller {
     if (!this._dragState) return
 
     const descriptor = this._dragState.target
-    if (descriptor && descriptor.position !== "chips") this._applyDrop(descriptor)
+    // "refused" (drop_target.js#buildRefusedTarget -- SINGLE_OCCUPANT_SLOTS'
+    // one exception) has no parentId, so #_applyDrop would already treat it
+    // as a no-op -- but a refused drop must say so, not silently vanish.
+    // Surfaced through the same errors banner every other client-side
+    // refusal already uses (#_renderErrors), not a console message.
+    if (descriptor && descriptor.position === "refused") {
+      this._renderErrors([descriptor.reason])
+    } else if (descriptor && descriptor.position !== "chips") {
+      this._applyDrop(descriptor)
+    }
 
     this._endDrag()
   }
@@ -1898,12 +2191,21 @@ export default class extends Controller {
   //      on the correct side. `descriptor.lineOrientation` picks which way:
   //      "horizontal" (a top/bottom edge) draws the ORIGINAL full-width bar
   //      above/below the element, same as before this feature; "vertical"
-  //      (a left/right edge, drop_target.js's horizontal bands) draws a
-  //      full-height bar beside it instead, with the ghost a narrow sliver
-  //      of the SAME thickness (ROOT_GHOST_HEIGHT) sitting left or right
-  //      rather than above or below -- so a left/right insertion reads as a
-  //      vertical line on that edge, never the horizontal one. "column" is
-  //      deliberately NOT given its own branch here, unlike "wrap": it is a
+  //      (a left/right edge, drop_target.js's horizontal bands -- OR a
+  //      CENTRE hover over a direct-child container's own child, which
+  //      drop_target.js#resolveDirectChildContainerCentreSibling resolves
+  //      to a synthetic left/right "edge" of its own, deliberately reusing
+  //      this exact same descriptor shape rather than earning a seventh
+  //      case here -- see that function's own doc and this method's own
+  //      case 4 above, which is what a centre hover over a card_group's
+  //      only card used to fall into before that fix) draws a full-height
+  //      bar beside it instead, with the ghost a narrow sliver of the SAME
+  //      thickness (ROOT_GHOST_HEIGHT) sitting left or right rather than
+  //      above or below -- so a left/right (real or synthetic) insertion
+  //      reads as a vertical line on that edge, never the horizontal one,
+  //      and never case 4's whole-element fill either -- exactly the "a
+  //      sibling lands here, not descend into me" read that fix needs.
+  //      "column" is deliberately NOT given its own branch here, unlike "wrap": it is a
   //      structural change (a new column joins an existing row) but a small
   //      one, and the plain vertical insertion line this branch already
   //      draws for an ordinary left/right "before"/"after" is exactly the
@@ -1951,10 +2253,17 @@ export default class extends Controller {
     }
     this._overlay.clearWrapOutline()
 
-    if (descriptor.position === "into") {
+    if (descriptor.position === "into" || descriptor.position === "refused") {
       this._overlay.clearInsertionLine()
       if (descriptor.anchorRect) {
         const anchor = descriptor.anchorRect
+        // "refused" (drop_target.js#buildRefusedTarget) reuses the exact
+        // same whole-element ghost as an ordinary "into" hover -- it IS a
+        // hover over that slot's own wrapper, same as "into" -- just
+        // always painted invalid (`descriptor.valid` is hardcoded false
+        // there) so the ghost itself previews the refusal before the user
+        // even releases; #_onFrameDrop is what actually stops the drop and
+        // shows the errors banner.
         this._overlay.setGhost(rectOf(anchor.left, anchor.top, anchor.width, anchor.height), this._dragState.label, descriptor.valid)
       } else {
         this._overlay.clearGhost()
@@ -2041,11 +2350,22 @@ export default class extends Controller {
   _endDrag() {
     if (!this._dragState) return
     this._dragState = null
+    // Only resets the TRACKING flag, deliberately leaving whatever
+    // #_onFrameDragOver's own refusal handling last rendered on screen --
+    // a refused drop (SINGLE_OCCUPANT_SLOTS) has to still read as refused
+    // once the pointer is released and the drag is over, not blank the
+    // instant it ends. The next drag's own first dragover tick (refused or
+    // not) is what decides whether the banner changes.
+    this._dragRefusalActive = false
     // See this file's header, "Drag-only growth" -- undoes
     // #_growSmallDropTargets explicitly, on both a successful drop and a
     // cancelled drag, rather than counting on the next repaint to happen
     // to wipe it.
     this._shrinkGrownDropTargets()
+    // See this file's header, "A direct-child container's own drop space"
+    // -- same idempotent, explicit teardown, for the other of the two
+    // drag-only growth passes #paletteDragStart/#_onFrameDragStart apply.
+    this._shrinkDirectChildContainerSpace()
     if (this._overlay) {
       this._overlay.clearGhost()
       this._overlay.clearInsertionLine()
@@ -2919,7 +3239,21 @@ export default class extends Controller {
       case "column": return { kind: "column", id, span: { base: 12 }, attrs: {}, children: [] }
       case "heading": return { kind: "heading", id, level: 2, content: "New heading" }
       case "text": return { kind: "text", id, tag: "p", content: "New text" }
-      case "partial": return { kind: "partial", id, path: "" }
+      // Same "must be non-blank to survive the next round-trip" story as
+      // ARG_PLACEHOLDERS above, one node kind over: Tree#validate_partial_path
+      // (docs/lib/tabler_ui/docs/editor/tree.rb) requires `path` to be a
+      // non-empty String ending in ".html.erb" with at least one real
+      // segment -- an empty string fails that outright ("must end with
+      // .html.erb ... got \"\""), and normalize_partial returns nil for
+      // the whole node, silently dropping it exactly like an un-seeded
+      // builder item. "partial.html.erb" is a single, valid segment that
+      // parses cleanly; it won't resolve to a real file until the user
+      // points it at one (or creates one), but an unresolved partial is
+      // Renderer's ordinary, non-erasing "unresolved partial" error marker
+      // in the canvas (#render_partial_node), not Tree stripping the node
+      // -- a real difference from the blank-path case, which never even
+      // reaches the renderer.
+      case "partial": return { kind: "partial", id, path: "partial.html.erb" }
       case "component": return this._buildComponentNode(id, componentName)
       default: return null
     }
@@ -2928,7 +3262,16 @@ export default class extends Controller {
   _buildComponentNode(id, componentName) {
     const meta = this._schema && this._schema.components && this._schema.components[componentName]
     const node = { kind: "component", id, name: componentName, args: {}, options: {} }
-    if (meta && meta.args) meta.args.forEach((a) => { node.args[a.name] = "" })
+    // See ARG_PLACEHOLDERS/#placeholderForArg above -- a component with a
+    // required positional (accordion/carousel/modal/offcanvas/
+    // settings_page/tabs' "id", Icon's "icon", Illustration's "name") used
+    // to be seeded with "", which Tree accepts as a present-but-blank
+    // value (KEY presence is all #normalize_required_args checks) rather
+    // than rejecting outright -- so the node itself survived, but landed
+    // with an invisible-looking blank required field and, for id, broken
+    // toggle wiring nobody would notice until they opened this exact
+    // field.
+    if (meta && meta.args) meta.args.forEach((a) => { node.args[a.name] = placeholderForArg(a.name) })
     if (meta && meta.builder) {
       node.items = []
     } else {

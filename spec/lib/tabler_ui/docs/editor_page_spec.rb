@@ -7,9 +7,12 @@ require "tabler_ui/docs/navigation"
 # its sandboxed preview frame (GET /ui/editor/frame, EditorController#frame,
 # see docs/app/views/layouts/tabler_ui/docs/editor_frame.html.erb). Both
 # render static markup only -- no editor JS exists yet (another agent's
-# work) -- so these specs only check the page shell itself: sidebar state,
-# the values the not-yet-written Stimulus controller will read, and that the
-# frame really is a separate, chrome-free document.
+# work) -- so these specs only check the page shell itself: that it renders
+# no docs sidebar (the top navbar is this page's only docs-navigation
+# surface -- see application.html.erb's own comment on wide_layout) and
+# marks itself current there, the values the not-yet-written Stimulus
+# controller will read, and that the frame really is a separate,
+# chrome-free document.
 #
 # See spec/lib/tabler_ui/docs/editor_endpoints_spec.rb for the JSON
 # endpoints (#schema, #preview) this same controller also serves.
@@ -21,33 +24,24 @@ RSpec.describe "TablerUi::Docs design editor page", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it "appears in the sidebar's top list-group, above the component categories" do
+    it "renders no docs sidebar -- the navbar is this page's only navigation surface" do
       fragment = Nokogiri::HTML5.fragment(response.body)
-      top_group = fragment.at_css("nav.docs-sidebar .list-group")
 
-      expect(top_group).not_to be_nil
-      expect(top_group.css("a").map(&:text)).to include("Design editor")
+      expect(fragment.at_css("nav.docs-sidebar")).to be_nil
     end
 
-    it "marks its own sidebar entry active, and nothing else" do
+    it "marks the navbar's Editor item current, and Documentation not current" do
       fragment = Nokogiri::HTML5.fragment(response.body)
-      links = fragment.at_css("nav.docs-sidebar").css("a")
-      active = links.select { |a| a["class"].to_s.include?("active") }
+      navbar = fragment.at_css("header.navbar")
+      links = navbar.css("a.nav-link")
 
-      expect(active.map(&:text)).to eq(["Design editor"])
-    end
+      editor_link = links.find { |a| a.text.strip == "Editor" }
+      documentation_link = links.find { |a| a.text.strip == "Documentation" }
 
-    it "opens no component category (this page isn't a component)" do
-      fragment = Nokogiri::HTML5.fragment(response.body)
-      sidebar = fragment.at_css("nav.docs-sidebar")
-
-      TablerUi::Docs::Navigation.category_names.each do |category|
-        toggle = sidebar.css("button[data-bs-toggle='collapse']").find { |btn| btn.text.strip.start_with?(category) }
-        target_id = toggle["data-bs-target"].delete_prefix("#")
-        pane = sidebar.at_css("##{target_id}")
-
-        expect(pane["class"]).not_to include("show")
-      end
+      expect(editor_link).not_to be_nil
+      expect(documentation_link).not_to be_nil
+      expect(editor_link["class"]).to include("active")
+      expect(documentation_link["class"]).not_to include("active")
     end
 
     it "carries the schema/preview URLs and a CSRF token as Stimulus values on its root element" do

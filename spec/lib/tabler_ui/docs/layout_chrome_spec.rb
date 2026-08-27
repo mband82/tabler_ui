@@ -50,6 +50,39 @@ RSpec.describe "TablerUi::Docs layout chrome", type: :request do
       # rendered, not a copy of its markup.
       expect(navbar.at_css("[data-controller='tabler-ui--dark-mode']")).not_to be_nil
     end
+
+    # Documentation and Editor are the two halves of this engine (see
+    # application.html.erb's own comment above the navbar block), so the
+    # navbar carries a link to each, on every kind of docs page -- not just
+    # the editor page itself (see editor_page_spec.rb for that page marking
+    # "Editor" current instead).
+    it "links both Documentation and Editor, to the index and the editor page respectively" do
+      ["/ui", "/ui/forms", "/ui/components/badge"].each do |path|
+        get path
+
+        navbar = Nokogiri::HTML5.fragment(response.body).at_css("header.navbar")
+        links = navbar.css("a.nav-link")
+
+        documentation_link = links.find { |a| a.text.strip == "Documentation" }
+        editor_link = links.find { |a| a.text.strip == "Editor" }
+
+        expect(documentation_link["href"]).to eq("/ui/"), "expected Documentation to link to the index on #{path}"
+        expect(editor_link["href"]).to eq("/ui/editor"), "expected Editor to link to /ui/editor on #{path}"
+      end
+    end
+
+    it "marks Documentation current, and Editor not current, on an ordinary docs page" do
+      get "/ui/components/badge"
+
+      navbar = Nokogiri::HTML5.fragment(response.body).at_css("header.navbar")
+      links = navbar.css("a.nav-link")
+
+      documentation_link = links.find { |a| a.text.strip == "Documentation" }
+      editor_link = links.find { |a| a.text.strip == "Editor" }
+
+      expect(documentation_link["class"]).to include("active")
+      expect(editor_link["class"]).not_to include("active")
+    end
   end
 
   # The navbar and the breadcrumb bar used to be two independent elements --

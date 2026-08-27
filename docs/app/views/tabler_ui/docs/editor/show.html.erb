@@ -23,10 +23,13 @@
 
     Does call content_for(:wide_layout), just below -- this page's
     three-pane toolbar layout wants the whole window, not the col-lg-8/10
-    the layout otherwise caps content at, so the sidebar column folds into
-    a collapsed toggle and the outer container drops its max-width (see
-    application.html.erb's own comment on that flag). No other docs page
-    sets this.
+    the layout otherwise caps content at, so the layout renders no docs
+    sidebar column here at all and the outer container drops its max-width
+    (see application.html.erb's own comment on that flag). The top navbar
+    is this page's only docs-navigation surface -- there's no "Browse
+    components" sidebar to open any more, since the navbar's own "Editor"/
+    "Documentation" items already cover what that used to be for. No other
+    docs page sets content_for(:wide_layout).
 
     Both tab strips below (Explorer/Components, Preview/Structure/Code)
     reuse the tabs component's own Bootstrap-tab markup convention

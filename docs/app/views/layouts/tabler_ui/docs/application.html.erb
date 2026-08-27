@@ -42,6 +42,20 @@
       <%= render "tabler_ui/docs/shared/search" %>
     <% end %>
 
+    <%# This engine is really two destinations wearing one layout --
+        the documentation browser (every page except the editor) and the
+        design editor (GET /ui/editor) -- and the navbar is the one piece
+        of chrome both share, so it's the natural place to move between
+        them rather than a link buried in the sidebar (see this file's own
+        note, further down, on why the sidebar's old "Design editor" entry
+        is gone now that this exists). "Editor" is current on exactly the
+        page that sets @nav_current to Navigation::EDITOR
+        (EditorController#show); every other docs page -- including the
+        index, where @nav_current is nil -- reads as "Documentation". Two
+        plain link items rather than a dropdown: there are only ever two
+        destinations, and a single-item dropdown has nothing to disclose. %>
+    <% editor_current = @nav_current == TablerUi::Docs::Navigation::EDITOR %>
+
     <%# The navbar and the (page-dependent) breadcrumb bar used to be two
         separate elements -- only the breadcrumb bar was `sticky-top`, and
         it lost its own stickiness as soon as the navbar above it (not
@@ -78,20 +92,34 @@
         it flags itself with content_for(:wide_layout) -- the same
         content_for? convention this layout already uses for :breadcrumb
         above and :contents below, rather than an instance variable a
-        controller would have to set, or branching on the request path. In
-        wide mode the outer container drops its max-width (container-fluid
-        instead of container-xl) and the permanently-visible sidebar column
-        further down becomes a collapsed-by-default collapse pane spanning
-        the full row instead of a standing column, so every column-inch is
-        available to the page below. Every other docs page leaves
-        content_for(:wide_layout) unset, so this is false there and both
-        branches below fall through to the layout's original markup,
+        controller would have to set, or branching on the request path.
+        Wide mode used to fold the permanently-visible sidebar column into a
+        collapsed-by-default "Browse components" strip spanning the row,
+        rather than drop it outright, back when the sidebar's own "Design
+        editor" entry was the only way to reach this page. Now that the
+        navbar above carries both destinations (see editor_current, above),
+        the editor has no reason to render any docs-navigation surface at
+        all -- so wide mode is simpler than it was: the outer container
+        still drops its max-width (container-fluid instead of container-xl),
+        but the row below is just the content, full width, no sidebar
+        column and no collapse strip to open it. Every other docs page
+        leaves content_for(:wide_layout) unset, so this is false there and
+        the row keeps its ordinary sidebar/content(/contents) split,
         unchanged. %>
     <% wide_layout = content_for?(:wide_layout) %>
 
     <div class="docs-shell" style="--docs-header-height: <%= header_height %>;">
       <header class="docs-fixed-header fixed-top">
         <%= tabler_ui.navbar(brand: search_and_brand) do |navbar| %>
+          <% navbar.left do |nav| %>
+            <%# active: is passed explicitly rather than left to the
+                component's own current_page?(url) auto-detection --
+                "Documentation" would only auto-detect as current on the
+                index itself (root_path), not on every other documentation
+                page these two items are meant to cover between them. %>
+            <% nav.add "Documentation", url: root_path, active: !editor_current %>
+            <% nav.add "Editor", url: editor_path, active: editor_current %>
+          <% end %>
           <% navbar.right do |nav| %>
             <% nav.dark_mode_toggle %>
           <% end %>
@@ -111,31 +139,11 @@
           <div class="<%= wide_layout ? "container-fluid" : "container-xl" %>">
             <div class="row">
               <% if wide_layout %>
-                <%# Same collapse markup shared/_sidebar_category.html.erb uses for
-                    each category pane inside the sidebar itself -- data-bs-toggle
-                    ="collapse" / aria-expanded / aria-controls on the trigger,
-                    class="collapse" (no "show": this pane starts collapsed, unlike
-                    a category's default-open state) + data-controller=
-                    "tabler-ui--collapse" on the pane -- so the chevron rotation
-                    docs.css already defines for .docs-sidebar-toggle applies here
-                    for free, and there's no second collapse implementation to keep
-                    in sync with the first (rule 6). Spans the full row (col-12) so
-                    the toggle and, once opened, the sidebar itself, both read as a
-                    strip across the top of the page rather than a narrow column. %>
-                <div class="col-12 mb-3">
-                  <button type="button"
-                          class="docs-sidebar-toggle btn btn-link d-flex align-items-center gap-2 px-0 py-1 text-secondary text-uppercase fs-6 text-decoration-none collapsed"
-                          data-bs-toggle="collapse"
-                          data-bs-target="#docs-wide-sidebar"
-                          aria-expanded="false"
-                          aria-controls="docs-wide-sidebar">
-                    Browse components
-                    <%= tabler_ui.icon icon: "chevron-down", size: "sm", html: { class: "docs-sidebar-toggle-icon" } %>
-                  </button>
-                  <div id="docs-wide-sidebar" class="collapse" data-controller="tabler-ui--collapse">
-                    <%= render "tabler_ui/docs/shared/sidebar", current: @nav_current %>
-                  </div>
-                </div>
+                <%# No sidebar column here at all, not even a collapsed one --
+                    see wide_layout's own comment above for why that changed.
+                    Full row width (col-12), same "docs-content" class the
+                    ordinary branch's content column carries below, so
+                    anything scoped to that class (docs.css) still applies. %>
                 <div class="col-12 mb-4 docs-content">
                   <%= yield %>
                 </div>

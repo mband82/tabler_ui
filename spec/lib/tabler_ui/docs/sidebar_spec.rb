@@ -58,6 +58,18 @@ RSpec.describe "TablerUi::Docs sidebar", type: :request do
 
       expect(href).to eq("/ui/components/badge")
     end
+
+    # Used to be a top list-group entry alongside "Overview"/"HTML
+    # attributes" -- now the top navbar's own "Editor" item is this page's
+    # one link (see layout_chrome_spec.rb), so a second, sidebar-local link
+    # to the exact same page would be pure duplication rather than a second
+    # route to it.
+    it "no longer links to the design editor -- the top navbar carries that link instead" do
+      get "/ui/components/badge"
+
+      links = sidebar_links(response.body)
+      expect(links.map(&:text)).not_to include("Design editor")
+    end
   end
 
   describe "marking the current page" do
